@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas时间轴组件 - 演练场</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .description {
+            color: #ccc;
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .timeline-container {
+            position: relative;
+            background-color: rgba(30, 30, 40, 0.9);
+            border-radius: 8px;
+            overflow: hidden;
+            /* 隐藏容器滚动条 */
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #timelineCanvas {
+            display: block;
+            background-color: rgba(20, 20, 30, 0.9);
+            border-radius: 6px;
+            width: 100%;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: linear-gradient(to right, #4a00e0, #8e2de2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .snap-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .snap-toggle input {
+            width: 20px;
+            height: 20px;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #8e2de2;
+        }
+
+        .instructions ul {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 5px;
+        }
+
+        /* 右键菜单样式 */
+        .context-menu {
+            position: absolute;
+            background: #2A2A3A;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            min-width: 150px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(74, 0, 224, 0.5);
+        }
+
+        .context-menu-item.delete {
+            color: #FF6B6B;
+        }
+
+        /* 编辑模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #2A2A3A;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+            color: #8e2de2;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+
+            .control-group {
+                justify-content: center;
+            }
+        }
+
+        /* 纯 Canvas 展示模式样式覆盖 */
+        body {
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 0;
+            margin: 0;
+            background: transparent;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        header,
+        .controls,
+        .status,
+        .instructions {
+            display: none !important;
+        }
+
+        .timeline-container {
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            height: 100vh;
+            background: transparent;
+        }
+
+        #timelineCanvas {
+            border-radius: 0;
+            height: 100% !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Canvas时间轴组件</h1>
+            <p class="description">一个使用Canvas实现的时间轴，支持多轨道、事件块拖拽、吸附定位和防重叠功能</p>
+        </header>
+
+        <div class="timeline-container">
+            <canvas id="timelineCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <button id="addTrack">添加轨道</button>
+                <button id="removeTrack">删除轨道</button>
+                <button id="addEvent">添加事件块</button>
+                <button id="zoomIn">放大</button>
+                <button id="zoomOut">缩小</button>
+                <button id="resetTimeIndicator">重置时间指示器</button>
+                <button id="toggleDebug">🐛 开启调试</button>
+            </div>
+            <div class="control-group">
+                <button id="playTimeline">▶️ 播放</button>
+                <button id="pauseTimeline">⏸️ 暂停</button>
+                <button id="stopTimeline">⏹️ 停止</button>
+                <label style="margin-left: 10px;">
+                    速度: <input type="range" id="playSpeed" min="0.5" max="5" step="0.5" value="1" style="width: 100px;">
+                    <span id="speedValue">1x</span>
+                </label>
+            </div>
+            <div class="control-group">
+                <label>
+                    跳转到: <input type="number" id="jumpToTime" min="6" max="30" step="0.25" value="10"
+                        style="width: 80px; padding: 5px;">
+                    秒
+                </label>
+                <button id="jumpButton">跳转</button>
+            </div>
+        </div>
+
+        <div class="status">
+            <p>状态: <span id="statusText">就绪</span></p>
+        </div>
+
+        <div class="instructions">
+            <h3>使用说明</h3>
+            <ul>
+                <li>点击"添加轨道"按钮可以增加新的轨道</li>
+                <li>点击"删除轨道"按钮可以删除最后一个轨道</li>
+                <li><strong>点击"添加事件块"按钮可以在当前选中的轨道上添加新的事件块</strong></li>
+                <li><strong>点击事件块可以选中并高亮显示，同时触发点击回调</strong></li>
+                <li><strong style="color: #FFD700;">双击事件块可以在该位置切割成两个事件块</strong></li>
+                <li>拖拽事件块可以改变其在时间轴上的位置，支持跨轨道移动</li>
+                <li><strong style="color: #FFD700;">拖拽事件块的左右边缘可以调整事件的开始时间和持续时间</strong></li>
+                <li>拖拽时间指示器可以手动调整指示器位置</li>
+                <li>点击"重置时间指示器"可以将时间指示器重置到时间轴开始位置</li>
+                <li><strong style="color: #00FF00;">⏯️ 实时控制：</strong>使用播放/暂停/停止按钮控制时间指示器自动移动</li>
+                <li><strong style="color: #00FF00;">⚡ 速度调节：</strong>拖动速度滑块可以调整播放速度（0.5x - 5x）</li>
+                <li><strong style="color: #00FF00;">🎯 精准跳转：</strong>输入时间值点击"跳转"按钮，可以快速定位到指定时间（输入单位为小时）</li>
+                <li><strong style="color: #00FF00;">setTimeIndicator(seconds)：</strong>可在代码中调用此方法实时变更时间指示器位置（参数单位为秒）
+                </li>
+                <li>右键点击事件块可以打开操作菜单（编辑、导出、删除）</li>
+                <li><strong style="color: #00FF00;">智能吸附：</strong>低缩放级别使用分钟级吸附，高缩放级别（≥2.0）自动切换到秒级吸附，提供更精确的定位</li>
+                <li>启用"吸附到时间指示器"后,事件块会吸附到时间指示器位置</li>
+                <li>事件块会自动避免重叠，无法放置到已有事件块的位置</li>
+                <li><strong>滚轮滚动：</strong>在画布上滚动鼠标滚轮可以上下查看轨道</li>
+                <li><strong>Ctrl + 滚轮：</strong>按住 Ctrl 键并滚动可以缩放时间轴</li>
+                <li><strong style="color: #00FF00;">缩放级别 2.0-3.0：</strong>10分钟主刻度，2分钟次刻度，吸附精度2分钟</li>
+                <li><strong style="color: #00FF00;">缩放级别 3.0-5.0：</strong>5分钟主刻度，1分钟次刻度，吸附精度1分钟</li>
+                <li><strong style="color: #00FF00;">缩放级别 5.0-8.0：</strong>1分钟主刻度（HH:MM:SS），15秒次刻度，吸附精度15秒</li>
+                <li><strong style="color: #00FF00;">缩放级别 8.0-10.0：</strong>30秒主刻度（HH:MM:SS），10秒次刻度+标签，吸附精度10秒</li>
+                <li><strong style="color: #00FF00;">缩放级别 ≥10.0：</strong>10秒主刻度（HH:MM:SS），2秒次刻度+标签，吸附精度2秒</li>
+                <li><strong style="color: #FFD700;">防止标签重叠：</strong>自动检测标签间距，仅在有足够空间时显示，确保视觉清晰</li>
+                <li><strong>垂直滚动条：</strong>当轨道数量超出视图时，右侧会显示垂直滚动条</li>
+                <li><strong>横向滚动条：</strong>当缩放后时间轴宽度超出视图时，底部会显示横向滚动条</li>
+                <li><strong>拖动滚动条：</strong>可以点击并拖动滚动条手柄，或点击滚动条轨道快速跳转</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" id="editEvent">编辑事件</div>
+        <div class="context-menu-item" id="exportEvent">导出事件</div>
+        <div class="context-menu-item delete" id="deleteEvent">删除事件</div>
+    </div>
+
+    <!-- 编辑事件模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>编辑事件</h3>
+            <div class="form-group">
+                <label for="eventTitle">事件标题</label>
+                <input type="text" id="eventTitle" placeholder="输入事件标题">
+            </div>
+            <div class="form-group">
+                <label for="eventStart">开始时间 (秒)</label>
+                <input type="number" id="eventStart" min="0" max="24" step="0.25" placeholder="0-24">
+            </div>
+            <div class="form-group">
+                <label for="eventDuration">持续时间 (秒)</label>
+                <input type="number" id="eventDuration" min="0.25" max="24" step="0.25" placeholder="0.25-24">
+            </div>
+            <div class="form-group">
+                <label for="eventDescription">事件描述</label>
+                <textarea id="eventDescription" placeholder="输入事件描述（可选）"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelEdit">取消</button>
+                <button id="saveEvent">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 从构建输出导入
+        import { Timeline } from "./dist/index.mjs";
+        import { LightThemePlugin } from "./dist/builtin-plugin/LightThemePlugin.mjs";
+        import { ContextMenuPlugin } from "./dist/builtin-plugin/ContextMenuPlugin.mjs";
+        import { PerformanceOverlayPlugin } from "./dist/builtin-plugin/PerformanceOverlayPlugin.mjs";
+        import { EventMediaPlugin } from "./dist/builtin-plugin/EventMediaPlugin.mjs";
+        import { MutexGuardPlugin } from "./dist/builtin-plugin/MutexGuardPlugin.mjs";
+
+        let timeline;
+        // 初始化时间轴
+        document.addEventListener('DOMContentLoaded', () => {
+            // 自定义配置示例
+            timeline = new Timeline('timelineCanvas', {
+                canvasHeight: window.innerHeight,
+                // 时间范围配置（单位：秒，从0开始的相对时间，不是时间戳）
+                startTime: 0,               // 开始时间（秒，相对时间起点）
+                endTime: 3600,              // 结束时间（秒，1小时 = 3600秒）- 测试短时间范围
+                endPaddingTime: 60,          // 留白时间（秒），在结束时间后添加额外的留白区域，便于视觉效果和操作（默认0）
+                secondWidth: 0.022,         // 每秒宽度（像素），原 hourWidth: 80 换算为 80/3600 ≈ 0.022
+
+                // 轨道配置
+                trackHeight: 46,            // 轨道高度（默认80）
+                trackMargin: 10,            // 轨道间距（默认10）
+                firstTrackTopMargin: 16,    // 第一个轨道顶部边距（默认10）
+                timelineHeight: 60,         // 时间轴区域高度（默认60）
+
+                // 功能开关
+                enableEventResize: true,    // 启用事件块大小调整（默认true）
+                enableEventSplit: true,     // 启用事件块切割（默认true）
+                enableTimeIndicator: true,  // 启用时间指示器（默认true）
+                enableContextMenu: true,    // 启用右键菜单（默认true）
+                debug: false,               // 启用调试模式（默认false）
+
+                // 轨道自动管理
+                autoAddTrack: true,         // 拖动事件到最后轨道时自动新增轨道（默认true）
+                autoRemoveEmptyLastTrack: true,  // 最后轨道为空时自动删除（默认true）
+
+                // 事件块配置
+                minEventDuration: 0.25,     // 最小事件持续时间（秒，默认0.25=15分钟）
+                resizeHandleWidth: 8,       // 调整手柄宽度（像素，默认8）
+                minAutoFitZoom: 14.0,
+
+                // 持续时间标签配置
+                showEventDurationLabel: true,  // 选中事件时显示持续时间标签（默认true）
+
+                // 吸附配置
+                snapInterval: 15,           // 吸附间隔（分钟，默认15）
+                snapToSeconds: true,        // 启用秒级吸附（高缩放级别时自动切换）
+                secondPrecisionZoomThreshold: 1.0,  // 启用秒级精度的缩放阈值（默认2.0）
+
+                // 时间指示器配置
+                timeIndicatorWidth: 3,      // 时间指示器宽度（默认3）
+                timeIndicatorSnapThreshold: 5,  // 吸附阈值（像素，默认10）
+                timeIndicatorHeadSize: 10,  // 指示器头部大小（默认12）
+                timeIndicatorTriangleHeight: 6,  // 三角形高度（默认8）
+
+                // 自定义右键菜单项
+                contextMenuItems: [
+                    { type: 'edit', name: '✏️ 编辑' },
+                    { type: 'duplicate', name: '📋 复制' },
+                    { type: 'delete', name: '🗑️ 删除' },
+                    { type: 'export', name: '📤 导出' },
+                ],
+
+                // 自定义右键菜单样式
+                contextMenuStyle: {
+                    fontSize: 14,
+                    fontFamily: 'Arial, sans-serif',
+                    fontWeight: 'normal',
+                    padding: 10,
+                    itemHeight: 36,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    minWidth: 150,
+                },
+
+                // 事件文本样式配置
+                eventTextStyle: {
+                    titleFontSize: 'auto',      // 标题字体大小（'auto' 或数字）
+                    timeFontSize: 'auto',       // 时间字体大小（'auto' 或数字）
+                    titleFontFamily: 'Arial',   // 标题字体
+                    timeFontFamily: 'Arial',    // 时间字体
+                    titleFontWeight: 'bold',    // 标题粗细
+                    timeFontWeight: 'normal',   // 时间粗细
+                    titleColor: '#4E5969',           // 标题颜色（null使用默认）
+                    timeColor: null,            // 时间颜色（null使用默认）
+                    textAlign: 'left',          // 文本对齐方式
+                    verticalAlign: 'middle',    // 垂直对齐方式
+                    titleOffsetY: 5,            // 标题Y轴偏移
+                    timeOffsetY: 0,             // 时间Y轴偏移
+                    showTitle: true,            // 显示标题
+                    showTime: false,             // 显示时间
+                    minHeightForTitle: 40,      // 显示标题的最小高度
+                    minHeightForTime: 50,       // 显示时间的最小高度
+                },
+
+                // 事件块样式配置
+                eventBlockStyle: {
+                    borderRadius: 2,            // 圆角大小（像素，默认2）
+                    enableSelectionGlow: false, // 是否启用选中辉光效果（默认false）
+                },
+
+                // ===== 事件回调 =====
+                onEventAdd: (data) => {
+                    console.log('✅ 事件已添加:', data);
+                },
+                onEventUpdate: (data) => {
+                    console.log('🔄 事件已更新:', data);
+                },
+                onEventDelete: (data) => {
+                    console.log('🗑️ 事件已删除:', data);
+                },
+                onEventMove: (data) => {
+                    console.log('🔀 事件已移动:', data);
+                },
+                onEventClick: (data) => {
+                    console.log('👆 事件已点击:', data);
+                    console.log(`选中事件: ${data.event.title}`);
+                    console.log(`所在轨道: ${data.trackName}`);
+                    console.log(`时间范围: ${data.formattedTimeRange}`);
+                    console.log(`持续时长: ${data.event.duration} 秒`);
+                    if (data.event.description) {
+                        console.log(`描述: ${data.event.description}`);
+                    }
+                    // 访问自定义字段
+                    if (data.event.customData) {
+                        console.log('自定义数据:', data.event.customData);
+                    }
+                },
+                onEventEdit: (data) => {
+                    console.log('✏️ 事件已编辑:', data);
+                },
+                // 时间指示器高亮回调
+                onTimeIndicatorHighlight: (data) => {
+                    console.log('🔦 时间指示器高亮:', data);
+                },
+
+                // 右键菜单回调（Canvas菜单）
+                onContextMenu: (data) => {
+                    console.log('🖱️ 右键菜单触发:', data);
+                    console.log("菜单类型:", data.menuType);
+                    console.log("轨道索引:", data.trackIndex);
+                    console.log("事件索引:", data.eventIndex);
+                    console.log("事件对象:", data.event);
+
+                    // 根据菜单类型执行不同操作
+                    switch (data.menuType) {
+                        case "edit":
+                            console.log("📝 执行编辑操作");
+                            // 这里可以打开自定义的编辑对话框
+                            alert(`编辑事件: ${data.event.title}`);
+                            break;
+                        case "duplicate":
+                            console.log("📋 执行复制操作");
+                            // 复制事件
+                            timeline.addEvent(
+                                data.trackIndex,
+                                data.event.endTime,
+                                data.event.endTime + data.event.duration,
+                                data.event.title + ' (副本)',
+                                data.event.description,
+                                data.event.customData
+                            );
+                            break;
+                        case "delete":
+                            console.log("🗑️ 执行删除操作");
+                            if (confirm(`确定要删除事件 "${data.event.title}" 吗？`)) {
+                                timeline.deleteEvent(data.trackIndex, data.eventIndex);
+                            }
+                            break;
+                        case "export":
+                            console.log("📤 执行导出操作");
+                            // 导出事件数据为JSON
+                            const exportData = {
+                                title: data.event.title,
+                                startTime: data.event.startTime,
+                                endTime: data.event.endTime,
+                                duration: data.event.duration,
+                                description: data.event.description,
+                                customData: data.event.customData,
+                            };
+                            console.log('导出数据:', JSON.stringify(exportData, null, 2));
+                            alert('数据已导出到控制台');
+                            break;
+                    }
+                },
+
+                onTrackAdd: (track) => {
+                    console.log('➕ 轨道已添加:', track);
+                },
+                onTrackRemove: (track) => {
+                    console.log('➖ 轨道已删除:', track);
+                },
+                onTimeIndicatorMove: (data) => {
+                    console.log('⏰ 时间指示器已移动:', data);
+                },
+                onZoom: (data) => {
+                    console.log('🔍 缩放级别已改变:', data);
+                },
+
+                // 状态变化回调 - 监听内部状态文本变化
+                onStatusChange: (statusText) => {
+                    console.log('📊 状态:', statusText);
+                    // 更新 UI 显示
+                    const statusElement = document.getElementById('statusText');
+                    if (statusElement) {
+                        statusElement.textContent = statusText;
+                    }
+                }
+            });
+
+            // 通过插件加载主题、右键菜单与性能叠加
+            timeline.usePlugin(LightThemePlugin);
+            // timeline.usePlugin(ContextMenuPlugin());
+            timeline.usePlugin(PerformanceOverlayPlugin);
+            timeline.usePlugin(MutexGuardPlugin());
+            const N = 20000;
+            const data = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+                const t = i / 200;
+                data[i] = Math.sin(t) * 0.8 + Math.sin(t * 0.25) * 0.2;
+            }
+
+            // timeline.usePlugin(EventMediaPlugin());
+
+            // 加载示例数据（支持自定义字段）
+            timeline.loadData({
+                timeIndicatorPosition: 0,   // 时间指示器位置（秒）
+                tracks: [
+                    {
+                        events: [
+                            {
+                                startTime: 0,      // 开始时间（秒，从时间起点开始的相对时间）
+                                endTime: 900,      // 结束时间（秒，15分钟 = 900秒）
+                                title: "早班",
+                                description: "上午工作时段",
+                                customData: {
+                                    userId: "user_001",
+                                    priority: "high",
+                                    tags: ["重要", "会议"],
+                                    mutex: ["work"]
+                                },
+                                media: { images: [{ src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAUVBMVEUAAAD///8QEBAcHBwWFhYlJSUiIiIYGBgTExMeHh4ZGRkVFRUbGxsREREXFxcPDw8aGhoZGBlOTk5vb2+np6fNzc2tra2ioqKUlJRjY2O5ubmDg4Pz8/NjY2O+K7f0AAAAD3RSTlMAEBAgQEDAwICAv79cC1m7AAAANUlEQVQY02NgIBYQYGBgZGJiYlAQY2YQJmBkYGBg2P8DkQwMDJCMgQGkYgZGBgYQZ2RgYGBgAAKlGAJgSx1J6gAAAABJRU5ErkJggg==", fit: "contain", opacity: 0.35 }] }
+                            },
+                            {
+                                startTime: 1800,   // 开始时间（秒，30分钟）
+                                endTime: 3600,     // 结束时间（秒，1小时）
+                                title: "夜班",
+                                description: "夜间工作时段",
+                                customData: {
+                                    userId: "user_002",
+                                    priority: "normal",
+                                    overtime: true,
+                                    mutex: ["night"]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        events: [
+                            {
+                                startTime: 0,      // 开始时间（秒，从时间起点开始的相对时间）
+                                endTime: 900,      // 结束时间（秒，15分钟 = 900秒）
+                                title: "早班",
+                                description: "上午工作时段",
+                                readonly: true,
+                                customData: {
+                                    userId: "user_001",
+                                    priority: "high",
+                                    tags: ["重要", "会议"]
+                                },
+                                media: { waveform: { data, color: "#FF7F00", backgroundColor: "rgba(255,255,255,0.03)", opacity: 0.5 } }
+                            },
+                            {
+                                startTime: 1200,
+                                endTime: 2100,
+                                title: "互斥示例",
+                                description: "与标签为 work 的事件互斥",
+                                customData: { mutex: ["work"] }
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            // ===== 按钮功能绑定 =====
+
+            // 添加轨道
+            document.getElementById('addTrack')?.addEventListener('click', () => {
+                timeline.addTrack();
+                console.log('✅ 添加了新轨道');
+            });
+
+            // 删除轨道
+            document.getElementById('removeTrack')?.addEventListener('click', () => {
+                timeline.removeTrack();
+                console.log('🗑️ 删除了最后一个轨道');
+            });
+
+            // 添加事件块
+            document.getElementById('addEvent')?.addEventListener('click', () => {
+                // 在当前选中轨道的合适位置添加事件
+                const trackIndex = timeline.state?.selectedTrack || 0;
+                const startTime = timeline.state?.timeIndicatorPosition || timeline.config.startTime;
+                const duration = 100; // 默认持续100秒
+                const endTime = startTime + duration;
+
+                // 生成随机标题
+                const eventTitles = ['会议', '任务', '休息', '培训', '评审', '开发', '测试'];
+                const randomTitle = eventTitles[Math.floor(Math.random() * eventTitles.length)];
+                const eventNumber = (timeline.state?.tracks[trackIndex]?.events.length || 0) + 1;
+
+                const success = timeline.addEvent(
+                    trackIndex,
+                    startTime,
+                    endTime,
+                    // `${randomTitle} ${eventNumber}`,
+                    '自动生成的事件',
+                    {
+                        autoGenerated: true,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+
+                if (success) {
+                    console.log(`✅ 在轨道 ${trackIndex} 添加了事件: ${randomTitle} ${eventNumber}`);
+                } else {
+                    console.warn('⚠️ 无法添加事件，可能存在时间冲突', success);
+                }
+            });
+
+            // 放大
+            document.getElementById('zoomIn')?.addEventListener('click', () => {
+                timeline.zoom(1.2); // 放大20%
+                console.log('🔍 放大视图');
+            });
+
+            // 缩小
+            document.getElementById('zoomOut')?.addEventListener('click', () => {
+                timeline.zoom(0.8); // 缩小20%
+                console.log('🔍 缩小视图');
+            });
+
+            // 重置时间指示器
+            document.getElementById('resetTimeIndicator')?.addEventListener('click', () => {
+                const success = timeline.setTimeIndicator(timeline.config.startTime);
+                if (success) {
+                    console.log('⏰ 时间指示器已重置到起始位置');
+                }
+            });
+
+            // 切换调试模式
+            document.getElementById('toggleDebug')?.addEventListener('click', (e) => {
+                timeline.config.debug = !timeline.config.debug;
+                const btn = e.target;
+
+                btn.textContent = timeline.config.debug ? '🐛 关闭调试' : '🐛 开启调试';
+                btn.style.background = timeline.config.debug ? 'linear-gradient(to right, #00FF00, #00CC00)' : 'linear-gradient(to right, #4a00e0, #8e2de2)';
+                console.log(timeline.config.debug ? '✅ 调试模式已开启 - 性能报告将显示在画布上层' : '❌ 调试模式已关闭');
+
+                timeline.draw();
+            });
+
+            // ===== 时间指示器实时控制功能 =====
+            let playInterval = null;
+            let playSpeed = 1; // 播放速度倍数
+
+            // 播放按钮
+            document.getElementById('playTimeline')?.addEventListener('click', () => {
+                if (playInterval) {
+                    console.log('⚠️ 已经在播放中');
+                    return;
+                }
+
+                console.log('▶️ 开始播放时间指示器');
+                // 每100ms更新一次，每次移动 playSpeed 秒
+                // 1x速度 = 每100ms移动1秒（实时播放）
+                playInterval = setInterval(() => {
+                    let currentTime = timeline.state.timeIndicatorPosition;
+                    // 每100ms移动 playSpeed 秒
+                    let newTime = currentTime + playSpeed;
+
+                    // 如果超出范围，循环回到开始
+                    if (newTime >= timeline.config.endTime) {
+                        newTime = timeline.config.startTime;
+                    }
+
+                    timeline.setTimeIndicator(newTime);
+                }, 100);  // 100ms更新一次，视觉流畅
+            });
+
+            // 暂停按钮
+            document.getElementById('pauseTimeline')?.addEventListener('click', () => {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    console.log('⏸️ 暂停播放');
+                } else {
+                    console.log('⚠️ 当前未在播放');
+                }
+            });
+
+            // 停止按钮
+            document.getElementById('stopTimeline')?.addEventListener('click', () => {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                }
+                timeline.setTimeIndicator(timeline.config.startTime);
+                console.log('⏹️ 停止播放并重置');
+            });
+
+            // 速度滑块
+            document.getElementById('playSpeed')?.addEventListener('input', (e) => {
+                playSpeed = parseFloat(e.target.value);
+                document.getElementById('speedValue').textContent = `${playSpeed}x`;
+                console.log(`⚡ 播放速度设置为: ${playSpeed}x`);
+            });
+
+            // 跳转按钮
+            document.getElementById('jumpButton')?.addEventListener('click', () => {
+                const jumpInput = document.getElementById('jumpToTime');
+                const targetSeconds = parseFloat(jumpInput.value) * 3600; // 输入的是小时，转换为秒
+
+                if (isNaN(targetSeconds)) {
+                    console.warn('⚠️ 请输入有效的时间值');
+                    return;
+                }
+
+                // 限制在有效范围内
+                const clampedSeconds = Math.max(
+                    timeline.config.startTime,
+                    Math.min(timeline.config.endTime, targetSeconds)
+                );
+
+                timeline.setTimeIndicator(clampedSeconds);
+                console.log(`🎯 跳转到: ${timeline.formatTime(clampedSeconds)}`);
+            });
+
+            // 支持回车键跳转
+            document.getElementById('jumpToTime')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('jumpButton').click();
+                }
+            });
+            setTimeout(() => {
+                timeline.setEndTime(9000)
+            }, 2000)
+
+            // 页面卸载时清理定时器
+            window.addEventListener('beforeunload', () => {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                }
+            });
+
+            // 监听窗口大小变化，调整 Canvas 高度
+            window.addEventListener('resize', () => {
+                if (timeline) {
+                    // 注意：Timeline 目前没有公开的 setHeight 方法，这里重新设置 canvas 尺寸可能需要内部支持
+                    // 但我们可以尝试重新初始化或者如果 Timeline 支持响应式
+                    // 假设 Timeline 内部处理了 resize 或者我们需要手动处理
+                    // 这里简单地刷新页面或者不做处理，因为 iframe 大小通常固定
+                    // 如果 Timeline 有 setCanvasSize 方法：
+                    // timeline.setCanvasSize(window.innerWidth, window.innerHeight);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
