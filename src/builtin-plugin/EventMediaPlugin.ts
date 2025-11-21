@@ -1,0 +1,1 @@
+export { EventMediaPlugin } from "../plugins/builtin/EventMediaPlugin";

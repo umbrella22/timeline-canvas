@@ -1,0 +1,47 @@
+{
+  "name": "timeline-canvas",
+  "version": "1.0.0",
+  "description": "A powerful timeline component built with Canvas and TypeScript",
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "oxlint src",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs:dev": "rspress dev",
+    "docs:build": "rspress build",
+    "docs:preview": "rspress preview"
+  },
+  "keywords": [
+    "timeline",
+    "canvas",
+    "typescript",
+    "event-timeline",
+    "visual-timeline"
+  ],
+  "author": "sky <https://github.com/umbrella22>",
+  "license": "MIT",
+  "packageManager": "pnpm@10.18.1",
+  "devDependencies": {
+    "oxlint": "^1.29.0",
+    "rspress": "^2.0.0-beta.21",
+    "tsdown": "^0.16.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "immer": "^10.1.1"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  }
+}

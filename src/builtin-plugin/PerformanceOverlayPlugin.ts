@@ -1,0 +1,1 @@
+export { PerformanceOverlayPlugin } from "../plugins/builtin/PerformanceOverlayPlugin";
