@@ -50,7 +50,7 @@ export class IdleState extends BaseState {
       return null;
     }
 
-    // 1. 处理上下文菜单点击
+    // 处理上下文菜单点击
     if (state.contextMenuVisible) {
       const menuBounds = state.contextMenuBounds;
       if (menuBounds) {
@@ -111,7 +111,7 @@ export class IdleState extends BaseState {
       }
     }
 
-    // 2. 检查垂直滚动条
+    // 检查垂直滚动条
     const contentHeight =
       config.timelineHeight +
       config.firstTrackTopMargin +
@@ -144,7 +144,7 @@ export class IdleState extends BaseState {
       }
     }
 
-    // 3. 检查水平滚动条
+    // 检查水平滚动条
     const contentWidth = this.timeline.getContentWidthForZoom(state.zoomLevel);
     if (contentWidth > canvasWidth) {
       const scrollbarHeight = 8;
@@ -171,7 +171,7 @@ export class IdleState extends BaseState {
       }
     }
 
-    // 4. 检查时间指示器
+    // 检查时间指示器
     if (config.enableTimeIndicator && !isReadOnly) {
       const timeIndicatorX = getTimeX(
         state.timeIndicatorPosition,
@@ -198,21 +198,11 @@ export class IdleState extends BaseState {
       }
     }
 
-    // 5. 如果点击在时间轴区域,不处理
+    // 如果点击在时间轴区域,不处理
     if (logicalY < config.timelineHeight) return null;
 
-    // 6. 只读模式:清除选择
-    if (isReadOnly) {
-      state.selectedEvent = null;
-      state.highlightedEvent = null;
-      state.selectedTrack = null;
-      state.isManualSelection = false;
-      this.timeline.draw();
-      return null;
-    }
-
-    // 7. 检查是否点击了事件的调整手柄
-    if (config.enableEventResize) {
+    // 检查是否点击了事件的调整手柄
+    if (config.enableEventResize && !isReadOnly) {
       const handle = this.timeline.getResizeHandle(logicalX, logicalY);
       if (handle) {
         const event = state.tracks[handle.trackIndex].events[handle.eventIndex];
@@ -275,8 +265,8 @@ export class IdleState extends BaseState {
       state.highlightedEvent = null;
       state.selectedTrack = null;
 
-      // 只读事件:仅选中,不拖拽
-      if (event.readonly) {
+      // 只读事件或全局只读模式:仅选中,不拖拽
+      if (event.readonly || isReadOnly) {
         this.timeline.setStatus(`已选中: ${event.title}`);
         if (this.timeline.callbacks.onEventHighlight) {
           this.timeline.callbacks.onEventHighlight({
@@ -508,8 +498,8 @@ export class IdleState extends BaseState {
     if (hoveredEvent) {
       const { trackIndex, eventIndex } = hoveredEvent;
       const event = state.tracks[trackIndex].events[eventIndex];
-      canvas.style.cursor =
-        config.readOnly || event.readonly ? "not-allowed" : "pointer";
+      // 只读模式下仍然可以点击选中，所以显示 pointer
+      canvas.style.cursor = "pointer";
       this.timeline.setStatus(
         `${event.title} (${this.timeline.formatTime(
           event.startTime
