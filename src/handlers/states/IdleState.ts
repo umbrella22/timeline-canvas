@@ -235,7 +235,7 @@ export class IdleState extends BaseState {
     }
 
     // 8. 检查是否点击了事件
-    const clickedEvent = this.timeline.getEventAtPosition(logicalX, logicalY);
+    const clickedEvent = this.timeline.getEventAtPosition(canvasX, canvasY);
     if (clickedEvent) {
       const { trackIndex, eventIndex } = clickedEvent;
       const event = state.tracks[trackIndex].events[eventIndex];
@@ -504,7 +504,7 @@ export class IdleState extends BaseState {
     }
 
     // 4. 事件悬停
-    const hoveredEvent = this.timeline.getEventAtPosition(logicalX, logicalY);
+    const hoveredEvent = this.timeline.getEventAtPosition(canvasX, canvasY);
     if (hoveredEvent) {
       const { trackIndex, eventIndex } = hoveredEvent;
       const event = state.tracks[trackIndex].events[eventIndex];
@@ -525,7 +525,7 @@ export class IdleState extends BaseState {
 
   handleContextMenu(ctx: MouseEventContext): InteractionState | null {
     ctx.originalEvent.preventDefault();
-    const { logicalX, logicalY, canvasX, canvasY } = ctx;
+    const { canvasX, canvasY } = ctx;
     const config = this.timeline.config;
     const state = this.timeline.state;
 
@@ -538,7 +538,7 @@ export class IdleState extends BaseState {
       return null;
     }
 
-    const clickedEvent = this.timeline.getEventAtPosition(logicalX, logicalY);
+    const clickedEvent = this.timeline.getEventAtPosition(canvasX, canvasY);
     if (clickedEvent) {
       const { trackIndex, eventIndex } = clickedEvent;
       state.contextMenuEvent = { trackIndex, eventIndex };

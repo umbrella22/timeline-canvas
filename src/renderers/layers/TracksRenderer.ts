@@ -61,7 +61,8 @@ export class TracksRenderer implements Renderer {
         i,
         trackY,
         canvas,
-        pluginManager
+        pluginManager,
+        width
       );
     }
   }

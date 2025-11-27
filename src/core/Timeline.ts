@@ -969,6 +969,7 @@ export class Timeline {
       mouseTime,
       0
     );
+
     if (candidates.length > 0) {
       candidates.sort((a, b) => b - a);
       for (const eventIndex of candidates) {
@@ -981,7 +982,10 @@ export class Timeline {
           this.state.scrollX;
         const eventWidth =
           event.duration * this.config.secondWidth * this.state.zoomLevel;
-        if (x >= eventX && x <= eventX + eventWidth) {
+
+        const isInRange = x >= eventX && x <= eventX + eventWidth;
+
+        if (isInRange) {
           return { trackIndex, eventIndex };
         }
       }

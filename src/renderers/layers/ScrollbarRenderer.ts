@@ -23,9 +23,10 @@ export class ScrollbarRenderer implements Renderer {
     height: number
   ): void {
     const contentWidth =
+      config.startPaddingTime +
       (config.endTime + config.endPaddingTime - config.startTime) *
-      config.secondWidth *
-      state.zoomLevel;
+        config.secondWidth *
+        state.zoomLevel;
     const hasHorizontalScrollbar = contentWidth > width;
     const horizontalScrollbarPadding = hasHorizontalScrollbar ? 13 : 0;
 
@@ -107,9 +108,10 @@ export class ScrollbarRenderer implements Renderer {
     height: number
   ): void {
     const contentWidth =
+      config.startPaddingTime +
       (config.endTime + config.endPaddingTime - config.startTime) *
-      config.secondWidth *
-      state.zoomLevel;
+        config.secondWidth *
+        state.zoomLevel;
     if (contentWidth <= width) return;
 
     const contentHeight =

@@ -29,12 +29,10 @@ export class ScrollingState extends BaseState {
         config.firstTrackTopMargin +
         state.tracks.length * (config.trackHeight + config.trackMargin);
       const contentWidth =
-        (config.startPaddingTime +
-          config.endTime +
-          config.endPaddingTime -
-          config.startTime) *
-        config.secondWidth *
-        state.zoomLevel;
+        config.startPaddingTime +
+        (config.endTime + config.endPaddingTime - config.startTime) *
+          config.secondWidth *
+          state.zoomLevel;
       const hasHorizontalScrollbar = contentWidth > canvasWidth;
       const horizontalScrollbarPadding = hasHorizontalScrollbar ? 13 : 0;
       const availableHeight = canvasHeight - horizontalScrollbarPadding;
@@ -58,12 +56,10 @@ export class ScrollingState extends BaseState {
     // 水平滚动条拖拽
     if (state.draggingHorizontalScrollbar) {
       const hContentWidth =
-        (config.startPaddingTime +
-          config.endTime +
-          config.endPaddingTime -
-          config.startTime) *
-        config.secondWidth *
-        state.zoomLevel;
+        config.startPaddingTime +
+        (config.endTime + config.endPaddingTime - config.startTime) *
+          config.secondWidth *
+          state.zoomLevel;
       const scrollbarTrackWidth = canvasWidth;
       const viewportRatio = canvasWidth / hContentWidth;
       const handleWidth = Math.max(30, scrollbarTrackWidth * viewportRatio);

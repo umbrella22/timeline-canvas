@@ -1,6 +1,6 @@
 {
   "name": "timeline-canvas",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A powerful timeline component built with Canvas and TypeScript",
   "main": "dist/index.mjs",
   "module": "dist/index.mjs",

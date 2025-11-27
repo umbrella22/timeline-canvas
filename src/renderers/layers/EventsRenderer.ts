@@ -18,8 +18,10 @@ export class EventsRenderer {
     trackIndex: number,
     trackY: number,
     canvas: HTMLCanvasElement,
-    pluginManager?: PluginManager
+    pluginManager?: PluginManager,
+    canvasLogicalWidth?: number
   ): void {
+    const logicalWidth = canvasLogicalWidth ?? canvas.width;
     const track = state.tracks[trackIndex];
     const eventVerticalPadding = Math.max(5, config.trackHeight * 0.0625);
     const eventHeight = config.trackHeight - eventVerticalPadding * 2;
@@ -47,7 +49,7 @@ export class EventsRenderer {
           state.zoomLevel -
         state.scrollX;
       const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
-      if (eventX + eventWidth < 0 || eventX > canvas.width) continue;
+      if (eventX + eventWidth < 0 || eventX > logicalWidth) continue;
       const isSelected =
         state.selectedEvent &&
         state.selectedEvent.trackIndex === trackIndex &&
