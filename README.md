@@ -2,6 +2,8 @@
 
 A powerful, high-performance timeline component built with HTML5 Canvas and TypeScript.
 
+[document Chinese Only](https://umbrella22.github.io/timeline-canvas/index.html)
+
 ## Features
 
 - 🚀 **High Performance**: Built with Canvas API for smooth rendering of large datasets.
