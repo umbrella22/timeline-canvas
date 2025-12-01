@@ -36,6 +36,8 @@ interface TimelineConfig {
   // 事件配置
   minEventDuration: number;
   resizeHandleWidth: number;
+  showEventDurationLabel: boolean;
+  formatEventDuration: ((duration: number) => string) | null;
 
   // 自动缩放
   autoFitOnInit: boolean;

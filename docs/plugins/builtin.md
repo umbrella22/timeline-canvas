@@ -7,6 +7,7 @@ Timeline Canvas 提供了多个内置插件，可以通过 `timeline.usePlugin()
 ### [基础插件](#基础插件)
 
 - [ContextMenuPlugin](#contextmenuplugin) - 右键菜单插件
+- [EventTooltipPlugin](#eventtooltipplugin) - 事件提示插件
 - [LightThemePlugin](#lightthemeplugin) - 亮色主题插件
 - [DarkThemePlugin](#darkthemeplugin) - 暗色主题插件
 - [PerformanceOverlayPlugin](#performanceoverlayplugin) - 性能监控插件
@@ -65,6 +66,35 @@ timeline.usePlugin(
   })
 );
 // 菜单项内容目前主要通过 TimelineConfig.contextMenuItems 配置
+```
+
+---
+
+### EventTooltipPlugin
+
+事件提示插件，当鼠标悬停在事件上时显示详细信息。
+
+#### 基本用法
+
+```javascript
+import { EventTooltipPlugin } from "timeline-canvas/plugins";
+
+timeline.usePlugin(EventTooltipPlugin());
+```
+
+#### 配置选项
+
+```javascript
+timeline.usePlugin(
+  EventTooltipPlugin({
+    showDelay: 300, // 显示延迟（毫秒）
+    maxWidth: 300, // 最大宽度
+    backgroundColor: "#333", // 背景色
+    textColor: "#fff", // 文字颜色
+    // 自定义 HTML 模板
+    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+  })
+);
 ```
 
 ---
@@ -227,3 +257,50 @@ timeline.loadData({
   ],
 });
 ```
+
+---
+
+## 功能插件
+
+### MutexGuardPlugin
+
+事件互斥插件，防止同一互斥组的事件在时间上重叠。
+
+#### 基本用法
+
+```javascript
+import { MutexGuardPlugin } from "timeline-canvas/plugins";
+
+timeline.usePlugin(MutexGuardPlugin());
+```
+
+#### 配置互斥组
+
+在事件的 `customData` 中设置 `mutex` 属性，指定该事件所属的互斥组。
+
+```javascript
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 100,
+          title: "任务A",
+          customData: { mutex: ["group1"] }, // 属于 group1
+        },
+        {
+          startTime: 50,
+          endTime: 150,
+          title: "任务B",
+          customData: { mutex: ["group1"] }, // 也属于 group1，将无法放置在与任务A重叠的位置
+        },
+      ],
+    },
+  ],
+});
+```
+
+#### 工作原理
+
+当用户尝试移动或调整事件大小时，插件会检查目标位置是否与同一互斥组的其他事件重叠。如果重叠，操作将被阻止或回滚。

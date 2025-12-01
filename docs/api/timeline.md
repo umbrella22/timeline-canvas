@@ -81,6 +81,30 @@ timeline.updateEvent(0, 1, {
 timeline.deleteEvent(0, 1);
 ```
 
+#### addTrack()
+
+添加一个新的空轨道。
+
+```javascript
+timeline.addTrack();
+```
+
+#### removeTrack()
+
+移除最后一个轨道。
+
+```javascript
+timeline.removeTrack();
+```
+
+#### autoRemoveEmptyLastTrack()
+
+自动移除最后一个空轨道（如果存在）。
+
+```javascript
+timeline.autoRemoveEmptyLastTrack();
+```
+
 #### setEndTime(endTime: number)
 
 设置时间轴结束时间（秒）。
@@ -122,6 +146,34 @@ timeline.zoom(0.8); // 缩小 20%
 
 ```javascript
 timeline.setTimeIndicator(18000);
+```
+
+#### setCanvasSize(width: number, height: number)
+
+设置画布尺寸。
+
+```javascript
+timeline.setCanvasSize(800, 600);
+```
+
+#### adjustCanvasSize()
+
+根据容器大小自动调整画布尺寸。
+
+```javascript
+timeline.adjustCanvasSize();
+```
+
+#### markDirty(layerIds?: string[])
+
+标记画布图层为脏，触发重绘。如果不指定图层，将重绘所有图层。
+
+```javascript
+// 重绘所有图层
+timeline.markDirty();
+
+// 仅重绘特定图层
+timeline.markDirty(["tracks", "indicator"]);
 ```
 
 ### 插件管理
@@ -168,6 +220,16 @@ await timeline.setTheme("light");
 ```javascript
 const plugins = timeline.getLoadedPlugins();
 console.log("已加载插件:", plugins);
+```
+
+#### isPluginLoaded(pluginName: string): boolean
+
+检查插件是否已加载。
+
+```javascript
+if (timeline.isPluginLoaded("performance-overlay")) {
+  console.log("性能监控插件已加载");
+}
 ```
 
 ### 事件监听

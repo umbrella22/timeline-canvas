@@ -395,3 +395,24 @@ function generateLargeDataset(eventCount) {
   return { events };
 }
 ```
+
+## 批量操作优化
+
+当需要一次性添加或修改大量事件时，频繁触发索引更新可能会影响性能。Timeline Canvas 提供了批量操作 API 来优化这种情况。
+
+### 批量更新索引
+
+使用 `beginIndexBatch()` 和 `endIndexBatch()` 来暂停和恢复索引更新。
+
+```javascript
+// 开始批量操作
+timeline.beginIndexBatch();
+
+// 执行大量操作
+for (let i = 0; i < 1000; i++) {
+  timeline.addEvent(0, i * 100, i * 100 + 50, `Event ${i}`);
+}
+
+// 结束批量操作，触发一次性索引重建
+timeline.endIndexBatch();
+```

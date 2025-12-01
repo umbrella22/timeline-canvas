@@ -26,10 +26,16 @@
   "license": "MIT",
   "packageManager": "pnpm@10.18.1",
   "devDependencies": {
-    "oxlint": "^1.29.0",
+    "@rsbuild/plugin-vue": "^1.2.0",
+    "@rspress/plugin-preview": "^1.46.2",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "oxlint": "^1.30.0",
+    "react": "^19.2.0",
     "rspress": "^2.0.0-beta.21",
-    "tsdown": "^0.16.6",
-    "typescript": "^5.9.3"
+    "tsdown": "^0.16.8",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.25"
   },
   "dependencies": {
     "immer": "^10.1.1"

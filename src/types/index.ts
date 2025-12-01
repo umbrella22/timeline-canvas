@@ -137,7 +137,9 @@ export interface TimelineCallbacks {
   onZoom?: ((data: ZoomData) => void) | null;
   onStatusChange?: ((statusText: string) => void) | null;
   onEventHighlight?: ((data: EventHighlightData) => void) | null;
-  onTimeIndicatorHighlight?: ((data: TimeIndicatorHighlightData) => void) | null;
+  onTimeIndicatorHighlight?:
+    | ((data: TimeIndicatorHighlightData) => void)
+    | null;
 }
 
 export interface TimelineEvent {
@@ -151,8 +153,17 @@ export interface TimelineEvent {
   readonly?: boolean;
   customData?: Record<string, any>;
   media?: {
-    images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
-    waveform?: { data: Float32Array | number[]; color?: string; backgroundColor?: string; opacity?: number };
+    images?: Array<{
+      src: string;
+      fit?: "cover" | "contain" | "stretch";
+      opacity?: number;
+    }>;
+    waveform?: {
+      data: Float32Array | number[];
+      color?: string;
+      backgroundColor?: string;
+      opacity?: number;
+    };
   };
 }
 
@@ -256,7 +267,14 @@ export interface TimelineState {
   lastClickEvent: SelectedEvent | null;
   hoveredSplitLine: HoveredSplitLine | null;
   statusText: string;
-  contextMenuBounds: { x: number; y: number; width: number; height: number; itemHeight: number; padding: number } | null;
+  contextMenuBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    itemHeight: number;
+    padding: number;
+  } | null;
   lastDrawTime: number;
 }
 
@@ -322,12 +340,40 @@ export interface EventHighlightData {
 
 export interface TimeIndicatorHighlightData {
   position: number;
-  highlightedEvents: Array<{ trackIndex: number; eventIndex: number; event: TimelineEvent }>;
+  highlightedEvents: Array<{
+    trackIndex: number;
+    eventIndex: number;
+    event: TimelineEvent;
+  }>;
 }
 
 export interface LoadDataFormat {
   timeIndicatorPosition?: number;
-  tracks: Array<{ events: Array<{ startTime?: number; endTime?: number; duration?: number; title: string; description?: string; color?: string; readonly?: boolean; customData?: Record<string, any> }> }>;
+  tracks: Array<{
+    events: Array<{
+      startTime?: number;
+      endTime?: number;
+      duration?: number;
+      title: string;
+      description?: string;
+      color?: string;
+      readonly?: boolean;
+      customData?: Record<string, any>;
+      media?: {
+        images?: Array<{
+          src: string;
+          fit?: "cover" | "contain" | "stretch";
+          opacity?: number;
+        }>;
+        waveform?: {
+          data: Float32Array | number[];
+          color?: string;
+          backgroundColor?: string;
+          opacity?: number;
+        };
+      };
+    }>;
+  }>;
 }
 
 import type { TimelinePlugin } from "../plugins/types";

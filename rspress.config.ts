@@ -1,4 +1,6 @@
 import { defineConfig } from "rspress/config";
+import { pluginPreview } from "@rspress/plugin-preview";
+import { pluginVue } from "@rsbuild/plugin-vue";
 
 export default defineConfig({
   base: "/timeline-canvas/",
@@ -28,4 +30,30 @@ export default defineConfig({
       "/api/": [{ text: "Timeline API", link: "/api/timeline" }],
     },
   },
+  plugins: [
+    pluginPreview({
+      iframeOptions: {
+        customEntry: ({ entryCssPath, demoPath }) => {
+          if (demoPath.endsWith(".vue")) {
+            return `
+              import { createApp } from 'vue';
+              import App from ${JSON.stringify(demoPath)};
+              import ${JSON.stringify(entryCssPath)};
+              createApp(App).mount('#root');
+              `;
+          }
+          return `
+            import { render } from 'react-dom';
+            import ${JSON.stringify(entryCssPath)};
+            import Demo from ${JSON.stringify(demoPath)};
+            render(<Demo />, document.getElementById('root'));
+            `;
+        },
+        builderConfig: {
+          plugins: [pluginVue()],
+        },
+      },
+      previewLanguages: ["jsx", "tsx", "vue"],
+    }),
+  ],
 });
