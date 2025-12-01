@@ -23,11 +23,53 @@ export default defineConfig({
         { text: "配置项", link: "/guide/configuration" },
       ],
       "/plugins/": [
-        { text: "内置插件", link: "/plugins/builtin" },
-        { text: "插件开发", link: "/plugins/plugin-development" },
+        {
+          text: "插件机制",
+          items: [
+            { text: "介绍", link: "/plugins/plugin-development/index" },
+            { text: "核心 API", link: "/plugins/plugin-development/api" },
+            { text: "生命周期", link: "/plugins/plugin-development/lifecycle" },
+            { text: "事件系统", link: "/plugins/plugin-development/events" },
+            { text: "渲染机制", link: "/plugins/plugin-development/rendering" },
+            { text: "编写插件", link: "/plugins/plugin-development/example" },
+            {
+              text: "最佳实践",
+              link: "/plugins/plugin-development/best-practices",
+            },
+            { text: "高级主题", link: "/plugins/plugin-development/advanced" },
+          ],
+        },
+        {
+          text: "内置插件",
+          items: [
+            { text: "总览", link: "/plugins/builtin/index" },
+            { text: "右键菜单", link: "/plugins/builtin/context-menu" },
+            { text: "事件提示", link: "/plugins/builtin/event-tooltip" },
+            { text: "亮色主题", link: "/plugins/builtin/light-theme" },
+            { text: "暗色主题", link: "/plugins/builtin/dark-theme" },
+            {
+              text: "性能监控",
+              link: "/plugins/builtin/performance-overlay",
+            },
+            { text: "事件媒体", link: "/plugins/builtin/event-media" },
+            { text: "事件互斥", link: "/plugins/builtin/mutex-guard" },
+          ],
+        },
       ],
       "/advanced/": [{ text: "性能与监控", link: "/advanced/performance" }],
-      "/api/": [{ text: "Timeline API", link: "/api/timeline" }],
+      "/api/": [
+        {
+          text: "Timeline API",
+          items: [
+            { text: "总览", link: "/api/timeline/index" },
+            { text: "数据管理", link: "/api/timeline/data-management" },
+            { text: "视图控制", link: "/api/timeline/view-control" },
+            { text: "插件管理", link: "/api/timeline/plugin-management" },
+            { text: "事件监听", link: "/api/timeline/event-listeners" },
+            { text: "类型定义", link: "/api/timeline/types" },
+          ],
+        },
+      ],
     },
   },
   plugins: [
