@@ -1,4 +1,4 @@
-import { t as TimelinePlugin } from "./types-CROJcXg0.mjs";
+import { t as TimelinePlugin } from "./types-Bw8z85-n.mjs";
 
 //#region src/plugins/builtin/ContextMenuPlugin.d.ts
 interface ContextMenuPluginOptions {
