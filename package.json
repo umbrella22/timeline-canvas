@@ -1,6 +1,6 @@
 {
   "name": "timeline-canvas",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "description": "A powerful timeline component built with Canvas and TypeScript",
   "main": "dist/index.mjs",
   "module": "dist/index.mjs",
@@ -48,6 +48,10 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./builtin-plugin/*": {
+      "types": "./dist/builtin-plugin/*.d.mts",
+      "import": "./dist/builtin-plugin/*.mjs"
     }
   }
 }

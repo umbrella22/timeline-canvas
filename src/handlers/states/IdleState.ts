@@ -267,6 +267,7 @@ export class IdleState extends BaseState {
 
       // 只读事件或全局只读模式:仅选中,不拖拽
       if (event.readonly || isReadOnly) {
+        canvas.style.cursor = "not-allowed";
         this.timeline.setStatus(`已选中: ${event.title}`);
         if (this.timeline.callbacks.onEventHighlight) {
           this.timeline.callbacks.onEventHighlight({

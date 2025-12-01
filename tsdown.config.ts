@@ -1,5 +1,5 @@
 import { defineConfig, type UserConfig } from "tsdown";
-import { cpSync, existsSync } from "node:fs";
+import { cpSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const commonOptions: UserConfig = {
@@ -9,20 +9,27 @@ const commonOptions: UserConfig = {
   target: "node20",
 };
 
+const BUILTIN_PLUGIN_DIR = "src/builtin-plugin";
+
+const getBuiltinPluginEntries = (): string[] => {
+  const pluginDir = resolve(__dirname, BUILTIN_PLUGIN_DIR);
+  if (!existsSync(pluginDir)) {
+    console.warn(`[tsdown] Builtin plugin directory not found: ${pluginDir}`);
+    return [];
+  }
+
+  return readdirSync(pluginDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+    .map((entry) => `${BUILTIN_PLUGIN_DIR}/${entry.name}`)
+    .sort();
+};
+
 export default defineConfig(({ watch }) => {
   const isWatch = !!watch;
   return [
     {
       ...commonOptions,
-      entry: [
-        "src/index.ts",
-        "src/builtin-plugin/DarkThemePlugin.ts",
-        "src/builtin-plugin/LightThemePlugin.ts",
-        "src/builtin-plugin/ContextMenuPlugin.ts",
-        "src/builtin-plugin/PerformanceOverlayPlugin.ts",
-        "src/builtin-plugin/EventMediaPlugin.ts",
-        "src/builtin-plugin/MutexGuardPlugin.ts",
-      ],
+      entry: ["src/index.ts", ...getBuiltinPluginEntries()],
       outDir: "dist",
       sourcemap: isWatch,
       treeshake: !isWatch,
