@@ -333,6 +333,19 @@ interface LoadDataFormat {
       color?: string;
       readonly?: boolean;
       customData?: Record<string, any>;
+      media?: {
+        images?: Array<{
+          src: string;
+          fit?: "cover" | "contain" | "stretch";
+          opacity?: number;
+        }>;
+        waveform?: {
+          data: Float32Array | number[];
+          color?: string;
+          backgroundColor?: string;
+          opacity?: number;
+        };
+      };
     }>;
   }>;
 }

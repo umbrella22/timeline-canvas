@@ -1,3 +1,3 @@
-import "../types-CPmgMeTy.mjs";
-import { t as DarkThemePlugin } from "../DarkThemePlugin-D-cvAIEz.mjs";
+import "../types-CROJcXg0.mjs";
+import { t as DarkThemePlugin } from "../DarkThemePlugin-Dj18CJjw.mjs";
 export { DarkThemePlugin as DarkTheme, DarkThemePlugin };

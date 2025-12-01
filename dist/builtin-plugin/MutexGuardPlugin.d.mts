@@ -1,4 +1,4 @@
-import { t as TimelinePlugin } from "../types-CPmgMeTy.mjs";
+import { t as TimelinePlugin } from "../types-CROJcXg0.mjs";
 
 //#region src/plugins/builtin/MutexGuardPlugin.d.ts
 declare function MutexGuardPlugin(): TimelinePlugin;
