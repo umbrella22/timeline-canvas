@@ -2,6 +2,8 @@
 
 一个基于 HTML5 Canvas 和 TypeScript 构建的强大、高性能时间轴组件。
 
+[文档地址](https://umbrella22.github.io/timeline-canvas/index.html)
+
 ## 特性
 
 - 🚀 **高性能**: 基于 Canvas API 构建，可流畅渲染大量数据。
