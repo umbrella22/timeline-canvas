@@ -19,8 +19,8 @@ export class RenderPipeline {
   private renderers: Map<LayerType, Renderer> = new Map();
   private renderOrder: LayerType[] = [
     "background",
-    "timeline",
     "tracks",
+    "timeline",
     "guideLines",
     "indicator",
     "interaction",
