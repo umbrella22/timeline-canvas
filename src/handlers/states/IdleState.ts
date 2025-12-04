@@ -84,7 +84,7 @@ export class IdleState extends BaseState {
               this.timeline.setStatus("只读事件不可编辑或删除");
               state.contextMenuVisible = false;
               state.contextMenuEvent = null;
-              this.timeline.draw();
+              this.timeline.notifyChange("interaction:contextMenu");
               return null;
             }
 
@@ -99,14 +99,14 @@ export class IdleState extends BaseState {
 
             state.contextMenuVisible = false;
             state.contextMenuEvent = null;
-            this.timeline.draw();
+            this.timeline.notifyChange("interaction:contextMenu");
           }
           return null;
         } else {
           // 点击菜单外部,关闭菜单
           state.contextMenuVisible = false;
           state.contextMenuEvent = null;
-          this.timeline.draw();
+          this.timeline.notifyChange("interaction:contextMenu");
         }
       }
     }
@@ -247,14 +247,14 @@ export class IdleState extends BaseState {
         }
 
         const clickTime =
-          (logicalX + state.scrollX - config.startPaddingTime) /
+          (logicalX - config.startPaddingTime) /
             (config.secondWidth * state.zoomLevel) +
           config.startTime;
         this.timeline.splitEvent(trackIndex, eventIndex, clickTime);
         state.lastClickTime = 0;
         state.lastClickEvent = null;
         this.timeline.hideSplitLine();
-        this.timeline.draw();
+        // splitEvent 已经通过调度器触发绘制
         return null;
       }
 
@@ -285,7 +285,7 @@ export class IdleState extends BaseState {
             formattedTimeRange: formatTimeRange(event.startTime, event.endTime),
           });
         }
-        this.timeline.draw();
+        this.timeline.notifyChange("selection:change");
         return null;
       }
 
@@ -325,7 +325,7 @@ export class IdleState extends BaseState {
         });
       }
 
-      this.timeline.draw();
+      this.timeline.notifyChange("selection:change");
       return this.createDraggingState();
     }
 
@@ -343,7 +343,7 @@ export class IdleState extends BaseState {
       });
     }
 
-    this.timeline.draw();
+    this.timeline.notifyChange("selection:change");
     return null;
   }
 
@@ -374,20 +374,20 @@ export class IdleState extends BaseState {
           if (itemIndex >= 0 && itemIndex < config.contextMenuItems.length) {
             if (state.hoveredContextMenuItem !== itemIndex) {
               state.hoveredContextMenuItem = itemIndex;
-              this.timeline.draw();
+              this.timeline.notifyChange("interaction:contextMenu");
             }
             canvas.style.cursor = "pointer";
           } else {
             if (state.hoveredContextMenuItem !== -1) {
               state.hoveredContextMenuItem = -1;
-              this.timeline.draw();
+              this.timeline.notifyChange("interaction:contextMenu");
             }
           }
           return null;
         } else {
           if (state.hoveredContextMenuItem !== -1) {
             state.hoveredContextMenuItem = -1;
-            this.timeline.draw();
+            this.timeline.notifyChange("interaction:contextMenu");
           }
         }
       }
@@ -404,14 +404,14 @@ export class IdleState extends BaseState {
             state.hoveredResizeHandle = null;
             canvas.style.cursor = "not-allowed";
             this.timeline.hideSplitLine();
-            this.timeline.draw();
+            this.timeline.notifyChange("interaction:hover");
             return null;
           }
 
           state.hoveredResizeHandle = handle;
           canvas.style.cursor = "ew-resize";
           this.timeline.hideSplitLine();
-          this.timeline.draw();
+          this.timeline.notifyChange("interaction:hover");
           return null;
         }
         state.hoveredResizeHandle = null;
@@ -430,12 +430,12 @@ export class IdleState extends BaseState {
           if (event.readonly) {
             this.timeline.hideSplitLine();
             canvas.style.cursor = "not-allowed";
-            this.timeline.draw();
+            this.timeline.notifyChange("interaction:hover");
             return null;
           }
 
           let splitTime =
-            (logicalX + state.scrollX - config.startPaddingTime) /
+            (logicalX - config.startPaddingTime) /
               (config.secondWidth * state.zoomLevel) +
             config.startTime;
 
@@ -460,7 +460,7 @@ export class IdleState extends BaseState {
           ) {
             this.timeline.showSplitLine(trackIndex, eventIndex, splitTime);
             canvas.style.cursor = "pointer";
-            this.timeline.draw();
+            this.timeline.notifyChange("interaction:splitLine");
             return null;
           }
         }
@@ -489,7 +489,7 @@ export class IdleState extends BaseState {
         canvasY <= config.timeIndicatorHeadSize
       ) {
         canvas.style.cursor = config.readOnly ? "not-allowed" : "ew-resize";
-        this.timeline.draw();
+        // 只是光标变化，不需要重绘
         return null;
       }
     }
@@ -510,7 +510,7 @@ export class IdleState extends BaseState {
       canvas.style.cursor = "default";
     }
 
-    this.timeline.draw();
+    // 纯悬停状态不需要重绘，只有状态变化时才需要
     return null;
   }
 
@@ -537,11 +537,11 @@ export class IdleState extends BaseState {
       state.contextMenuX = canvasX;
       state.contextMenuY = canvasY;
       state.hoveredContextMenuItem = -1;
-      this.timeline.draw();
+      this.timeline.notifyChange("interaction:contextMenu");
     } else {
       state.contextMenuVisible = false;
       state.contextMenuEvent = null;
-      this.timeline.draw();
+      this.timeline.notifyChange("interaction:contextMenu");
     }
 
     return null;

@@ -5,6 +5,7 @@ export { ContextMenuPlugin } from "./plugins/builtin/ContextMenuPlugin";
 export { PerformanceOverlayPlugin } from "./plugins/builtin/PerformanceOverlayPlugin";
 export { EventMediaPlugin } from "./plugins/builtin/EventMediaPlugin";
 export { EventTooltipPlugin } from "./plugins/builtin/EventTooltipPlugin";
+export type { ChangeType } from "./core/managers/ChangeScheduler";
 export type {
   TimelineConfig,
   TimelineState,

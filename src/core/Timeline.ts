@@ -25,10 +25,11 @@ import { RenderManager } from "./managers/RenderManager";
 import { MouseHandler } from "../handlers/MouseHandler";
 import { WheelHandler } from "../handlers/WheelHandler";
 import { PluginManager } from "./managers/PluginManager";
-import { Logger } from "./managers/Logger";
+import { Logger, configureGlobalLogger } from "./managers/Logger";
 import { ErrorHandler } from "./managers/ErrorHandler";
 import { StateManager } from "./managers/StateManager";
 import { EventIndexManager } from "./managers/EventIndexManager";
+import { ChangeScheduler, type ChangeType } from "./managers/ChangeScheduler";
 // Built-in plugins are now optional external imports for tree-shaking.
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
 import { DarkThemePlugin } from "../plugins/builtin/DarkThemePlugin";
@@ -64,13 +65,20 @@ export class Timeline {
   private errorHandler: ErrorHandler;
   private stateManager: StateManager;
   private eventIndexManager: EventIndexManager;
+  private changeScheduler: ChangeScheduler;
   private currentThemePluginId: string | null = null;
 
   constructor(canvasId: string, options: TimelineOptions = {}) {
     this.logger = new Logger({
       enabled: true,
-      level: "info",
+      level: options.debug ? "debug" : "info",
       prefix: "Timeline",
+      useGlobalConfig: false, // 主 Timeline 实例使用独立配置
+    });
+    // 同步全局日志配置
+    configureGlobalLogger({
+      enabled: true,
+      level: options.debug ? "debug" : "info",
     });
     this.errorHandler = new ErrorHandler(this.logger);
     const canvas = document.getElementById(canvasId);
@@ -157,6 +165,15 @@ export class Timeline {
       this.pluginManager
     );
 
+    // 初始化变更调度器
+    this.changeScheduler = new ChangeScheduler(
+      this.state,
+      this.config,
+      this.callbacks
+    );
+    this.changeScheduler.setRenderManager(this.renderManager);
+    this.changeScheduler.setDrawFunction(() => this.draw());
+
     this.init();
     this.setupEventListeners();
   }
@@ -195,8 +212,7 @@ export class Timeline {
     const ok = await this.pluginManager.loadPlugin(plugin);
     if (ok) {
       this.currentThemePluginId = id;
-      this.markDirty(["background", "tracks", "timeline", "overlay"]);
-      this.draw();
+      this.notifyChange("theme:change");
     }
     return ok;
   }
@@ -205,7 +221,7 @@ export class Timeline {
     if (this.config.autoFitOnInit) {
       this.autoFitZoomToCanvas();
     }
-    this.draw();
+    this.notifyChange("data:load");
   }
 
   public getContentWidthForZoom(zoomLevel: number): number {
@@ -218,6 +234,27 @@ export class Timeline {
 
   public getAvailableHeight(): number {
     return this.renderManager.getAvailableHeight();
+  }
+
+  /**
+   * 通知状态变更，由调度器自动处理脏层标记、派生状态计算和回调触发
+   */
+  public notifyChange(change: ChangeType): void {
+    this.changeScheduler.notify(change);
+  }
+
+  /**
+   * 开始批量变更操作
+   */
+  public beginChangeBatch(): void {
+    this.changeScheduler.beginBatch();
+  }
+
+  /**
+   * 结束批量变更操作
+   */
+  public endChangeBatch(): void {
+    this.changeScheduler.endBatch();
   }
 
   public markDirty(
@@ -370,17 +407,7 @@ export class Timeline {
   public adjustCanvasSize(): void {
     const maxScrollY = this.renderManager.computeMaxScrollY();
     this.state.scrollY = Math.max(0, Math.min(maxScrollY, this.state.scrollY));
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
-    this.draw();
+    this.notifyChange("canvas:resize");
   }
 
   public addTrack(): void {
@@ -493,8 +520,7 @@ export class Timeline {
     };
     track.events.push(event);
     this.eventIndexManager.invalidateTrack(trackIndex);
-    this.markDirty(["tracks", "timeline", "scrollbar"]);
-    this.draw();
+    this.notifyChange("events:add");
     if (this.callbacks.onEventAdd)
       this.callbacks.onEventAdd({ trackIndex, event: cloneEvent(event) });
   }
@@ -517,8 +543,7 @@ export class Timeline {
     const oldEvent = cloneEvent(event);
     Object.assign(event, updates);
     this.eventIndexManager.invalidateTrack(trackIndex);
-    this.markDirty(["tracks", "timeline", "scrollbar"]);
-    this.draw();
+    this.notifyChange("events:update");
     this.setStatus(`已更新事件: ${event.title}`);
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
@@ -564,8 +589,7 @@ export class Timeline {
     if (eventData.description !== undefined)
       event.description = eventData.description;
     this.eventIndexManager.invalidateTrack(trackIndex);
-    this.markDirty(["tracks", "timeline", "scrollbar"]);
-    this.draw();
+    this.notifyChange("events:update");
     this.setStatus(`已更新事件: ${event.title}`);
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
@@ -585,9 +609,8 @@ export class Timeline {
     const event = cloneEvent(track.events[eventIndex]);
     track.events.splice(eventIndex, 1);
     this.eventIndexManager.invalidateTrack(trackIndex);
-    this.markDirty(["tracks", "timeline", "scrollbar"]);
     this.autoRemoveEmptyLastTrack();
-    this.draw();
+    this.notifyChange("events:delete");
     this.setStatus(`已删除事件: ${event.title}`);
     if (this.callbacks.onEventDelete)
       this.callbacks.onEventDelete({ trackIndex, eventIndex, event });
@@ -643,69 +666,11 @@ export class Timeline {
     }
     if (this.state.tracks.length === 0) this.addTrack();
     this.eventIndexManager.invalidateAll();
-    this.markDirty(["tracks", "timeline", "scrollbar", "guideLines"]);
     if (data.timeIndicatorPosition !== undefined)
       this.setTimeIndicator(data.timeIndicatorPosition);
-    this.draw();
+    this.notifyChange("data:load");
     this.setStatus(`已加载 ${this.state.tracks.length} 个轨道`);
     return true;
-  }
-
-  private detectTimeIndicatorHighlightedEvents(
-    position: number
-  ): Array<{ trackIndex: number; eventIndex: number }> {
-    const highlightedEvents: Array<{ trackIndex: number; eventIndex: number }> =
-      [];
-    for (
-      let trackIndex = 0;
-      trackIndex < this.state.tracks.length;
-      trackIndex++
-    ) {
-      const track = this.state.tracks[trackIndex];
-      for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
-        const event = track.events[eventIndex];
-        // 修复：使用 >= startTime 以包含事件开始时刻
-        if (position >= event.startTime && position < event.endTime) {
-          highlightedEvents.push({ trackIndex, eventIndex });
-        }
-      }
-    }
-    return highlightedEvents;
-  }
-
-  private updateTimeIndicatorHighlights(position: number): void {
-    const newHighlightedEvents =
-      this.detectTimeIndicatorHighlightedEvents(position);
-    const createEventKey = (trackIndex: number, eventIndex: number) =>
-      `${trackIndex}-${eventIndex}`;
-    const oldEventKeys = new Set(
-      this.state.timeIndicatorHighlightedEvents.map((e) =>
-        createEventKey(e.trackIndex, e.eventIndex)
-      )
-    );
-    const newEventKeys = new Set(
-      newHighlightedEvents.map((e) =>
-        createEventKey(e.trackIndex, e.eventIndex)
-      )
-    );
-    const hasChanged =
-      oldEventKeys.size !== newEventKeys.size ||
-      !Array.from(newEventKeys).every((key) => oldEventKeys.has(key));
-    this.state.timeIndicatorHighlightedEvents = newHighlightedEvents;
-    if (hasChanged) {
-      if (this.callbacks.onTimeIndicatorHighlight) {
-        const highlightData = newHighlightedEvents.map(
-          ({ trackIndex, eventIndex }) => {
-            const event = this.state.tracks[trackIndex].events[eventIndex];
-            return { trackIndex, eventIndex, event: cloneEvent(event) };
-          }
-        );
-        this.callbacks.onTimeIndicatorHighlight({
-          position,
-          highlightedEvents: highlightData,
-        });
-      }
-    }
   }
 
   public setTimeIndicator(seconds: number, applySnap = false): boolean {
@@ -727,10 +692,9 @@ export class Timeline {
       Math.min(this.config.endTime, seconds)
     );
     this.state.timeIndicatorPosition = seconds;
-    this.updateTimeIndicatorHighlights(seconds);
     this.scrollToTimeIndicator(seconds);
-    this.markDirty(["indicator", "timeline", "interaction"]);
-    this.draw();
+    // 使用调度器处理高亮计算和回调触发
+    this.notifyChange("timeIndicator:move");
     this.setStatus(`时间指示器已移动到: ${formatTime(seconds)}`);
     if (this.callbacks.onTimeIndicatorMove)
       this.callbacks.onTimeIndicatorMove({
@@ -816,17 +780,7 @@ export class Timeline {
         Math.min(maxScrollX, this.state.scrollX)
       );
     }
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
-    this.draw();
+    this.notifyChange("zoom:change");
     this.setStatus(`缩放级别: ${Math.round(this.state.zoomLevel * 100)}%`);
     if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
       this.callbacks.onZoom({
@@ -858,17 +812,7 @@ export class Timeline {
       this.state.zoomLevel
     );
     this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
-    this.draw();
+    this.notifyChange("zoom:change");
     this.setStatus(`缩放级别: ${Math.round(this.state.zoomLevel * 100)}%`);
     if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
       this.callbacks.onZoom({
@@ -912,7 +856,7 @@ export class Timeline {
       contentWidth - this.renderManager.getCachedLogicalWidth()
     );
     this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
-    this.draw();
+    this.notifyChange("config:endTime");
     this.setStatus(
       `结束时间已更新: ${formatTime(oldEndTime)} → ${formatTime(endTime)}`
     );
@@ -942,9 +886,13 @@ export class Timeline {
     x: number,
     y: number
   ): { trackIndex: number; eventIndex: number } | null {
-    if (y < this.config.timelineHeight) return null;
+    // 将画布坐标转换为逻辑坐标（考虑滚动偏移）
+    const logicalY = y + this.state.scrollY;
+    if (logicalY < this.config.timelineHeight) return null;
     const trackIndex = Math.floor(
-      (y - this.config.timelineHeight - this.config.firstTrackTopMargin) /
+      (logicalY -
+        this.config.timelineHeight -
+        this.config.firstTrackTopMargin) /
         (this.config.trackHeight + this.config.trackMargin)
     );
     if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return null;
@@ -953,7 +901,8 @@ export class Timeline {
     const trackY =
       this.config.timelineHeight +
       this.config.firstTrackTopMargin +
-      trackIndex * (this.config.trackHeight + this.config.trackMargin);
+      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
+      this.state.scrollY;
     if (
       y < trackY + eventVerticalPadding ||
       y > trackY + this.config.trackHeight - eventVerticalPadding
@@ -997,9 +946,13 @@ export class Timeline {
     x: number,
     y: number
   ): { trackIndex: number; eventIndex: number; edge: "left" | "right" } | null {
-    if (y < this.config.timelineHeight) return null;
+    // 将画布坐标转换为逻辑坐标（考虑滚动偏移）
+    const logicalY = y + this.state.scrollY;
+    if (logicalY < this.config.timelineHeight) return null;
     const trackIndex = Math.floor(
-      (y - this.config.timelineHeight - this.config.firstTrackTopMargin) /
+      (logicalY -
+        this.config.timelineHeight -
+        this.config.firstTrackTopMargin) /
         (this.config.trackHeight + this.config.trackMargin)
     );
     if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return null;
@@ -1009,7 +962,8 @@ export class Timeline {
     const trackY =
       this.config.timelineHeight +
       this.config.firstTrackTopMargin +
-      trackIndex * (this.config.trackHeight + this.config.trackMargin);
+      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
+      this.state.scrollY;
     if (
       y < trackY + eventVerticalPadding ||
       y > trackY + this.config.trackHeight - eventVerticalPadding
@@ -1189,14 +1143,14 @@ export class Timeline {
       Math.abs(this.state.hoveredSplitLine.splitTime - splitTime) > 0.001;
     if (needsUpdate) {
       this.state.hoveredSplitLine = { trackIndex, eventIndex, splitTime };
-      this.draw();
+      this.notifyChange("interaction:splitLine");
     }
   }
 
   public hideSplitLine(): void {
     if (this.state.hoveredSplitLine) {
       this.state.hoveredSplitLine = null;
-      this.draw();
+      this.notifyChange("interaction:splitLine");
     }
   }
 
@@ -1234,8 +1188,7 @@ export class Timeline {
     track.events[eventIndex] = firstEvent;
     track.events.push(secondEvent);
     this.eventIndexManager.invalidateTrack(trackIndex);
-    this.markDirty(["tracks", "timeline", "scrollbar"]);
-    this.draw();
+    this.notifyChange("events:split");
     this.setStatus(`已切割事件: ${event.title}`);
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
@@ -1267,10 +1220,9 @@ export class Timeline {
       this.state.hoveredSplitLine = null;
       this.state.guideLines = [];
     }
-    this.draw();
+    this.notifyChange("config:readOnly");
     this.setStatus(readOnly ? "已进入只读模式" : "已退出只读模式");
   }
-
   public highlightEvent(trackIndex: number, eventIndex: number): boolean {
     if (trackIndex < 0 || trackIndex >= this.state.tracks.length) {
       this.logger.error(`无效的轨道索引: ${trackIndex}`);
@@ -1285,7 +1237,7 @@ export class Timeline {
     this.state.selectedTrack = null;
     this.state.highlightedEvent = { trackIndex, eventIndex };
     const event = track.events[eventIndex];
-    this.draw();
+    this.notifyChange("highlight:change");
     this.setStatus(`已高亮事件: ${event.title}`);
     return true;
   }
@@ -1295,7 +1247,7 @@ export class Timeline {
       this.state.highlightedEvent = null;
       this.state.selectedEvent = null;
       this.state.selectedTrack = null;
-      this.draw();
+      this.notifyChange("highlight:change");
       this.setStatus("已清除高亮");
     }
   }

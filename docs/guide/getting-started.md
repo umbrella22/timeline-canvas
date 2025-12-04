@@ -2,7 +2,163 @@
 
 ## 架构概览
 
-[![](https://mermaid.ink/img/pako:eNqVWFtv00gU_iuVEW8Dm0vbpNEKKSSmsYhTy3ZbFreq3GSSWqRx5DhQQEhcthToQldA6YK03LaI8lJuVem2VP0zcZL-ix17bGfGcSnrvHjOfc6c851xrjNFvQSZFFMx1PrcgHx2qjaAnpMnB6zdp52nG9bn25jSaM5ikSmmx2Ewz37SgqBgRmdj2dpdme6xxiVWVBCjfe9ba3e9tfvY5cFaaarm-2u_3rEO7oT5k7V5WNVq0BUhvcp5xeP-Omv8cqa1s9d-9N66t20935j2jAfMdTbfdP68iwQCO7AfgVeEarOi1Xi1plag4Rhtrzxu7W1jtWlaXuQVEW0DGpT8zpf2qyeh8hKvSKZqQlK882C7ffNWqDjLK-xlWDM55GKB1GntLtshbb21vq8GdCZ4ZUKDV-q6YZIa3fd3rZV_Qr3keSWvV_zo195ZB2vh4eQU1jB0I6fWSlVX_PDp8-7Hj9b677Q4cbbB6nFEw9PP5xRebzYg5eD76_brpT4H9jOZUybnIKyS4u29F939zf8RD05_e-ON9X0lGA8nKVzNhIZaNDW95pycm367jLFmICYum2cVDoXTk-582D1c-xIqnRXTo0rWUCuo5Co9jfbys_byfqiGyErcRRZVXUO7Rul0P91pr25Z6--tTyvBqsuIY_m8IhUNvVqlHe29sB5shG-kkOUyaXlMdDoMVaBWVE3dsIMl9P9Y6qzvosPEEQcTHtLluDe-7nX2XvU1OsUkjkIU3C4TtHqv1_02O7z15KhexzIhlSZzPJvnCuyM6AMIduF3wfbh2lZ3fyuQFVlMZ85LthYqiksNSqe7v4FDIRVGx7ms48lWGm1qJZhHvmhFa-V29-adzu7BUUeAVP0DoMP08t-nKbMoUpkbKzi6fg1T2hQa08VyNm07xRUzqwacOkXT_vvNT_UXPoLWzoPWznL72VLwIMSMe7YZHUW5YBJH6-sEW0BWvHgG5Kt12CB0UCo6n_esl8s_UYoY1o8oRZJJhCzkx0e5wkxa4NxBgd6IIdF-9A6h7HSffEa-4MpT23R0yG2GZxDH4myrr45zLM_OCAoafIdv_8KSfYhRyLIiksEZCpVhJ9iCbJtx5kqoiDw2lkcS1rd31uK3cCMXZLYg2SWHfN3_YH1e7RP7wVi4u9jZ38QKwU1m0-J5Jasal-Q5OA9xHoMzjBvNyUpeq8yZRwtlxlBbXJBneLYwrrgHwcNaM1RYYMVzYyKfLmRYRYBGWTfm1VoRjl2GRlW9GqqCs8izWS6N5zYPS5r6A1E7pzInYGFZ16umVg8V58dR4DOj42kxq_BNFPdoUzVKfaJHVfrqp_bDzbCrVY9DpByl6Rw36uMiSlRZq-BZvPgQHRLhUJLTMutLEiMvOFHk3wRWUnANW5svWv_eJy-IMpeX3MqylvZRUKE3xO7BS7u_Fr-itsREdOkcOHXqDLoG4rV903QIfC5AmMx5huS8QxB4ainSS4lesvTSs-4ue7b5nEPgJLzkJLxEVwKKYE99ioCHOkXCMEzb8caB507ksbbgLt1k-KONJruTiyKS04liEKMnQCcGC8Uh5oYXn4Dj62GmS_bXJBtBJMVGaxw3RrhQngdtoUwX08KNOmAWrtZDMb9kcAj47BAW9VMd-HHT4cbk0EnECWETGIO5bsxE_A6aHMV08cONx9kTLtAeXHh7wE1NdYvTvBTF6VK6o-zW9CnEx9o3dF3GjYyJxaraaGRheUCt1wfKWrWaOlEesn-gYRr6JZg6MTw87L6fuqKVzLlUtL4Q0C3qBnSVYbwcK5d85ehIYrgUo_Vjffrz-IPHM5EsD8GkbyKeTMJ48TgTc_hbwttCuRyHEd9EeShRjESOM9GwYdAzEIdkDhKz0bJ67DYM53bj7SKKsgh9C5FYMlmKHmeh7kwGL4YiHIRF30IxFk0OzR5noaSaqqev2j9ffwTav-OOcrapoWlW6-UxCaO9PJbVSGgeCSM2uAMHv1FFkXSEunadkCSBByIPJB6wPJjgQR695LxiIOX4HJjMeUdMMjgJ2CgNbGQGGI0BBjTgIyE-V1JLFEAPbIEHsIAEVUAAKaDAExCACcQMEGX33KmN-VAJejAFXOQBHpYAFxkAhgBAQJhbCaRNjATA6X7gdDzAXW4fOSloQx1wkA2QOAYI1AIESAEKkwCBQV4xMICpGFqJSZlGEwJmHqIrlb1krttupxjTvrlNMSn0WoJltVk17WvJDaRWV2sXdX3e0zT0ZmWOSZXVagOtmnUUOcxqKrrVzPtUw_2qaNZMJhWLJx0jTOo6s8CkRhKnIyPRSGIkOTgYSwzFE4C5ioSGTg9F48OJoUhseHA4Phi9AZhrjtfI6eRgfCQejw8iEEnEYyNRwKCrHfoa4_G_Z86faDf-A1ajm-o?type=png)](https://mermaid-live.nodejs.cn/edit#pako:eNqVWFtv00gU_iuVEW8Dm0vbpNEKKSSmsYhTy3ZbFreq3GSSWqRx5DhQQEhcthToQldA6YK03LaI8lJuVem2VP0zcZL-ix17bGfGcSnrvHjOfc6c851xrjNFvQSZFFMx1PrcgHx2qjaAnpMnB6zdp52nG9bn25jSaM5ikSmmx2Ewz37SgqBgRmdj2dpdme6xxiVWVBCjfe9ba3e9tfvY5cFaaarm-2u_3rEO7oT5k7V5WNVq0BUhvcp5xeP-Omv8cqa1s9d-9N66t20935j2jAfMdTbfdP68iwQCO7AfgVeEarOi1Xi1plag4Rhtrzxu7W1jtWlaXuQVEW0DGpT8zpf2qyeh8hKvSKZqQlK882C7ffNWqDjLK-xlWDM55GKB1GntLtshbb21vq8GdCZ4ZUKDV-q6YZIa3fd3rZV_Qr3keSWvV_zo195ZB2vh4eQU1jB0I6fWSlVX_PDp8-7Hj9b677Q4cbbB6nFEw9PP5xRebzYg5eD76_brpT4H9jOZUybnIKyS4u29F939zf8RD05_e-ON9X0lGA8nKVzNhIZaNDW95pycm367jLFmICYum2cVDoXTk-582D1c-xIqnRXTo0rWUCuo5Co9jfbys_byfqiGyErcRRZVXUO7Rul0P91pr25Z6--tTyvBqsuIY_m8IhUNvVqlHe29sB5shG-kkOUyaXlMdDoMVaBWVE3dsIMl9P9Y6qzvosPEEQcTHtLluDe-7nX2XvU1OsUkjkIU3C4TtHqv1_02O7z15KhexzIhlSZzPJvnCuyM6AMIduF3wfbh2lZ3fyuQFVlMZ85LthYqiksNSqe7v4FDIRVGx7ms48lWGm1qJZhHvmhFa-V29-adzu7BUUeAVP0DoMP08t-nKbMoUpkbKzi6fg1T2hQa08VyNm07xRUzqwacOkXT_vvNT_UXPoLWzoPWznL72VLwIMSMe7YZHUW5YBJH6-sEW0BWvHgG5Kt12CB0UCo6n_esl8s_UYoY1o8oRZJJhCzkx0e5wkxa4NxBgd6IIdF-9A6h7HSffEa-4MpT23R0yG2GZxDH4myrr45zLM_OCAoafIdv_8KSfYhRyLIiksEZCpVhJ9iCbJtx5kqoiDw2lkcS1rd31uK3cCMXZLYg2SWHfN3_YH1e7RP7wVi4u9jZ38QKwU1m0-J5Jasal-Q5OA9xHoMzjBvNyUpeq8yZRwtlxlBbXJBneLYwrrgHwcNaM1RYYMVzYyKfLmRYRYBGWTfm1VoRjl2GRlW9GqqCs8izWS6N5zYPS5r6A1E7pzInYGFZ16umVg8V58dR4DOj42kxq_BNFPdoUzVKfaJHVfrqp_bDzbCrVY9DpByl6Rw36uMiSlRZq-BZvPgQHRLhUJLTMutLEiMvOFHk3wRWUnANW5svWv_eJy-IMpeX3MqylvZRUKE3xO7BS7u_Fr-itsREdOkcOHXqDLoG4rV903QIfC5AmMx5huS8QxB4ainSS4lesvTSs-4ue7b5nEPgJLzkJLxEVwKKYE99ioCHOkXCMEzb8caB507ksbbgLt1k-KONJruTiyKS04liEKMnQCcGC8Uh5oYXn4Dj62GmS_bXJBtBJMVGaxw3RrhQngdtoUwX08KNOmAWrtZDMb9kcAj47BAW9VMd-HHT4cbk0EnECWETGIO5bsxE_A6aHMV08cONx9kTLtAeXHh7wE1NdYvTvBTF6VK6o-zW9CnEx9o3dF3GjYyJxaraaGRheUCt1wfKWrWaOlEesn-gYRr6JZg6MTw87L6fuqKVzLlUtL4Q0C3qBnSVYbwcK5d85ehIYrgUo_Vjffrz-IPHM5EsD8GkbyKeTMJ48TgTc_hbwttCuRyHEd9EeShRjESOM9GwYdAzEIdkDhKz0bJ67DYM53bj7SKKsgh9C5FYMlmKHmeh7kwGL4YiHIRF30IxFk0OzR5noaSaqqev2j9ffwTav-OOcrapoWlW6-UxCaO9PJbVSGgeCSM2uAMHv1FFkXSEunadkCSBByIPJB6wPJjgQR695LxiIOX4HJjMeUdMMjgJ2CgNbGQGGI0BBjTgIyE-V1JLFEAPbIEHsIAEVUAAKaDAExCACcQMEGX33KmN-VAJejAFXOQBHpYAFxkAhgBAQJhbCaRNjATA6X7gdDzAXW4fOSloQx1wkA2QOAYI1AIESAEKkwCBQV4xMICpGFqJSZlGEwJmHqIrlb1krttupxjTvrlNMSn0WoJltVk17WvJDaRWV2sXdX3e0zT0ZmWOSZXVagOtmnUUOcxqKrrVzPtUw_2qaNZMJhWLJx0jTOo6s8CkRhKnIyPRSGIkOTgYSwzFE4C5ioSGTg9F48OJoUhseHA4Phi9AZhrjtfI6eRgfCQejw8iEEnEYyNRwKCrHfoa4_G_Z86faDf-A1ajm-o)
+```mermaid
+graph TB
+    %% 应用层
+    subgraph "应用层"
+        APP[应用程序]
+        USER[用户交互]
+    end
+
+    %% 核心层
+    subgraph "Timeline 核心"
+        TL[Timeline<br/>主控制器]
+
+        subgraph "管理器层"
+            PM[PluginManager<br/>插件管理]
+            RM[RenderManager<br/>渲染管理]
+            SM[StateManager<br/>状态管理]
+            EM[EventIndexManager<br/>事件索引]
+            VM[ViewportManager<br/>视口管理]
+            LM[Logger<br/>日志管理]
+            EH[ErrorHandler<br/>错误处理]
+        end
+
+        subgraph "处理器层"
+            MH[MouseHandler<br/>鼠标处理]
+            WH[WheelHandler<br/>滚轮处理]
+        end
+
+        subgraph "状态模式"
+            IS[InteractionState<br/>交互状态]
+            IDLE[IdleState<br/>空闲状态]
+            DRAG[DraggingState<br/>拖拽状态]
+            RESIZE[ResizingState<br/>调整大小]
+            SCROLL[ScrollingState<br/>滚动状态]
+            INDICATOR[TimeIndicatorDragState<br/>指示器拖拽]
+        end
+    end
+
+    %% 渲染系统
+    subgraph "渲染系统"
+        RP[RenderPipeline<br/>渲染管道]
+
+        subgraph "渲染层"
+            TIMELINE_R[TimelineRenderer<br/>时间轴]
+            TRACKS_R[TracksRenderer<br/>轨道]
+            GUIDELINES_R[GuideLinesRenderer<br/>参考线]
+            INDICATOR_R[IndicatorRenderer<br/>指示器]
+            INTERACTION_R[InteractionRenderer<br/>交互]
+            SCROLLBAR_R[ScrollbarRenderer<br/>滚动条]
+        end
+
+        subgraph "渲染上下文"
+            RC[RenderContext<br/>渲染上下文]
+            RT[Renderer Types<br/>渲染器类型]
+        end
+    end
+
+    %% 插件系统
+    subgraph "插件系统"
+        PLUGIN_API[PluginAPI<br/>插件接口]
+        PLUGIN_CTX[PluginContext<br/>插件上下文]
+
+        subgraph "插件类型"
+            THEME_P[主题插件]
+            RENDER_P[渲染插件]
+            EVENT_P[事件插件]
+            TOOL_P[工具插件]
+            EXTENSION_P[扩展插件]
+        end
+
+        subgraph "内置插件"
+            DARK[DarkThemePlugin]
+            LIGHT[LightThemePlugin]
+            CONTEXT_MENU[ContextMenuPlugin]
+            PERFORMANCE[PerformanceOverlayPlugin]
+            EVENT_MEDIA[EventMediaPlugin]
+            EVENT_TOOLTIP[EventTooltipPlugin]
+            MUTEX_GUARD[MutexGuardPlugin]
+        end
+    end
+
+    %% 数据层
+    subgraph "数据层"
+        CONFIG[TimelineConfig<br/>配置]
+        STATE[TimelineState<br/>状态]
+        TYPES[类型定义]
+        UTILS[工具函数]
+    end
+
+    %% 连接关系
+    APP --> TL
+    USER --> MH
+    USER --> WH
+
+    TL --> PM
+    TL --> RM
+    TL --> SM
+    TL --> EM
+    TL --> MH
+    TL --> WH
+
+    MH --> IS
+    IS --> IDLE
+    IS --> DRAG
+    IS --> RESIZE
+    IS --> SCROLL
+    IS --> INDICATOR
+
+    RM --> RP
+    RP --> TIMELINE_R
+    RP --> TRACKS_R
+    RP --> GUIDELINES_R
+    RP --> INDICATOR_R
+    RP --> INTERACTION_R
+    RP --> SCROLLBAR_R
+
+    PM --> PLUGIN_API
+    PLUGIN_API --> PLUGIN_CTX
+    PLUGIN_CTX --> THEME_P
+    PLUGIN_CTX --> RENDER_P
+    PLUGIN_CTX --> EVENT_P
+    PLUGIN_CTX --> TOOL_P
+    PLUGIN_CTX --> EXTENSION_P
+
+    THEME_P --> DARK
+    THEME_P --> LIGHT
+    RENDER_P --> CONTEXT_MENU
+    RENDER_P --> PERFORMANCE
+    EVENT_P --> EVENT_MEDIA
+    EVENT_P --> EVENT_TOOLTIP
+    TOOL_P --> MUTEX_GUARD
+
+    CONFIG --> TL
+    STATE --> TL
+    TYPES --> TL
+    UTILS --> TL
+
+    %% 样式定义
+    classDef app fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef core fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef manager fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef handler fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef state fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef render fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef plugin fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef data fill:#fafafa,stroke:#9e9e9e,stroke-width:1px
+    classDef builtin fill:#fff8e1,stroke:#ffa000,stroke-width:2px
+
+    class APP,USER app
+    class TL core
+    class PM,RM,SM,EM,VM,LM,EH manager
+    class MH,WH handler
+    class IS,IDLE,DRAG,RESIZE,SCROLL,INDICATOR state
+    class RP,TIMELINE_R,TRACKS_R,GUIDELINES_R,INDICATOR_R,INTERACTION_R,SCROLLBAR_R,RC,RT render
+    class PLUGIN_API,PLUGIN_CTX,THEME_P,RENDER_P,EVENT_P,TOOL_P,EXTENSION_P plugin
+    class CONFIG,STATE,TYPES,UTILS data
+    class DARK,LIGHT,CONTEXT_MENU,PERFORMANCE,EVENT_MEDIA,EVENT_TOOLTIP,MUTEX_GUARD builtin
+```
 
 ## 安装
 

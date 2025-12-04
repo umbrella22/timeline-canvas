@@ -1,5 +1,6 @@
 import { defineConfig } from "rspress/config";
 import { pluginPreview } from "@rspress/plugin-preview";
+import mermaid from "rspress-plugin-mermaid";
 import { pluginVue } from "@rsbuild/plugin-vue";
 
 export default defineConfig({
@@ -73,6 +74,9 @@ export default defineConfig({
     },
   },
   plugins: [
+    mermaid({
+      look: "handDrawn",
+    }),
     pluginPreview({
       iframeOptions: {
         customEntry: ({ entryCssPath, demoPath }) => {

@@ -127,7 +127,7 @@ const TimelinePlayground = () => {
         enableEventSplit: true,
         enableTimeIndicator: true,
         enableContextMenu: true,
-        debug: false,
+        debug: true,
         snapToSeconds: true,
         showEventDurationLabel: true,
         autoAddTrack: true,

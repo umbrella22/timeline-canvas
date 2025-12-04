@@ -1,6 +1,71 @@
 # 插件开发教程
 
-[![](https://mermaid.ink/img/pako:eNqNVu9P20YY_lciV_12oCSOyY8Pk0LipVZjx3KcqpuDKpOcwWpiR8bu6AhSW1qqDiambl1XprXbxCb2hZW1K4yM8c_ETvgvdr5zEmckMMsffPc-73Pvve-9z3mNqpl1SGWoJUttLUfk-aoRQc_16xHvx2P3bKPXedztfCCTK84iQVUpWW_Chm7AAFWlCMJ_5KIysC6MZkVeERvOkm7wqqEuQStkknhFgkYdWhNMYmAS9VaYEc1VjQtBeTvPUay9d51e5004IpGPzMx8FMmKXBAD-gotgkbYnpNvB_acadhw1Q5hkA1jxGKlwAllhSzlHrzu_rP1f2I67Livt8ZiIkSYVL7B8qzSPe6c__wdwS9MBkqskGclxTv-w3vz9aVI9hYryEr3ZAtBLgXKpVJRcY9-cZ8cXU54W2aFMlcSFO_Zb-7hizHw5K27m096pwcEOHZA_O1i0nxWuqnkVeuuvAybkOR-YRKwyBVuyEpRX1q2J0NJZkgZS4KMor3Ds0JFCSrJQ8O5zEdkpY9LEp8VcqwiQkszraZq1GDpHrQa6v0Lnji7ozyjpfJcVmHvQQOtVNfVKx38rMucSFxk02zYeuvi9hEI-_AVtKE7hUpWyiu8g_ZTcFSrPoafcvjwQbnYEBJpCEkMdxpJdPYTVioHJ8w9fBQKh5gwaj6bu1mQShUhr_Q3tr1Xv09FyhzPFjmBVbyXH85fvu-fvp8OlRBrWemf7p8_nL50ocLlMWNZcXce9R9s9E7OpoI5Ic_lsnIJtcz2097eiftq_xKszKIIZP-Id0_2uifPp0LLOalULM5nEW1n1_1i3_vhp6nY0i1WQkOl_-tm7_tvR7BQwXytffHW-_LA-_MhmSGC1fbe7bub28NatFHdxuykvd29x72vNttIdwPjqGvb5w92-2dPkcC1kQ8xSwE3Zu2_3eh9s98OAiaAUXEJEPcvgY9Ygm1NQYTukCP37x33YLf71zMyWWuoKyt5qEVqpgUjmt5oZK7BmMZoEKzYlnkXZq5FY0wyvRgMZz7T6_ZyJt5a_Y9_Cx__gEGjIaMxQ4aEGkukalcxWPhmGcSQ0hiYGjLEFhkYj17FsOjoqHOHQWgojOiQAs4xsegkihAJKhoQeSChV8QZCdtQ2QC6d0BQUIDlEBDVAlhHgC8RYCjNQU7CHJgZkPKCUWXBoC8B6TowaiswbBoQagkwPPNgUHqSvvBivpwDLNUgLMIgpK4gJJhgTAtBSOUGiaUA-i3R61TGthwIqCZEsuwPqTV_2Spl-3dBlcqgzzrUVKdh-yq3jtxaqvGpaTYHnpbpLC1TGU1trKCR06qrNszrKtLJ5nCW7CdnOoZNZeJ0ApNQmTVqlcqkk7PRdCyaTKcSiXiSoZOAuo9AzCwTo-eSTDQ-l5ijE7F1QH2OV43OphJ0mqbpBJ1KJel4OgYodDHYpsWTvy3807X-L8ScRKU?type=png)](https://mermaid-live.nodejs.cn/edit#pako:eNqNVu9P20YY_lciV_12oCSOyY8Pk0LipVZjx3KcqpuDKpOcwWpiR8bu6AhSW1qqDiambl1XprXbxCb2hZW1K4yM8c_ETvgvdr5zEmckMMsffPc-73Pvve-9z3mNqpl1SGWoJUttLUfk-aoRQc_16xHvx2P3bKPXedztfCCTK84iQVUpWW_Chm7AAFWlCMJ_5KIysC6MZkVeERvOkm7wqqEuQStkknhFgkYdWhNMYmAS9VaYEc1VjQtBeTvPUay9d51e5004IpGPzMx8FMmKXBAD-gotgkbYnpNvB_acadhw1Q5hkA1jxGKlwAllhSzlHrzu_rP1f2I67Livt8ZiIkSYVL7B8qzSPe6c__wdwS9MBkqskGclxTv-w3vz9aVI9hYryEr3ZAtBLgXKpVJRcY9-cZ8cXU54W2aFMlcSFO_Zb-7hizHw5K27m096pwcEOHZA_O1i0nxWuqnkVeuuvAybkOR-YRKwyBVuyEpRX1q2J0NJZkgZS4KMor3Ds0JFCSrJQ8O5zEdkpY9LEp8VcqwiQkszraZq1GDpHrQa6v0Lnji7ozyjpfJcVmHvQQOtVNfVKx38rMucSFxk02zYeuvi9hEI-_AVtKE7hUpWyiu8g_ZTcFSrPoafcvjwQbnYEBJpCEkMdxpJdPYTVioHJ8w9fBQKh5gwaj6bu1mQShUhr_Q3tr1Xv09FyhzPFjmBVbyXH85fvu-fvp8OlRBrWemf7p8_nL50ocLlMWNZcXce9R9s9E7OpoI5Ic_lsnIJtcz2097eiftq_xKszKIIZP-Id0_2uifPp0LLOalULM5nEW1n1_1i3_vhp6nY0i1WQkOl_-tm7_tvR7BQwXytffHW-_LA-_MhmSGC1fbe7bub28NatFHdxuykvd29x72vNttIdwPjqGvb5w92-2dPkcC1kQ8xSwE3Zu2_3eh9s98OAiaAUXEJEPcvgY9Ygm1NQYTukCP37x33YLf71zMyWWuoKyt5qEVqpgUjmt5oZK7BmMZoEKzYlnkXZq5FY0wyvRgMZz7T6_ZyJt5a_Y9_Cx__gEGjIaMxQ4aEGkukalcxWPhmGcSQ0hiYGjLEFhkYj17FsOjoqHOHQWgojOiQAs4xsegkihAJKhoQeSChV8QZCdtQ2QC6d0BQUIDlEBDVAlhHgC8RYCjNQU7CHJgZkPKCUWXBoC8B6TowaiswbBoQagkwPPNgUHqSvvBivpwDLNUgLMIgpK4gJJhgTAtBSOUGiaUA-i3R61TGthwIqCZEsuwPqTV_2Spl-3dBlcqgzzrUVKdh-yq3jtxaqvGpaTYHnpbpLC1TGU1trKCR06qrNszrKtLJ5nCW7CdnOoZNZeJ0ApNQmTVqlcqkk7PRdCyaTKcSiXiSoZOAuo9AzCwTo-eSTDQ-l5ijE7F1QH2OV43OphJ0mqbpBJ1KJel4OgYodDHYpsWTvy3807X-L8ScRKU)
+```mermaid
+graph TB
+    %% 核心组件
+    subgraph "Timeline 核心"
+        TL[Timeline]
+        PM[PluginManager]
+        RM[RenderManager]
+        RP[RenderPipeline]
+    end
+
+    subgraph "插件系统"
+        PM --> API[PluginAPI]
+        API --> CTX[PluginContext]
+        CTX --> PLUGINS[插件实例]
+    end
+
+    subgraph "插件类型"
+        PLUGINS --> THEME[主题插件]
+        PLUGINS --> RENDER[渲染插件]
+        PLUGINS --> EVENT[事件插件]
+        PLUGINS --> TOOL[工具插件]
+        PLUGINS --> EXTENSION[扩展插件]
+    end
+
+    subgraph "内置插件"
+        THEME --> DARK[DarkThemePlugin]
+        THEME --> LIGHT[LightThemePlugin]
+        RENDER --> CONTEXT_MENU[ContextMenuPlugin]
+        RENDER --> PERFORMANCE[PerformanceOverlayPlugin]
+        EVENT --> EVENT_MEDIA[EventMediaPlugin]
+        EVENT --> EVENT_TOOLTIP[EventTooltipPlugin]
+        TOOL --> MUTEX_GUARD[MutexGuardPlugin]
+    end
+
+    subgraph "渲染系统"
+        RM --> RP
+        RP --> LAYERS[渲染层]
+        LAYERS --> BACKGROUND[背景层]
+        LAYERS --> TIMELINE[时间轴层]
+        LAYERS --> TRACKS[轨道层]
+        LAYERS --> GUIDELINES[参考线层]
+        LAYERS --> INDICATOR[指示器层]
+        LAYERS --> INTERACTION[交互层]
+        LAYERS --> SCROLLBAR[滚动条层]
+        LAYERS --> OVERLAY[覆盖层]
+    end
+
+    %% 数据流
+    PM -->|注册渲染层| RM
+    PM -->|事件处理| TL
+    PLUGINS -->|通过API| PM
+    RM -->|渲染调用| LAYERS
+    BACKGROUND -->|插件渲染| PM
+    OVERLAY -->|插件渲染| PM
+
+    %% 样式定义
+    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef plugin fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef render fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef builtin fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class TL,PM,RM,RP core
+    class API,CTX,PLUGINS,THEME,RENDER,EVENT,TOOL,EXTENSION plugin
+    class RM,RP,LAYERS,BACKGROUND,TIMELINE,TRACKS,GUIDELINES,INDICATOR,INTERACTION,SCROLLBAR,OVERLAY render
+    class DARK,LIGHT,CONTEXT_MENU,PERFORMANCE,EVENT_MEDIA,EVENT_TOOLTIP,MUTEX_GUARD builtin
+```
 
 本教程将带你从零开始开发一个 Timeline Canvas 插件，详细介绍插件生命周期、API 使用方法和最佳实践。
 

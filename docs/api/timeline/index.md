@@ -38,6 +38,8 @@ const timeline = new Timeline("timelineCanvas", {
 - `addTrack` - 添加轨道
 - `removeTrack` - 移除轨道
 - `setEndTime` - 设置结束时间
+- `beginIndexBatch` - 开始批量索引
+- `endIndexBatch` - 结束批量索引
 
 ### [视图控制](./view-control)
 
@@ -46,6 +48,9 @@ const timeline = new Timeline("timelineCanvas", {
 - `setTimeIndicator` - 设置时间指示器
 - `setCanvasSize` - 设置画布尺寸
 - `markDirty` - 触发重绘
+- `notifyChange` - 通知变更
+- `beginChangeBatch` - 开始批量变更
+- `endChangeBatch` - 结束批量变更
 
 ### [插件管理](./plugin-management)
 

@@ -4,6 +4,9 @@ import type {
   RenderLayer,
   PerformanceProvider,
 } from "../../plugins/types";
+import { getLogger } from "./Logger";
+
+const logger = getLogger("PluginManager");
 
 export class PluginManager {
   private plugins: Map<
@@ -63,8 +66,18 @@ export class PluginManager {
         message: string,
         type: "info" | "warning" | "error" = "info"
       ) => {
-        // 简化实现：控制台输出
-        console.log(`[plugin:${pluginId}] ${type}: ${message}`);
+        // 使用日志管理器输出插件通知
+        const pluginLogger = getLogger(`plugin:${pluginId}`);
+        switch (type) {
+          case "error":
+            pluginLogger.error(message);
+            break;
+          case "warning":
+            pluginLogger.warn(message);
+            break;
+          default:
+            pluginLogger.info(message);
+        }
       },
       getData: (key: string) => store.get(key),
       setData: (key: string, value: any) => store.set(key, value),

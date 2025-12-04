@@ -13,6 +13,9 @@ import {
   getTimeX,
 } from "../../utils";
 import { IdleState } from "./IdleState";
+import { getLogger } from "../../core/managers/Logger";
+
+const logger = getLogger("DraggingState");
 
 /**
  * 拖拽事件状态
@@ -64,13 +67,26 @@ export class DraggingState extends BaseState {
     }
 
     const { trackIndex, eventIndex } = state.draggingEvent;
+
+    // 验证事件索引是否有效
+    if (
+      trackIndex < 0 ||
+      trackIndex >= state.tracks.length ||
+      eventIndex < 0 ||
+      eventIndex >= state.tracks[trackIndex].events.length
+    ) {
+      logger.warn("当前错误的状态:", { value: state.draggingEvent });
+      state.draggingEvent = null;
+      return this.createIdleState();
+    }
+
     const event = state.tracks[trackIndex].events[eventIndex];
 
     this.timeline.setStatus(`正在拖动: ${event.title}`);
 
     // 计算新的时间位置
-    const currentMouseX = logicalX + state.scrollX;
-    const originalMouseX = state.draggingEvent.startX + state.scrollX;
+    const currentMouseX = logicalX;
+    const originalMouseX = state.draggingEvent.startX;
     const deltaPixels = currentMouseX - originalMouseX;
     const deltaTime = deltaPixels / (config.secondWidth * state.zoomLevel);
     let newStartTime = state.draggingEvent.originalStartTime + deltaTime;
@@ -216,7 +232,7 @@ export class DraggingState extends BaseState {
       state.draggingEvent.canMove = canMove;
     }
 
-    this.timeline.draw();
+    this.timeline.notifyChange("events:move");
     return null;
   }
 
@@ -229,7 +245,20 @@ export class DraggingState extends BaseState {
 
     const { trackIndex, eventIndex, originalTrackIndex, originalEventIndex } =
       state.draggingEvent;
-    const event = state.tracks[trackIndex].events[eventIndex];
+
+    // 验证轨道索引是否有效
+    if (trackIndex < 0 || trackIndex >= state.tracks.length) {
+      logger.warn(`无法找到拖拽的事件, 放弃操作`, { trackIndex, eventIndex });
+      state.draggingEvent = null;
+      return this.createIdleState();
+    }
+
+    const event = state.tracks[trackIndex]?.events[eventIndex];
+    if (!event) {
+      logger.warn(`无法找到拖拽的事件, 放弃操作`, { trackIndex, eventIndex });
+      state.draggingEvent = null;
+      return this.createIdleState();
+    }
     const wasSelected =
       state.selectedEvent &&
       state.selectedEvent.trackIndex === originalTrackIndex &&
@@ -273,7 +302,7 @@ export class DraggingState extends BaseState {
     }
 
     state.draggingEvent = null;
-    this.timeline.draw();
+    this.timeline.notifyChange("events:move");
 
     return this.createIdleState();
   }

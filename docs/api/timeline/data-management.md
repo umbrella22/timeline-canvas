@@ -105,3 +105,41 @@ timeline.setEndTime(86400); // 设置结束时间为24小时
 ```javascript
 const endTime = timeline.getEndTime(); // 返回秒数
 ```
+
+## beginIndexBatch
+
+`beginIndexBatch()`
+
+开始批量索引更新。在批量添加或修改大量事件时使用，可以提高性能。
+
+```javascript
+timeline.beginIndexBatch();
+// 批量添加事件...
+timeline.endIndexBatch();
+```
+
+## endIndexBatch
+
+`endIndexBatch()`
+
+结束批量索引更新，并重建索引。
+
+## invalidateIndexTrack
+
+`invalidateIndexTrack(trackIndex: number)`
+
+使指定轨道的索引失效，下次查询时会重新构建。
+
+```javascript
+timeline.invalidateIndexTrack(0);
+```
+
+## invalidateIndexAll
+
+`invalidateIndexAll()`
+
+使所有轨道的索引失效。
+
+```javascript
+timeline.invalidateIndexAll();
+```

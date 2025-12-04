@@ -1,4 +1,7 @@
 import { PluginType, TimelinePlugin, RenderLayer } from "../types";
+import { getLogger } from "../../core/managers/Logger";
+
+const logger = getLogger("ContextMenuPlugin");
 
 interface ContextMenuPluginOptions {
   /** 自定义 HTML 模板字符串。传入此参数将自动启用 HTML 渲染模式 */
@@ -24,9 +27,7 @@ export function ContextMenuPlugin(
       // 传入 htmlTemplate 自动启用 HTML 模式，但需要验证内容有效性
       let useHtml = !!htmlTemplate;
       if (useHtml && (!htmlTemplate || htmlTemplate.trim() === "")) {
-        console.warn(
-          "[ContextMenuPlugin] htmlTemplate is empty, falling back to Canvas rendering"
-        );
+        logger.warn("htmlTemplate is empty, falling back to Canvas rendering");
         useHtml = false;
       }
       const layer: RenderLayer = {

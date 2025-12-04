@@ -10,19 +10,8 @@ export class WheelHandler {
     } else {
       this.timeline.state.scrollY += e.deltaY;
       this.timeline.adjustCanvasSize();
-      // 滚动时需要重绘所有层，因为所有层都可能随滚动发生位置变化
-      // 特别是 indicator(时间指示器) 和 guideLines(辅助线) 必须重绘，否则会因画布清空而消失
-      this.timeline.markDirty([
-        "background",
-        "tracks",
-        "timeline",
-        "guideLines",
-        "indicator",
-        "scrollbar",
-        "interaction",
-        "overlay",
-      ]);
-      this.timeline.draw();
+      // 使用调度器处理滚动变更
+      this.timeline.notifyChange("scroll:y");
     }
   }
 }

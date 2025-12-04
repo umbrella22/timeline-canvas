@@ -1,5 +1,8 @@
 import type { Timeline } from "../core/Timeline";
 import { type InteractionState, IdleState } from "./states";
+import { LogColors, getLogger } from "../core/managers/Logger";
+
+const logger = getLogger("StateMachine");
 
 /**
  * MouseHandler - 鼠标事件处理器(重构为状态模式)
@@ -49,6 +52,7 @@ export class MouseHandler {
 
     // 调用旧状态的退出钩子
     if (oldState.onExit) {
+      logger.debugStyled(LogColors.stateExit, `◁ Exit: ${oldState.name}`);
       oldState.onExit(newState);
     }
 
@@ -57,15 +61,15 @@ export class MouseHandler {
 
     // 调用新状态的进入钩子
     if (newState.onEnter) {
+      logger.debugStyled(LogColors.stateEnter, `▷ Enter: ${newState.name}`);
       newState.onEnter(oldState);
     }
 
     // 调试日志
-    if (this.timeline.config.debug) {
-      console.log(
-        `[MouseHandler] State transition: ${oldState.name} -> ${newState.name}`
-      );
-    }
+    logger.debugStyled(
+      LogColors.stateTransition,
+      `⟳ Transition: ${oldState.name} → ${newState.name}`
+    );
   }
 
   /**

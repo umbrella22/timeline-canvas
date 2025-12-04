@@ -6,6 +6,9 @@ import {
   formatDuration,
   drawRoundedRect,
 } from "../../utils";
+import { LogColors, getLogger } from "../../core/managers/Logger";
+
+const logger = getLogger("EventsRenderer");
 
 /**
  * 事件渲染器 - 绘制轨道上的所有事件
@@ -34,6 +37,12 @@ export class EventsRenderer {
       textStyle.timeFontSize === "auto"
         ? Math.max(8, Math.min(12, config.trackHeight * 0.15))
         : textStyle.timeFontSize;
+
+    logger.debugStyled(
+      LogColors.eventRender,
+      `Track ${trackIndex}: ${track.events.length} events`
+    );
+
     for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
       const event = track.events[eventIndex];
       const isDraggingThis =
@@ -41,7 +50,13 @@ export class EventsRenderer {
         state.draggingEvent.isDragging &&
         state.draggingEvent.trackIndex === trackIndex &&
         state.draggingEvent.eventIndex === eventIndex;
-      if (isDraggingThis) continue;
+      if (isDraggingThis) {
+        logger.debugStyled(
+          LogColors.eventSkip,
+          `  ⊘ Event[${eventIndex}] "${event.title}" skipped (dragging)`
+        );
+        continue;
+      }
       const eventX =
         config.startPaddingTime +
         (event.startTime - config.startTime) *
@@ -49,7 +64,23 @@ export class EventsRenderer {
           state.zoomLevel -
         state.scrollX;
       const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
-      if (eventX + eventWidth < 0 || eventX > logicalWidth) continue;
+      if (eventX + eventWidth < 0 || eventX > logicalWidth) {
+        logger.debugStyled(
+          LogColors.eventSkip,
+          `  ⊘ Event[${eventIndex}] "${event.title}" culled (out of viewport)`
+        );
+        continue;
+      }
+
+      logger.debugStyled(LogColors.eventInfo, `  ● Event[${eventIndex}]`, {
+        title: event.title,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        duration: event.duration,
+        x: eventX.toFixed(1),
+        width: eventWidth.toFixed(1),
+      });
+
       const isSelected =
         state.selectedEvent &&
         state.selectedEvent.trackIndex === trackIndex &&

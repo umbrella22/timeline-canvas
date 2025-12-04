@@ -1,4 +1,7 @@
 import { PluginType, TimelinePlugin, RenderLayer } from "../types";
+import { getLogger } from "../../core/managers/Logger";
+
+const logger = getLogger("EventTooltipPlugin");
 
 interface EventTooltipPluginOptions {
   /** 自定义 HTML 模板函数，接收事件标题，返回 HTML 字符串。传入此参数将自动启用 HTML 渲染模式 */
@@ -273,8 +276,8 @@ export function EventTooltipPlugin(
             // 验证 htmlTemplate 返回有效内容
             const testContent = htmlTemplate(tooltipState.title);
             if (!testContent || testContent.trim() === "") {
-              console.warn(
-                "[EventTooltipPlugin] htmlTemplate returned empty content, falling back to Canvas rendering"
+              logger.warn(
+                "htmlTemplate returned empty content, falling back to Canvas rendering"
               );
             } else {
               let container: HTMLElement | null =

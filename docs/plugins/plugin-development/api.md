@@ -1,6 +1,32 @@
 # 核心 API
 
-[![](https://mermaid.ink/img/pako:eNp9k79v00AUx_8V602tZFzHSWxzQ5eyMBhlgAV5Odmv6UnxXTifq5YoG1QVVCICNlBFty6wIKBqVPhnEid_Bmc7jpomrZf78T7v1_f8BhCJGIFAiq8y5BE-YbQraRJyQ399KhWLWJ9yZbxIURo0NWafL_PTP-v25yzBHuNYMPV-neoEhb3Ty7qMB5TTLsoNUGkuwPzDx8n49_TH-eTv-5BXZFHIo93dOgcxshQrj61-uWxXXA1othMQoydofBerwE6wQKanX6bj6wraE1zhkbpNlPfEYJypragyb2-w00ixQ6pwI6Oz5D8vpydnVWfzX2_y69GtQlYaUzLDnX3aS_FOR5oqVNAVv_s2v7mZjT_l51_rKM-EQkMc6tcqGLMua5Hw32h-cTa5-m5Z1r2CSky0_4pYT-PNqmZ8TdcluqJKjA_qsqRSJcXxvdJdvZ2NTlale1g4MKErWQykuDIhQZnQ4giDwjMEdYAJhkD0NsZ9mvVUCCEfajf9J74UIqk9pci6B0DKoCZk_Vh3spiVJYI8RrknMq6ANFp-GQPIAI6AOF7TajjNlms3Hc9vuJ4Jx0Bc3_Kchus-9lst223bzaEJr8uktuU7tufbbqtt-47rtR0TMGZKyKCa13Jsh_8BFnRYwQ?type=png)](https://mermaid-live.nodejs.cn/edit#pako:eNp9k79v00AUx_8V602tZFzHSWxzQ5eyMBhlgAV5Odmv6UnxXTifq5YoG1QVVCICNlBFty6wIKBqVPhnEid_Bmc7jpomrZf78T7v1_f8BhCJGIFAiq8y5BE-YbQraRJyQ399KhWLWJ9yZbxIURo0NWafL_PTP-v25yzBHuNYMPV-neoEhb3Ty7qMB5TTLsoNUGkuwPzDx8n49_TH-eTv-5BXZFHIo93dOgcxshQrj61-uWxXXA1othMQoydofBerwE6wQKanX6bj6wraE1zhkbpNlPfEYJypragyb2-w00ixQ6pwI6Oz5D8vpydnVWfzX2_y69GtQlYaUzLDnX3aS_FOR5oqVNAVv_s2v7mZjT_l51_rKM-EQkMc6tcqGLMua5Hw32h-cTa5-m5Z1r2CSky0_4pYT-PNqmZ8TdcluqJKjA_qsqRSJcXxvdJdvZ2NTlale1g4MKErWQykuDIhQZnQ4giDwjMEdYAJhkD0NsZ9mvVUCCEfajf9J74UIqk9pci6B0DKoCZk_Vh3spiVJYI8RrknMq6ANFp-GQPIAI6AOF7TajjNlms3Hc9vuJ4Jx0Bc3_Kchus-9lst223bzaEJr8uktuU7tufbbqtt-47rtR0TMGZKyKCa13Jsh_8BFnRYwQ)
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Timeline as Timeline
+    participant PM as PluginManager
+    participant Plugin as 插件实例
+
+    User->>Timeline: usePlugin(plugin)
+    Timeline->>PM: loadPlugin(plugin)
+
+    PM->>PM: 创建PluginContext
+    PM->>Plugin: init(context)
+    PM->>Plugin: activate(context)
+    PM->>PM: 注册插件资源
+
+    PM-->>Timeline: true/false
+    Timeline-->>User: 加载结果
+
+    Note over User,Plugin: 插件运行中...
+
+    User->>Timeline: removePlugin(pluginId)
+    Timeline->>PM: unloadPlugin(pluginId)
+    PM->>Plugin: deactivate(context)
+    PM->>Plugin: destroy(context)
+    PM->>PM: 清理插件资源
+    PM-->>Timeline: true/false
+```
 
 ## 2. 插件接口详解
 

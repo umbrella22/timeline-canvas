@@ -47,6 +47,18 @@ export class ResizingState extends BaseState {
       originalStartTime,
       originalDuration,
     } = state.resizingEvent;
+
+    // 验证事件索引是否有效
+    if (
+      trackIndex < 0 ||
+      trackIndex >= state.tracks.length ||
+      eventIndex < 0 ||
+      eventIndex >= state.tracks[trackIndex].events.length
+    ) {
+      state.resizingEvent = null;
+      return this.createIdleState();
+    }
+
     const event = state.tracks[trackIndex].events[eventIndex];
     const deltaX = logicalX - state.resizingEvent.startX;
     const deltaTime = deltaX / (config.secondWidth * state.zoomLevel);
@@ -101,7 +113,7 @@ export class ResizingState extends BaseState {
           newDuration
         );
         if (!ok) {
-          this.timeline.draw();
+          this.timeline.notifyChange("events:update");
           return null;
         }
 
@@ -161,7 +173,7 @@ export class ResizingState extends BaseState {
           newDuration
         );
         if (!ok) {
-          this.timeline.draw();
+          this.timeline.notifyChange("events:update");
           return null;
         }
 
@@ -171,7 +183,7 @@ export class ResizingState extends BaseState {
       }
     }
 
-    this.timeline.draw();
+    this.timeline.notifyChange("events:update");
     this.timeline.setStatus(
       `调整大小: ${this.timeline.formatTime(
         event.startTime
@@ -189,8 +201,19 @@ export class ResizingState extends BaseState {
     }
 
     const { trackIndex, eventIndex } = state.resizingEvent;
-    const event = state.tracks[trackIndex].events[eventIndex];
 
+    // 验证事件索引是否有效
+    if (
+      trackIndex < 0 ||
+      trackIndex >= state.tracks.length ||
+      eventIndex < 0 ||
+      eventIndex >= state.tracks[trackIndex].events.length
+    ) {
+      state.resizingEvent = null;
+      return this.createIdleState();
+    }
+
+    const event = state.tracks[trackIndex].events[eventIndex];
     state.resizingEvent = null;
     this.timeline.getCanvas().style.cursor = "default";
     this.timeline.setStatus(`已调整事件大小: ${event.title}`);
@@ -204,7 +227,7 @@ export class ResizingState extends BaseState {
       });
     }
 
-    this.timeline.draw();
+    this.timeline.notifyChange("events:update");
     return this.createIdleState();
   }
 

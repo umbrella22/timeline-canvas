@@ -9,6 +9,9 @@ import { IndicatorRenderer } from "../../renderers/layers/IndicatorRenderer";
 import { GuideLinesRenderer } from "../../renderers/layers/GuideLinesRenderer";
 import { InteractionRenderer } from "../../renderers/layers/InteractionRenderer";
 import { createRenderContext } from "../../renderers/core/types";
+import { LogColors, getLogger } from "./Logger";
+
+const logger = getLogger("DirtyCheck");
 
 export class RenderManager {
   private canvas: HTMLCanvasElement;
@@ -47,7 +50,7 @@ export class RenderManager {
   ]);
   private lastLayerTimes: Record<string, number> = {};
   private isFirstRender = true;
-  private renderPipeline: RenderPipeline; // 新的渲染管道(架构准备,暂未启用)
+  private renderPipeline: RenderPipeline;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -147,6 +150,11 @@ export class RenderManager {
   }
 
   public draw(): void {
+    // 如果没有脏层，跳过绘制
+    if (this.dirtyLayers.size === 0 && !this.isFirstRender) {
+      return;
+    }
+
     this.pluginManager.measureStart("draw");
     const ctx = this.ctx;
     ctx.save();
@@ -182,9 +190,17 @@ export class RenderManager {
     );
 
     // 使用渲染管道渲染核心图层
-    // 首次渲染或 dirtyLayers 为空时强制全量渲染
-    const shouldForceFullRender =
-      this.isFirstRender || this.dirtyLayers.size === 0;
+    // 在单画布架构下，由于 clearRect 会清空整个画布
+    // 任何脏层都需要触发全量渲染，以确保所有层都被正确绘制
+    // TODO: 未来可使用离屏 Canvas 分层缓存来实现真正的脏层优化
+    const shouldForceFullRender = true;
+
+    // 如果没有脏层且不是首次渲染，标记所有层为需要渲染（因为 canvas 已被清空）
+    if (this.dirtyLayers.size === 0 && !this.isFirstRender) {
+      // 这是一个无变更的绘制调用，跳过
+      // 但由于前面已经清空了 canvas，我们需要全量渲染
+      // TODO: 优化为使用离屏缓存
+    }
 
     this.renderPipeline.render(renderContext, {
       forceFullRender: shouldForceFullRender,
@@ -213,9 +229,6 @@ export class RenderManager {
     ctx.restore();
     this.dirtyLayers.clear();
   }
-
-  // 旧的私有渲染方法已删除
-  // drawDraggingEvent 和 drawDragPreviewInternal 已迁移到 InteractionRenderer
 
   public getContentWidth(zoomLevel: number): number {
     return this.viewport.getContentWidth(zoomLevel);
@@ -271,10 +284,15 @@ export class RenderManager {
       | "interaction"
     >
   ): void {
+    logger.debugStyled(
+      LogColors.dataUpdate,
+      `✓ Marking layers dirty: [${layers.join(", ")}]`
+    );
     for (const l of layers) this.dirtyLayers.add(l);
   }
 
   public markAllDirty(): void {
+    logger.debugStyled(LogColors.dataUpdate, `✓ Marking ALL layers dirty`);
     this.dirtyLayers = new Set([
       "background",
       "tracks",

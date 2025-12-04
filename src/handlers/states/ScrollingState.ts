@@ -49,17 +49,7 @@ export class ScrollingState extends BaseState {
         Math.min(maxScrollY, scrollRatio * maxScrollY)
       );
 
-      this.timeline.markDirty([
-        "background",
-        "tracks",
-        "timeline",
-        "guideLines",
-        "indicator",
-        "scrollbar",
-        "interaction",
-        "overlay",
-      ]);
-      this.timeline.draw();
+      this.timeline.notifyChange("scroll:y");
       return null;
     }
 
@@ -82,17 +72,7 @@ export class ScrollingState extends BaseState {
         Math.min(maxScrollX, scrollRatio * maxScrollX)
       );
 
-      this.timeline.markDirty([
-        "background",
-        "tracks",
-        "timeline",
-        "guideLines",
-        "indicator",
-        "scrollbar",
-        "interaction",
-        "overlay",
-      ]);
-      this.timeline.draw();
+      this.timeline.notifyChange("scroll:x");
       return null;
     }
 
