@@ -6,8 +6,6 @@ import type {
 } from "../../plugins/types";
 import { getLogger } from "./Logger";
 
-const logger = getLogger("PluginManager");
-
 export class PluginManager {
   private plugins: Map<
     string,

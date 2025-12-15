@@ -1,58 +1,33 @@
 {
-  "name": "timeline-canvas",
-  "version": "1.0.9",
-  "description": "A powerful timeline component built with Canvas and TypeScript",
-  "main": "dist/index.mjs",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "name": "timeline-canvas-workspace",
+  "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.18.1",
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
-    "lint": "oxlint src",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "pnpm -C packages/timeline build",
+    "dev": "pnpm -C packages/timeline dev",
+    "lint": "pnpm -C packages/timeline lint",
+    "typecheck": "pnpm -C packages/timeline typecheck",
+    "postinstall": "node ./script/postinstall.mjs",
+    "changeset:add": "changeset add",
+    "changeset:version": "changeset version && node scripts/postinstall.mjs",
+    "changeset:publish": "changeset publish",
+    "mcp": "pnpm -C packages/mcp-service start",
+    "mcp:typecheck": "pnpm -C packages/mcp-service typecheck",
     "docs:dev": "rspress dev",
     "docs:build": "rspress build",
     "docs:preview": "rspress preview"
   },
-  "keywords": [
-    "timeline",
-    "canvas",
-    "typescript",
-    "event-timeline",
-    "visual-timeline"
-  ],
-  "author": "sky <https://github.com/umbrella22>",
-  "license": "MIT",
-  "packageManager": "pnpm@10.18.1",
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@rsbuild/plugin-vue": "^1.2.0",
     "@rspress/plugin-preview": "^1.46.2",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
-    "oxlint": "^1.30.0",
     "react": "^19.2.0",
     "rspress": "^2.0.0-beta.21",
     "rspress-plugin-mermaid": "^0.3.0",
-    "tsdown": "^0.16.8",
     "typescript": "^5.9.3",
     "vue": "^3.5.25"
-  },
-  "dependencies": {
-    "immer": "^10.1.1"
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
-    },
-    "./builtin-plugin/*": {
-      "types": "./dist/builtin-plugin/*.d.mts",
-      "import": "./dist/builtin-plugin/*.mjs"
-    }
   }
 }

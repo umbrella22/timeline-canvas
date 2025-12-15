@@ -22,6 +22,7 @@ export default defineConfig({
         { text: "安装与构建", link: "/guide/installation" },
         { text: "使用与示例", link: "/guide/usage" },
         { text: "配置项", link: "/guide/configuration" },
+        { text: "MCP 服务", link: "/guide/mcp" },
       ],
       "/plugins/": [
         {

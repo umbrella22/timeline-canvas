@@ -219,7 +219,14 @@ timeline.loadData({
     },
   ],
 });
+
 ```
+
+## 在 VS Code 中使用 MCP（可选）
+
+如果你使用 VS Code + Copilot Chat，并希望让 AI 以“工具调用”的方式协助生成插件骨架、做校验或触发 allowlist 脚本，请参考：
+
+- [MCP 服务（Copilot Chat）](/guide/mcp)
 
 ### 4. 添加插件
 
@@ -247,6 +254,8 @@ timeline.usePlugin(ContextMenuPlugin({
     }
   ]
 }));
+
+````
 
 ### 5. 回调参数参考
 
@@ -284,9 +293,7 @@ interface ContextMenuData {
   eventIndex: number;
   event: TimelineEvent;
 }
-````
-
-````
+```
 
 ## 完整示例（与 Demo 一致的秒制用法）
 

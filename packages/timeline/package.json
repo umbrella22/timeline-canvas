@@ -1,0 +1,52 @@
+{
+  "name": "timeline-canvas",
+  "version": "1.0.9",
+  "description": "A powerful timeline component built with Canvas and TypeScript",
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "timeline",
+    "canvas",
+    "typescript",
+    "event-timeline",
+    "visual-timeline"
+  ],
+  "author": "sky <https://github.com/umbrella22>",
+  "license": "MIT",
+  "packageManager": "pnpm@10.18.1",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "oxlint": "^1.30.0",
+    "tsdown": "^0.16.8",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.25"
+  },
+  "dependencies": {
+    "immer": "^10.1.1"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README_CN.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./builtin-plugin/*": {
+      "types": "./dist/builtin-plugin/*.d.mts",
+      "import": "./dist/builtin-plugin/*.mjs"
+    }
+  }
+}

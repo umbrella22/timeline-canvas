@@ -1,6 +1,9 @@
 import { defineConfig, type UserConfig } from "tsdown";
 import { cpSync, existsSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const packageDir = dirname(fileURLToPath(import.meta.url));
 
 const commonOptions: UserConfig = {
   format: ["esm"],
@@ -12,7 +15,7 @@ const commonOptions: UserConfig = {
 const BUILTIN_PLUGIN_DIR = "src/builtin-plugin";
 
 const getBuiltinPluginEntries = (): string[] => {
-  const pluginDir = resolve(__dirname, BUILTIN_PLUGIN_DIR);
+  const pluginDir = resolve(packageDir, BUILTIN_PLUGIN_DIR);
   if (!existsSync(pluginDir)) {
     console.warn(`[tsdown] Builtin plugin directory not found: ${pluginDir}`);
     return [];
@@ -41,8 +44,9 @@ export default defineConfig(({ watch }) => {
         {
           name: "copy-to-docs",
           writeBundle() {
-            const src = resolve(__dirname, "dist");
-            const dest = resolve(__dirname, "docs/public/dist");
+            const workspaceRoot = resolve(packageDir, "../..");
+            const src = resolve(packageDir, "dist");
+            const dest = resolve(workspaceRoot, "docs/public/dist");
             if (existsSync(src)) {
               cpSync(src, dest, { recursive: true, force: true });
               console.log(`[copy-to-docs] Copied dist to ${dest}`);

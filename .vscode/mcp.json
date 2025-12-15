@@ -1,0 +1,23 @@
+{
+	"servers": {
+		"timeline-canvas": {
+			"type": "stdio",
+			"command": "npx",
+			"cwd": "${input:cwd}",
+			"args": [
+				"-y",
+				"timeline-canvas-mcp@1.0.0"
+			],
+			"env": {
+				"MCP_WORKSPACE_ROOT": "${input:cwd}"
+			}
+		}
+	},
+	"inputs": [
+		{
+			"id": "cwd",
+			"type": "promptString",
+			"description": "Working directory (cwd)"
+		}
+	]
+}

@@ -135,6 +135,7 @@ timeline.usePlugin(new PerformanceOverlayPlugin());
 ## 开发
 
 ```bash
+# 在仓库根目录执行以下命令（monorepo）
 # 安装依赖
 pnpm install
 

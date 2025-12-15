@@ -135,6 +135,7 @@ timeline.usePlugin(new PerformanceOverlayPlugin());
 ## Development
 
 ```bash
+# Run these from the repo root (monorepo)
 # Install dependencies
 pnpm install
 

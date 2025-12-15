@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, CSSProperties } from 'react';
-import { Timeline } from '../../src/index';
-import { LightThemePlugin } from '../../src/plugins/builtin/LightThemePlugin';
-import { DarkThemePlugin } from '../../src/plugins/builtin/DarkThemePlugin';
-import { ContextMenuPlugin } from '../../src/plugins/builtin/ContextMenuPlugin';
-import { PerformanceOverlayPlugin } from '../../src/plugins/builtin/PerformanceOverlayPlugin';
-import { EventMediaPlugin } from '../../src/plugins/builtin/EventMediaPlugin';
-import { MutexGuardPlugin } from '../../src/plugins/builtin/MutexGuardPlugin';
-import { EventTooltipPlugin } from "../../src/plugins/builtin/EventTooltipPlugin"
+import { Timeline } from '../../packages/timeline/src/index';
+import { LightThemePlugin } from '../../packages/timeline/src/plugins/builtin/LightThemePlugin';
+import { DarkThemePlugin } from '../../packages/timeline/src/plugins/builtin/DarkThemePlugin';
+import { ContextMenuPlugin } from '../../packages/timeline/src/plugins/builtin/ContextMenuPlugin';
+import { PerformanceOverlayPlugin } from '../../packages/timeline/src/plugins/builtin/PerformanceOverlayPlugin';
+import { EventMediaPlugin } from '../../packages/timeline/src/plugins/builtin/EventMediaPlugin';
+import { MutexGuardPlugin } from '../../packages/timeline/src/plugins/builtin/MutexGuardPlugin';
+import { EventTooltipPlugin } from "../../packages/timeline/src/plugins/builtin/EventTooltipPlugin"
 
 // Inline styles
 const styles: Record<string, CSSProperties> = {
