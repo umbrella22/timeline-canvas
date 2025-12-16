@@ -1,0 +1,51 @@
+# Timeline Canvas
+
+> Canvas Timeline 使用文档
+
+## 指南
+
+- [快速开始](/timeline-canvas/guide/getting-started.md)
+
+## 配置
+
+- [配置项](/timeline-canvas/guide/configuration.md)
+
+## 插件
+
+- [ContextMenuPlugin](/timeline-canvas/plugins/builtin/context-menu.md)
+- [EventTooltipPlugin](/timeline-canvas/plugins/builtin/event-tooltip.md)
+- [LightThemePlugin](/timeline-canvas/plugins/builtin/light-theme.md)
+- [DarkThemePlugin](/timeline-canvas/plugins/builtin/dark-theme.md)
+- [PerformanceOverlayPlugin](/timeline-canvas/plugins/builtin/performance-overlay.md)
+- [EventMediaPlugin](/timeline-canvas/plugins/builtin/event-media.md)
+- [MutexGuardPlugin](/timeline-canvas/plugins/builtin/mutex-guard.md)
+- [内置插件总览](/timeline-canvas/plugins/builtin/index.md)
+
+## API
+
+- [数据管理 API](/timeline-canvas/api/timeline/data-management.md)
+- [视图控制 API](/timeline-canvas/api/timeline/view-control.md)
+- [插件管理 API](/timeline-canvas/api/timeline/plugin-management.md)
+- [事件监听 API](/timeline-canvas/api/timeline/event-listeners.md)
+- [类型定义](/timeline-canvas/api/timeline/types.md)
+- [Timeline API 总览](/timeline-canvas/api/timeline/index.md)
+
+## 演练场
+
+- [演练场](/timeline-canvas/playground.md)
+
+## Other
+
+- [性能与监控](/timeline-canvas/advanced/performance.md)
+- [](/timeline-canvas/components/TimelinePlayground.md)
+- [安装与构建](/timeline-canvas/guide/installation.md)
+- [MCP 服务（面向 Copilot Chat / AI CLI）](/timeline-canvas/guide/mcp.md)
+- [使用与示例](/timeline-canvas/guide/usage.md)
+- [高级主题](/timeline-canvas/plugins/plugin-development/advanced.md)
+- [核心 API](/timeline-canvas/plugins/plugin-development/api.md)
+- [最佳实践](/timeline-canvas/plugins/plugin-development/best-practices.md)
+- [事件系统](/timeline-canvas/plugins/plugin-development/events.md)
+- [编写插件示例](/timeline-canvas/plugins/plugin-development/example.md)
+- [插件开发教程](/timeline-canvas/plugins/plugin-development/index.md)
+- [插件生命周期](/timeline-canvas/plugins/plugin-development/lifecycle.md)
+- [渲染机制](/timeline-canvas/plugins/plugin-development/rendering.md)
