@@ -1,13 +1,18 @@
-import { defineConfig } from "rspress/config";
+import { defineConfig } from "@rspress/core";
 import { pluginPreview } from "@rspress/plugin-preview";
+import { pluginLlms } from "@rspress/plugin-llms";
 import mermaid from "rspress-plugin-mermaid";
 import { pluginVue } from "@rsbuild/plugin-vue";
+import { pluginSitemap } from '@rspress/plugin-sitemap';
+import { pluginTwoslash } from '@rspress/plugin-twoslash';
 
 export default defineConfig({
   base: "/timeline-canvas/",
   root: "docs",
   title: "Timeline Canvas",
   description: "Canvas Timeline 使用文档",
+  lang: "zh",
+  lastUpdated: true,
   themeConfig: {
     nav: [
       { text: "指南", link: "/guide/getting-started" },
@@ -75,8 +80,11 @@ export default defineConfig({
     },
   },
   plugins: [
-    mermaid({
-      look: "handDrawn",
+    mermaid(),
+    pluginLlms(),
+    pluginTwoslash(),
+    pluginSitemap({
+      siteUrl: 'https://umbrella22.github.io/timeline-canvas/', // 替换为你的网站 URL
     }),
     pluginPreview({
       iframeOptions: {

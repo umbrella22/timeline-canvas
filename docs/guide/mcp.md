@@ -115,7 +115,7 @@ pnpm -C packages/mcp-service start
 
 ### 结构 B：配置键名是 `servers`（与本仓库示例一致）
 
-一些客户端会用 `servers` + `type: "stdio"` 的结构（本仓库 [.vscode/mcp.json](.vscode/mcp.json) 就是这种风格）：
+一些客户端会用 `servers` + `type: "stdio"` 的结构：
 
 ```jsonc
 {
