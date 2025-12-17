@@ -411,7 +411,7 @@ declare global {
 /**
  * 状态变更类型
  */
-type ChangeType = "events:add" | "events:update" | "events:delete" | "events:move" | "events:split" | "tracks:add" | "tracks:remove" | "timeIndicator:move" | "timeIndicator:drag" | "scroll:x" | "scroll:y" | "zoom:change" | "selection:change" | "highlight:change" | "canvas:resize" | "data:load" | "theme:change" | "interaction:hover" | "interaction:contextMenu" | "interaction:splitLine" | "config:endTime" | "config:readOnly";
+type ChangeType = "events:add" | "events:update" | "events:delete" | "events:move" | "events:split" | "tracks:add" | "tracks:remove" | "timeIndicator:move" | "timeIndicator:drag" | "scroll:x" | "scroll:y" | "zoom:change" | "selection:change" | "highlight:change" | "canvas:resize" | "data:load" | "theme:change" | "interaction:hover" | "interaction:contextMenu" | "interaction:splitLine" | "config:debug" | "config:timeIndicator" | "config:endTime" | "config:readOnly";
 //#endregion
 //#region src/core/Timeline.d.ts
 declare class Timeline {
@@ -458,6 +458,8 @@ declare class Timeline {
    * 结束批量变更操作
    */
   endChangeBatch(): void;
+  setDebug(enabled: boolean): void;
+  setEnableTimeIndicator(enabled: boolean): void;
   markDirty(layers: Array<"background" | "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "overlay" | "interaction">): void;
   getLastLayerTimes(): Record<string, number>;
   beginIndexBatch(): void;

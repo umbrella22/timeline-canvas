@@ -1,4 +1,4 @@
-import { t as TimelinePlugin } from "./types-D5-4YwEP.mjs";
+import { t as TimelinePlugin } from "./types-CKN-Qcus.mjs";
 
 //#region src/plugins/builtin/EventMediaPlugin.d.ts
 declare function EventMediaPlugin(): TimelinePlugin;

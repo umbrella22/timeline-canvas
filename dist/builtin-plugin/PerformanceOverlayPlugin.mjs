@@ -1,1 +1,1 @@
-import"../performanceMonitor-Cf-Ah4F7.mjs";import"../types-CkHQNcJ5.mjs";import{t as e}from"../PerformanceOverlayPlugin-Bx-DkYbW.mjs";export{e as PerformanceOverlayPlugin};
+import{t as e}from"../PerformanceOverlayPlugin-BSGFr5Yq.mjs";export{e as PerformanceOverlayPlugin};
