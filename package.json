@@ -31,6 +31,7 @@
     "react-dom": "^19.2.3",
     "@rspress/core": "^2.0.0-rc.2",
     "rspress-plugin-mermaid": "^0.3.0",
+    "tsdown": "^0.18.0",
     "typescript": "^5.9.3",
     "vue": "^3.5.25"
   }

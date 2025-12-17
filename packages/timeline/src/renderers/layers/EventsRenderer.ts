@@ -10,6 +10,8 @@ import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("EventsRenderer");
 
+const lastTrackLogTime = new Map<number, number>();
+
 /**
  * 事件渲染器 - 绘制轨道上的所有事件
  */
@@ -38,10 +40,15 @@ export class EventsRenderer {
         ? Math.max(8, Math.min(12, config.trackHeight * 0.15))
         : textStyle.timeFontSize;
 
-    logger.debugStyled(
-      LogColors.eventRender,
-      `Track ${trackIndex}: ${track.events.length} events`
-    );
+    const now = performance.now();
+    const lastLogTime = lastTrackLogTime.get(trackIndex) ?? 0;
+    if (now - lastLogTime >= 500) {
+      lastTrackLogTime.set(trackIndex, now);
+      logger.debugStyled(
+        LogColors.eventRender,
+        `Track ${trackIndex}: ${track.events.length} events`
+      );
+    }
 
     for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
       const event = track.events[eventIndex];
@@ -51,10 +58,6 @@ export class EventsRenderer {
         state.draggingEvent.trackIndex === trackIndex &&
         state.draggingEvent.eventIndex === eventIndex;
       if (isDraggingThis) {
-        logger.debugStyled(
-          LogColors.eventSkip,
-          `  ⊘ Event[${eventIndex}] "${event.title}" skipped (dragging)`
-        );
         continue;
       }
       const eventX =
@@ -65,21 +68,8 @@ export class EventsRenderer {
         state.scrollX;
       const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
       if (eventX + eventWidth < 0 || eventX > logicalWidth) {
-        logger.debugStyled(
-          LogColors.eventSkip,
-          `  ⊘ Event[${eventIndex}] "${event.title}" culled (out of viewport)`
-        );
         continue;
       }
-
-      logger.debugStyled(LogColors.eventInfo, `  ● Event[${eventIndex}]`, {
-        title: event.title,
-        startTime: event.startTime,
-        endTime: event.endTime,
-        duration: event.duration,
-        x: eventX.toFixed(1),
-        width: eventWidth.toFixed(1),
-      });
 
       const isSelected =
         state.selectedEvent &&
@@ -97,7 +87,10 @@ export class EventsRenderer {
         indicatorPosition > event.startTime &&
         indicatorPosition < event.endTime;
       const isTimeIndicatorHighlighted =
-        !state.isManualSelection && isInHighlightList && isIndicatorInRange;
+        config.enableTimeIndicator &&
+        !state.isManualSelection &&
+        isInHighlightList &&
+        isIndicatorInRange;
       const shouldHighlight =
         isSelected || isHighlighted || isTimeIndicatorHighlighted;
       ctx.save();

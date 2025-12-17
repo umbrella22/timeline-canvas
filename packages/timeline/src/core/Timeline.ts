@@ -257,6 +257,24 @@ export class Timeline {
     this.changeScheduler.endBatch();
   }
 
+  public setDebug(enabled: boolean): void {
+    if (this.config.debug === enabled) return;
+    this.config.debug = enabled;
+    this.logger.setLevel(enabled ? "debug" : "info");
+    configureGlobalLogger({ level: enabled ? "debug" : "info" });
+    this.notifyChange("config:debug");
+  }
+
+  public setEnableTimeIndicator(enabled: boolean): void {
+    if (this.config.enableTimeIndicator === enabled) return;
+    this.config.enableTimeIndicator = enabled;
+    if (!enabled) {
+      this.state.draggingTimeIndicator = false;
+      this.state.timeIndicatorHighlightedEvents = [];
+    }
+    this.notifyChange("config:timeIndicator");
+  }
+
   public markDirty(
     layers: Array<
       | "background"

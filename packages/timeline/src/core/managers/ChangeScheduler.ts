@@ -33,6 +33,8 @@ export type ChangeType =
   | "interaction:hover"
   | "interaction:contextMenu"
   | "interaction:splitLine"
+  | "config:debug"
+  | "config:timeIndicator"
   | "config:endTime"
   | "config:readOnly";
 
@@ -84,6 +86,7 @@ interface BatchContext {
  */
 export class ChangeScheduler {
   private state: TimelineState;
+  private config: TimelineConfig;
   private callbacks: TimelineCallbacks;
   private renderManager: RenderManager | null = null;
   private drawFn: (() => void) | null = null;
@@ -99,10 +102,11 @@ export class ChangeScheduler {
 
   constructor(
     state: TimelineState,
-    _config: TimelineConfig,
+    config: TimelineConfig,
     callbacks: TimelineCallbacks
   ) {
     this.state = state;
+    this.config = config;
     this.callbacks = callbacks;
     this.initializeHandlers();
   }
@@ -285,6 +289,17 @@ export class ChangeScheduler {
 
     this.handlers.set("interaction:splitLine", {
       layers: ["tracks"],
+      needsDraw: true,
+    });
+
+    this.handlers.set("config:debug", {
+      layers: ["overlay"],
+      needsDraw: true,
+    });
+
+    this.handlers.set("config:timeIndicator", {
+      layers: ["indicator", "tracks", "interaction"],
+      derive: () => this.refreshHighlightList(),
       needsDraw: true,
     });
 
@@ -495,6 +510,7 @@ export class ChangeScheduler {
   private detectHighlightedEvents(
     position: number
   ): Array<{ trackIndex: number; eventIndex: number }> {
+    if (!this.config.enableTimeIndicator) return [];
     const highlightedEvents: Array<{ trackIndex: number; eventIndex: number }> =
       [];
 

@@ -25,10 +25,7 @@
   "packageManager": "pnpm@10.18.1",
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "oxlint": "^1.30.0",
-    "tsdown": "^0.16.8",
-    "typescript": "^5.9.3",
-    "vue": "^3.5.25"
+    "oxlint": "^1.33.0"
   },
   "dependencies": {
     "immer": "^10.1.1"

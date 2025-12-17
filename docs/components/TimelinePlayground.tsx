@@ -277,14 +277,14 @@ const TimelinePlayground = () => {
 
         timeline.config.enableEventResize = config.enableEventResize;
         timeline.config.enableEventSplit = config.enableEventSplit;
-        timeline.config.enableTimeIndicator = config.enableTimeIndicator;
+        timeline.setEnableTimeIndicator(config.enableTimeIndicator);
         timeline.config.enableContextMenu = config.enableContextMenu;
-        timeline.config.debug = config.debug;
+        timeline.setDebug(config.debug);
         timeline.config.snapToSeconds = config.snapToSeconds;
         timeline.config.showEventDurationLabel = config.showEventDurationLabel;
         timeline.config.autoAddTrack = config.autoAddTrack;
         timeline.config.autoRemoveEmptyLastTrack = config.autoRemoveEmptyLastTrack;
-        timeline.config.readOnly = config.readOnly;
+        timeline.setReadOnly(config.readOnly);
 
         timeline.draw();
     }, [config]);

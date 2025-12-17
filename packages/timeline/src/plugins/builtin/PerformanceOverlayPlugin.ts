@@ -9,7 +9,9 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
     type: PluginType.TOOL,
   },
   activate(context) {
-    const monitor = new PerformanceMonitor(context.config.enablePerformanceMonitor || context.config.debug);
+    const monitor = new PerformanceMonitor(
+      context.config.enablePerformanceMonitor || context.config.debug
+    );
     context.api.setPerformanceProvider(monitor);
     context.api.setData("perfMonitor", monitor);
     context.api.setData("perfOverlayPos", { x: 10, y: 10 });
@@ -20,11 +22,25 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const size = context.api.getData("perfOverlaySize") as { width: number; height: number } | undefined;
-      const pos = (context.api.getData("perfOverlayPos") as { x: number; y: number }) || { x: 10, y: 10 };
-      if (size && x >= pos.x && x <= pos.x + size.width && y >= pos.y && y <= pos.y + size.height) {
+      const size = context.api.getData("perfOverlaySize") as
+        | { width: number; height: number }
+        | undefined;
+      const pos = (context.api.getData("perfOverlayPos") as {
+        x: number;
+        y: number;
+      }) || { x: 10, y: 10 };
+      if (
+        size &&
+        x >= pos.x &&
+        x <= pos.x + size.width &&
+        y >= pos.y &&
+        y <= pos.y + size.height
+      ) {
         context.api.setData("perfOverlayDragging", true);
-        context.api.setData("perfOverlayOffset", { x: x - pos.x, y: y - pos.y });
+        context.api.setData("perfOverlayOffset", {
+          x: x - pos.x,
+          y: y - pos.y,
+        });
         e.stopPropagation();
         e.preventDefault();
       }
@@ -35,8 +51,14 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const offset = (context.api.getData("perfOverlayOffset") as { x: number; y: number }) || { x: 0, y: 0 };
-      const size = (context.api.getData("perfOverlaySize") as { width: number; height: number }) || { width: 0, height: 0 };
+      const offset = (context.api.getData("perfOverlayOffset") as {
+        x: number;
+        y: number;
+      }) || { x: 0, y: 0 };
+      const size = (context.api.getData("perfOverlaySize") as {
+        width: number;
+        height: number;
+      }) || { width: 0, height: 0 };
       let nx = x - offset.x;
       let ny = y - offset.y;
       nx = Math.max(0, Math.min(rect.width - size.width, nx));
@@ -55,18 +77,33 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
     canvas.addEventListener("mousedown", onMouseDown, { capture: true });
     canvas.addEventListener("mousemove", onMouseMove, { capture: true });
     window.addEventListener("mouseup", onMouseUp, { capture: true });
-    context.api.setData("perfOverlayListeners", { onMouseDown, onMouseMove, onMouseUp });
+    context.api.setData("perfOverlayListeners", {
+      onMouseDown,
+      onMouseMove,
+      onMouseUp,
+    });
     const layer: RenderLayer = {
       name: "performance-overlay",
       position: "overlay",
       render(ctx) {
-        const m = context.api.getData("perfMonitor") as PerformanceMonitor | undefined;
-        const shouldEnable = !!(context.config.enablePerformanceMonitor || context.config.debug);
+        const m = context.api.getData("perfMonitor") as
+          | PerformanceMonitor
+          | undefined;
+        const shouldEnable = !!(
+          context.config.enablePerformanceMonitor || context.config.debug
+        );
         if (m) {
-          if (shouldEnable) m.enable(); else m.disable();
+          if (shouldEnable) {
+            m.enable();
+          } else {
+            m.disable();
+            m.clear();
+            return;
+          }
+        } else if (!shouldEnable) {
+          return;
         }
         const allStats = context.api.getPerformanceStats();
-        if (allStats.size === 0) return;
 
         const padding = 15;
         const lineHeight = 20;
@@ -74,13 +111,34 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
         const fps = context.api.getFPS();
         const lines = Array.from(allStats.entries());
         const overlayWidth = 280;
-        const ordered = ["background","tracks","timeline","interaction","guideLines","scrollbar","overlay","dragPreview"];
-        const layerTimes = context.timeline.getLastLayerTimes ? context.timeline.getLastLayerTimes() : undefined;
-        const layerCount = layerTimes ? ordered.filter((k) => layerTimes[k] !== undefined).length : 0;
+        const ordered = [
+          "background",
+          "tracks",
+          "timeline",
+          "interaction",
+          "guideLines",
+          "scrollbar",
+          "overlay",
+          "dragPreview",
+        ];
+        const layerTimes = context.timeline.getLastLayerTimes
+          ? context.timeline.getLastLayerTimes()
+          : undefined;
+        const layerCount = layerTimes
+          ? ordered.filter((k) => layerTimes[k] !== undefined).length
+          : 0;
         const extraRows = layerTimes ? 1 + layerCount : 0;
-        const overlayHeight = headerHeight + (1 + lines.length + extraRows) * lineHeight + padding * 2;
-        const pos = (context.api.getData("perfOverlayPos") as { x: number; y: number }) || { x: 10, y: 10 };
-        context.api.setData("perfOverlaySize", { width: overlayWidth, height: overlayHeight });
+        const statsRows = allStats.size === 0 ? 1 : lines.length;
+        const overlayHeight =
+          headerHeight + (1 + statsRows + extraRows) * lineHeight + padding * 2;
+        const pos = (context.api.getData("perfOverlayPos") as {
+          x: number;
+          y: number;
+        }) || { x: 10, y: 10 };
+        context.api.setData("perfOverlaySize", {
+          width: overlayWidth,
+          height: overlayHeight,
+        });
 
         ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
         ctx.fillRect(pos.x, pos.y, overlayWidth, overlayHeight);
@@ -92,7 +150,8 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
         ctx.textAlign = "left";
         ctx.fillText("性能监控报告", pos.x + 10, pos.y + 20);
         let yOffset = pos.y + 20 + headerHeight;
-        ctx.fillStyle = fps >= 55 ? "#00FF00" : fps >= 30 ? "#FFFF00" : "#FF0000";
+        ctx.fillStyle =
+          fps >= 55 ? "#00FF00" : fps >= 30 ? "#FFFF00" : "#FF0000";
         ctx.font = "bold 14px monospace";
         ctx.fillText(`FPS: ${fps.toFixed(1)}`, pos.x + 10, yOffset);
         ctx.font = "12px monospace";
@@ -107,21 +166,33 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
           ctx.fillStyle = "#FFFFFF";
           for (const key of ordered) {
             if (layerTimes[key] !== undefined) {
-              ctx.fillText(`${key}: ${layerTimes[key].toFixed(2)}`, pos.x + 10, yOffset);
+              ctx.fillText(
+                `${key}: ${layerTimes[key].toFixed(2)}`,
+                pos.x + 10,
+                yOffset
+              );
               yOffset += lineHeight;
             }
           }
         }
 
-        lines.forEach(([name, stats]) => {
-          let color = "#00FF00";
-          if (stats.average > 16) color = "#FFFF00";
-          if (stats.average > 33) color = "#FF0000";
-          ctx.fillStyle = color;
-          const text = `${name}: ${stats.average.toFixed(2)}ms (${stats.min.toFixed(1)}-${stats.max.toFixed(1)})`;
-          ctx.fillText(text, pos.x + 10, yOffset);
+        if (allStats.size === 0) {
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillText("Collecting...", pos.x + 10, yOffset);
           yOffset += lineHeight;
-        });
+        } else {
+          lines.forEach(([name, stats]) => {
+            let color = "#00FF00";
+            if (stats.average > 16) color = "#FFFF00";
+            if (stats.average > 33) color = "#FF0000";
+            ctx.fillStyle = color;
+            const text = `${name}: ${stats.average.toFixed(
+              2
+            )}ms (${stats.min.toFixed(1)}-${stats.max.toFixed(1)})`;
+            ctx.fillText(text, pos.x + 10, yOffset);
+            yOffset += lineHeight;
+          });
+        }
       },
     };
     context.api.registerRenderLayer(layer);
@@ -129,7 +200,11 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
   deactivate(context) {
     context.api.unregisterRenderLayer("performance-overlay");
     const listeners = context.api.getData("perfOverlayListeners") as
-      | { onMouseDown: (e: MouseEvent) => void; onMouseMove: (e: MouseEvent) => void; onMouseUp: (e: MouseEvent) => void }
+      | {
+          onMouseDown: (e: MouseEvent) => void;
+          onMouseMove: (e: MouseEvent) => void;
+          onMouseUp: (e: MouseEvent) => void;
+        }
       | undefined;
     const canvas = context.timeline.getCanvas();
     if (listeners) {

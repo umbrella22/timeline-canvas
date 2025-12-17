@@ -9,6 +9,8 @@ import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("RenderPipeline");
 
+let lastPipelineLogTime = 0;
+
 /**
  * 渲染管道 - 管理和执行多个渲染器
  *
@@ -71,14 +73,18 @@ export class RenderPipeline {
       skipPerfMeasure = false,
     } = options;
 
-    logger.debugStyled(
-      LogColors.pipeline,
-      `▶ Render Start`,
-      `forceFullRender=${forceFullRender}`,
-      dirtyLayers
-        ? `dirtyLayers=[${Array.from(dirtyLayers).join(", ")}]`
-        : "dirtyLayers=all"
-    );
+    const shouldLog = startTime - lastPipelineLogTime >= 250;
+    if (shouldLog) {
+      lastPipelineLogTime = startTime;
+      logger.debugStyled(
+        LogColors.pipeline,
+        `▶ Render Start`,
+        `forceFullRender=${forceFullRender}`,
+        dirtyLayers
+          ? `dirtyLayers=[${Array.from(dirtyLayers).join(", ")}]`
+          : "dirtyLayers=all"
+      );
+    }
 
     this.stats.renderedLayers = 0;
     this.stats.skippedLayers = 0;
@@ -100,20 +106,11 @@ export class RenderPipeline {
 
       if (!shouldRender) {
         this.stats.skippedLayers++;
-        logger.debugStyled(
-          LogColors.pipelineSkip,
-          `  ⊘ Layer "${layer}" skipped`
-        );
         continue;
       }
 
       // 执行渲染
       const layerStartTime = skipPerfMeasure ? 0 : performance.now();
-
-      logger.debugStyled(
-        LogColors.pipelineLayer,
-        `  ● Layer "${layer}" rendering...`
-      );
 
       try {
         renderer.render(context);
@@ -129,14 +126,15 @@ export class RenderPipeline {
 
     this.stats.totalTime = performance.now() - startTime;
     this.prevContext = context;
-
-    logger.debugStyled(
-      LogColors.pipeline,
-      `◀ Render End`,
-      `rendered=${this.stats.renderedLayers}, skipped=${
-        this.stats.skippedLayers
-      }, time=${this.stats.totalTime.toFixed(2)}ms`
-    );
+    if (shouldLog) {
+      logger.debugStyled(
+        LogColors.pipeline,
+        `◀ Render End`,
+        `rendered=${this.stats.renderedLayers}, skipped=${
+          this.stats.skippedLayers
+        }, time=${this.stats.totalTime.toFixed(2)}ms`
+      );
+    }
 
     return { ...this.stats };
   }
