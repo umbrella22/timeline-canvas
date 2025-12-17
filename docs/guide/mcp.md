@@ -152,7 +152,7 @@ pnpm -C packages/mcp-service start
 配置完成后，在 Copilot Chat 里做一次最小验证：
 
 - 调用 `timeline_repo_map`：应返回仓库关键文件地图
-- 调用 `timeline_list_builtin_plugins`：应列出 `src/plugins/builtin` 下的插件
+- 调用 `timeline_list_builtin_plugins`：应列出 `packages/timeline/src/plugins/builtin` 下的插件
 
 ## 推荐工作流（最短路径）
 
@@ -163,10 +163,10 @@ pnpm -C packages/mcp-service start
 1. 先跑仓库地图，快速知道应该看哪些目录：
 
 ```json
-{ "roots": ["src", "docs"], "maxEntries": 600 }
+{ "roots": ["packages/timeline/src", "docs"], "maxEntries": 600 }
 ```
 
-1. 在 `src/` 和 `docs/` 里搜索你关心的关键字（例如 `usePlugin`、类名或报错信息）：
+1. 在 `packages/timeline/src` 和 `docs` 里搜索你关心的关键字（例如 `usePlugin`、类名或报错信息）：
 
 ```json
 { "query": "usePlugin", "mode": "literal", "maxResults": 20, "contextLines": 2 }
@@ -175,7 +175,11 @@ pnpm -C packages/mcp-service start
 1. 对某个命中文件用 excerpt 精读小段（避免一次读太多）：
 
 ```json
-{ "file": "src/core/Timeline.ts", "startLine": 1, "endLine": 160 }
+{
+  "file": "packages/timeline/src/core/Timeline.ts",
+  "startLine": 1,
+  "endLine": 160
+}
 ```
 
 ### 2) 不知道从哪里开始看：走入口链路
@@ -244,7 +248,7 @@ pnpm -C packages/mcp-service start
 
 输入参数：
 
-- `roots?: string[]`（默认：`["src", "docs"]`）：扫描的根目录（相对仓库根）
+- `roots?: string[]`（默认：`["packages/timeline/src", "docs"]`）：扫描的根目录（相对仓库根）
 - `maxEntries?: number`（默认：`800`，范围 50~2000）：最多输出条目数
 
 输出：一段面向导航的文本列表。
@@ -252,19 +256,21 @@ pnpm -C packages/mcp-service start
 示例：
 
 ```json
-{ "roots": ["src"], "maxEntries": 400 }
+{ "roots": ["packages/timeline/src"], "maxEntries": 400 }
 ```
 
 ### `timeline_search`
 
-用途：在 `src/`、`docs/` 范围内按关键字搜索，返回文件路径 + 行列号 + 少量上下文片段。
+用途：在仓库指定目录范围内按关键字搜索，返回文件路径 + 行列号 + 少量上下文片段。
+
+说明：当运行环境可用 `rg`（ripgrep）时会优先使用 `rg --vimgrep` 加速；否则自动降级为纯 Node.js 扫描。
 
 输入参数：
 
 - `query: string`：搜索内容
 - `mode?: "literal" | "regex"`（默认：`"literal"`）：字面量/正则
 - `caseSensitive?: boolean`（默认：`false`）：是否大小写敏感
-- `roots?: string[]`（默认：`["src", "docs"]`）：搜索根目录
+- `roots?: string[]`（默认：`["packages/timeline/src", "docs", "packages/mcp-service/src"]`）：搜索根目录
 - `extensions?: string[]`（默认：`["ts","tsx","md","mdx"]`）：文件扩展名白名单
 - `maxResults?: number`（默认：`30`，范围 1~200）：最多返回命中条数
 - `contextLines?: number`（默认：`2`，范围 0~10）：命中行前后上下文行数
@@ -283,7 +289,7 @@ pnpm -C packages/mcp-service start
 
 输入参数：
 
-- `file: string`：相对仓库根的文件路径（例如 `src/core/Timeline.ts`）
+- `file: string`：相对仓库根的文件路径（例如 `packages/timeline/src/core/Timeline.ts`）
 - `startLine: number`：起始行（从 1 开始）
 - `endLine: number`：结束行（从 1 开始）
 - `maxLines?: number`（默认：`200`，范围 1~500）：允许读取的最大行数
@@ -293,7 +299,11 @@ pnpm -C packages/mcp-service start
 示例：
 
 ```json
-{ "file": "src/core/Timeline.ts", "startLine": 1, "endLine": 120 }
+{
+  "file": "packages/timeline/src/core/Timeline.ts",
+  "startLine": 1,
+  "endLine": 120
+}
 ```
 
 ### `timeline_trace_entrypoints`
@@ -318,9 +328,9 @@ pnpm -C packages/mcp-service start
 
 会做什么：
 
-- 在 `src/plugins/builtin/` 生成插件实现文件
-- 在 `src/builtin-plugin/` 生成 re-export（用于 package export map）
-- 在 `src/index.ts` 自动添加导出
+- 在 `packages/timeline/src/plugins/builtin/` 生成插件实现文件
+- 在 `packages/timeline/src/builtin-plugin/` 生成 re-export（用于 package export map）
+- 在 `packages/timeline/src/index.ts` 自动添加导出
 
 输入参数：
 
@@ -330,7 +340,7 @@ pnpm -C packages/mcp-service start
 - `description?: string`：可选，插件描述
 - `version?: string`（默认：`"1.0.0"`）：插件版本文本
 - `withReexport?: boolean`（默认：`true`）：是否生成 re-export 文件
-- `withIndexExport?: boolean`（默认：`true`）：是否自动在 `src/index.ts` 添加导出
+- `withIndexExport?: boolean`（默认：`true`）：是否自动在 `packages/timeline/src/index.ts` 添加导出
 
 输出：执行结果文本（包含创建/修改的文件信息或报错）。
 
@@ -346,7 +356,7 @@ pnpm -C packages/mcp-service start
 
 ### `timeline_validate_builtin_plugin`
 
-用途：校验内置插件的“接线”是否完整：文件是否存在、导出符号是否存在、`src/index.ts` 是否已导出。
+用途：校验内置插件的“接线”是否完整：文件是否存在、导出符号是否存在、`packages/timeline/src/index.ts` 是否已导出。
 
 输入参数：
 
@@ -362,7 +372,7 @@ pnpm -C packages/mcp-service start
 
 ### `timeline_list_builtin_plugins`
 
-用途：列出 `src/plugins/builtin` 下的插件名。
+用途：列出 `packages/timeline/src/plugins/builtin` 下的插件名。
 
 输入参数：无。
 
