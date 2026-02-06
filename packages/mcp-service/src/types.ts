@@ -133,3 +133,50 @@ export interface MigrationDiff {
   symbol: string;
   details: string;
 }
+
+// ─── Rename symbol types ───
+
+export interface RenameSymbolInput {
+  symbol: string;
+  newName: string;
+  scope?: "all" | "value-only" | "type-only";
+  dryRun?: boolean;
+}
+
+export interface RenameLocation {
+  file: string;
+  line: number;
+  start: number;      // offset within file
+  end: number;
+  originalText: string;
+  kind: "definition" | "reference" | "re-export" | "import" | "type-reference";
+}
+
+// ─── Impact analysis types ───
+
+export type ChangeType =
+  | "parameter-semantics"
+  | "parameter-type"
+  | "return-type"
+  | "signature-shape"
+  | "removal";
+
+export interface ImpactAnalysisInput {
+  symbol: string;
+  changeType: ChangeType;
+}
+
+export interface CallSite {
+  file: string;
+  line: number;
+  text: string;
+  arguments: ArgumentInfo[];
+}
+
+export interface ArgumentInfo {
+  index: number;
+  expression: string;
+  /** Traced origin variable/parameter name if identifiable */
+  origin?: string;
+  originLine?: number;
+}

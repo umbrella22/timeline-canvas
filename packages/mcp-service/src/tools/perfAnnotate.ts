@@ -8,6 +8,7 @@
  *  - Missing visibility culling
  *  - Per-frame object creation
  *  - Cacheable but uncached computations
+ *  - Cross-module redundant calls in the same event-handling chain
  */
 
 import { readFile } from "../services/projectModel.js";
@@ -34,6 +35,10 @@ const SCAN_TARGETS: FileTarget[] = [
   { rel: `${TIMELINE_SRC}/core/managers/InteractionManager.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/core/managers/DragDropManager.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/core/managers/SelectionManager.ts`, category: "interaction" },
+  // Interaction states (common source of redundant calls)
+  { rel: `${TIMELINE_SRC}/core/interaction/IdleState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/core/interaction/DragState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/core/interaction/ResizeState.ts`, category: "interaction" },
 ];
 
 interface PatternRule {
@@ -148,6 +153,184 @@ async function scanFile(
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+// ─── Cross-module redundant call detection ───
+
+/**
+ * Known expensive methods that should not be called multiple times per frame.
+ */
+const EXPENSIVE_METHODS = [
+  "getEventAtPosition",
+  "getEventsInRange",
+  "getEventAtPoint",
+  "getCandidatesByTime",
+  "getResizeHandle",
+  "hitTest",
+  "getInteractionTarget",
+  "findEventAt",
+  "getVisibleEvents",
+];
+
+/**
+ * Event handler method name patterns that represent entry points
+ * for the same user event (e.g., mousemove).
+ */
+const EVENT_CHAIN_PATTERNS: Array<{ event: string; pattern: RegExp }> = [
+  { event: "mousemove", pattern: /handle(?:Mouse)?Move|onMouseMove|mousemove/i },
+  { event: "mousedown", pattern: /handle(?:Mouse)?Down|onMouseDown|mousedown/i },
+  { event: "mouseup", pattern: /handle(?:Mouse)?Up|onMouseUp|mouseup/i },
+  { event: "click", pattern: /handle(?:Click)|onClick|click/i },
+  { event: "wheel", pattern: /handle(?:Wheel)|onWheel|wheel/i },
+  { event: "pointermove", pattern: /handle(?:Pointer)?Move|onPointerMove|pointermove/i },
+];
+
+interface RedundantCallInfo {
+  expensiveMethod: string;
+  event: string;
+  callSites: Array<{
+    file: string;
+    line: number;
+    caller: string; // The handler method name
+    text: string;
+  }>;
+}
+
+/**
+ * Scan files for cross-module redundant calls of expensive methods
+ * within the same event-handling chain.
+ */
+async function detectRedundantCalls(
+  targets: FileTarget[]
+): Promise<RedundantCallInfo[]> {
+  // Map: expensiveMethod → event → callSites
+  const callMap = new Map<
+    string,
+    Map<string, Array<{ file: string; line: number; caller: string; text: string }>>
+  >();
+
+  for (const target of targets) {
+    const content = await readFile(target.rel);
+    if (!content) continue;
+
+    const lines = content.split(/\r?\n/);
+
+    // Track which handler method we're currently inside
+    let currentHandler: { name: string; event: string; indent: number } | null = null;
+    let braceDepth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Detect handler method definitions
+      for (const ep of EVENT_CHAIN_PATTERNS) {
+        // Match method declarations and addEventListener callbacks
+        const methodMatch = line.match(
+          /(?:(?:async\s+)?(?:private\s+|public\s+|protected\s+)?(\w+)\s*\(|addEventListener\s*\(\s*["'](\w+)["']\s*,)/
+        );
+        if (methodMatch) {
+          const methodName = methodMatch[1] ?? methodMatch[2] ?? "";
+          if (ep.pattern.test(methodName) || ep.pattern.test(line)) {
+            // Count opening braces to track scope
+            const leadingSpaces = line.search(/\S/);
+            currentHandler = {
+              name: methodName,
+              event: ep.event,
+              indent: leadingSpaces >= 0 ? leadingSpaces : 0,
+            };
+            braceDepth = 0;
+            break;
+          }
+        }
+      }
+
+      // Track brace depth within handler
+      if (currentHandler) {
+        for (const ch of line) {
+          if (ch === "{") braceDepth++;
+          if (ch === "}") braceDepth--;
+        }
+        if (braceDepth <= 0 && i > 0 && line.includes("}")) {
+          currentHandler = null;
+          continue;
+        }
+      }
+
+      // If inside a handler, check for expensive method calls
+      if (currentHandler) {
+        for (const expMethod of EXPENSIVE_METHODS) {
+          const callPattern = new RegExp(`\\b${expMethod}\\s*\\(`);
+          if (callPattern.test(line)) {
+            if (!callMap.has(expMethod)) {
+              callMap.set(expMethod, new Map());
+            }
+            const eventMap = callMap.get(expMethod)!;
+            if (!eventMap.has(currentHandler.event)) {
+              eventMap.set(currentHandler.event, []);
+            }
+            eventMap.get(currentHandler.event)!.push({
+              file: target.rel,
+              line: i + 1,
+              caller: currentHandler.name,
+              text: line.trim(),
+            });
+          }
+        }
+      }
+
+      // Also detect direct addEventListener with expensive calls in callback
+      for (const expMethod of EXPENSIVE_METHODS) {
+        if (!currentHandler) {
+          const listenerMatch = line.match(
+            /addEventListener\s*\(\s*["'](\w+)["']/
+          );
+          if (listenerMatch) {
+            const eventName = listenerMatch[1];
+            const callPattern = new RegExp(`\\b${expMethod}\\s*\\(`);
+            // Look ahead up to 30 lines for the expensive call within this listener
+            for (let j = i; j < Math.min(i + 30, lines.length); j++) {
+              if (callPattern.test(lines[j])) {
+                if (!callMap.has(expMethod)) {
+                  callMap.set(expMethod, new Map());
+                }
+                const eventMap = callMap.get(expMethod)!;
+                if (!eventMap.has(eventName)) {
+                  eventMap.set(eventName, []);
+                }
+                eventMap.get(eventName)!.push({
+                  file: target.rel,
+                  line: j + 1,
+                  caller: `addEventListener('${eventName}', ...)`,
+                  text: lines[j].trim(),
+                });
+                break; // Only count once per listener
+              }
+              // Stop if we hit a closing of the listener
+              if (lines[j].includes("});") || lines[j].includes("})")) break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Filter to find actual redundancies: same method called >1 time for same event
+  const results: RedundantCallInfo[] = [];
+  for (const [method, eventMap] of callMap) {
+    for (const [event, sites] of eventMap) {
+      if (sites.length > 1) {
+        results.push({
+          expensiveMethod: method,
+          event,
+          callSites: sites,
+        });
+      }
+    }
+  }
+
+  // Sort by number of redundant calls (most redundant first)
+  results.sort((a, b) => b.callSites.length - a.callSites.length);
+  return results;
+}
+
 export async function perfAnnotate(args: PerfAnnotateInput): Promise<string> {
   const { target } = args;
   const targets =
@@ -171,7 +354,21 @@ export async function perfAnnotate(args: PerfAnnotateInput): Promise<string> {
       (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
   );
 
-  if (allHotspots.length === 0) {
+  // ─── Cross-module redundant call detection ───
+  const redundantCalls = await detectRedundantCalls(
+    target === "all"
+      ? SCAN_TARGETS
+      : // For redundant calls, always include interaction + plugin files
+        [
+          ...SCAN_TARGETS.filter((t) => t.category === target),
+          ...SCAN_TARGETS.filter(
+            (t) =>
+              t.category === "interaction" && target !== "interaction"
+          ),
+        ]
+  );
+
+  if (allHotspots.length === 0 && redundantCalls.length === 0) {
     return `No performance hotspots found for target '${target}'.`;
   }
 
@@ -187,7 +384,7 @@ export async function perfAnnotate(args: PerfAnnotateInput): Promise<string> {
   const low = allHotspots.filter((h) => h.severity === "low").length;
 
   const lines: string[] = [
-    `Performance Analysis (${target}): ${allHotspots.length} hotspot(s)`,
+    `Performance Analysis (${target}): ${allHotspots.length} hotspot(s), ${redundantCalls.length} redundant call pattern(s)`,
     `  HIGH: ${high}, MEDIUM: ${medium}, LOW: ${low}`,
     "",
   ];
@@ -201,6 +398,28 @@ export async function perfAnnotate(args: PerfAnnotateInput): Promise<string> {
       lines.push(`    → ${h.suggestion}`);
     }
     lines.push("");
+  }
+
+  // ─── Redundant call results ───
+  if (redundantCalls.length > 0) {
+    lines.push(`══ Cross-Module Redundant Calls ══`);
+    lines.push("");
+
+    for (const rc of redundantCalls) {
+      lines.push(
+        `  ⚠ ${rc.expensiveMethod} called ${rc.callSites.length} time(s) in '${rc.event}' chain:`
+      );
+      for (const site of rc.callSites) {
+        lines.push(
+          `    - ${site.file} L${site.line} (${site.caller})`
+        );
+        lines.push(`      ${site.text}`);
+      }
+      lines.push(
+        `    → Suggestion: Merge into a single query; share result via state/event/context`
+      );
+      lines.push("");
+    }
   }
 
   return lines.join("\n");

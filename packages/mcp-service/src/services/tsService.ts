@@ -72,6 +72,7 @@ export class TsService {
   private ts: typeof import("typescript") | null = null;
   private program: import("typescript").Program | null = null;
   private checker: import("typescript").TypeChecker | null = null;
+  private languageService: import("typescript").LanguageService | null = null;
   private sourceFiles: Map<string, import("typescript").SourceFile> = new Map();
   private lastBuildTime = 0;
   private tsconfigPath: string;
@@ -454,8 +455,285 @@ export class TsService {
   invalidate(): void {
     this.program = null;
     this.checker = null;
+    this.languageService = null;
     this.sourceFiles.clear();
     this.lastBuildTime = 0;
+  }
+
+  // ─── LanguageService-based APIs ───
+
+  /**
+   * Creates or returns a cached TypeScript LanguageService for precise
+   * rename/reference operations.
+   */
+  private ensureLanguageService(): import("typescript").LanguageService {
+    if (this.languageService) return this.languageService;
+
+    const ts = this.getTs();
+    const configFile = ts.readConfigFile(this.tsconfigPath, ts.sys.readFile);
+    if (configFile.error) {
+      throw new Error(
+        `Failed to read tsconfig: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n")}`
+      );
+    }
+    const parsed = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(this.tsconfigPath)
+    );
+
+    const fileVersions = new Map<string, string>();
+    for (const f of parsed.fileNames) {
+      fileVersions.set(f, "0");
+    }
+
+    const host: import("typescript").LanguageServiceHost = {
+      getScriptFileNames: () => parsed.fileNames,
+      getScriptVersion: (fileName) => fileVersions.get(fileName) ?? "0",
+      getScriptSnapshot: (fileName) => {
+        const content = ts.sys.readFile(fileName);
+        if (content === undefined) return undefined;
+        return ts.ScriptSnapshot.fromString(content);
+      },
+      getCurrentDirectory: () => path.dirname(this.tsconfigPath),
+      getCompilationSettings: () => parsed.options,
+      getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+      fileExists: ts.sys.fileExists,
+      readFile: ts.sys.readFile,
+      readDirectory: ts.sys.readDirectory,
+    };
+
+    this.languageService = ts.createLanguageService(
+      host,
+      ts.createDocumentRegistry()
+    );
+    return this.languageService;
+  }
+
+  /**
+   * Find all rename locations for a symbol using the TS LanguageService.
+   * Much more precise than text-based findReferences — respects scoping,
+   * overloads, and symbol identity.
+   */
+  findRenameLocations(
+    symbolName: string
+  ): Array<{
+    file: string;
+    line: number;
+    character: number;
+    start: number;
+    length: number;
+    text: string;
+  }> {
+    this.getTs(); // ensure TS is loaded
+    const ls = this.ensureLanguageService();
+    const program = ls.getProgram();
+    if (!program) throw new Error("LanguageService has no program");
+
+    // Find definition position(s) to seed rename
+    const defs = this.findDefinitions(symbolName);
+    if (defs.length === 0) return [];
+
+    const results: Array<{
+      file: string;
+      line: number;
+      character: number;
+      start: number;
+      length: number;
+      text: string;
+    }> = [];
+    const seen = new Set<string>();
+
+    for (const def of defs) {
+      const absPath = path.resolve(workspaceRoot, def.file);
+      const sourceFile = program.getSourceFile(absPath);
+      if (!sourceFile) continue;
+
+      const pos = sourceFile.getPositionOfLineAndCharacter(
+        def.line - 1,
+        def.character
+      );
+      const locations = ls.findRenameLocations(absPath, pos, false, false);
+      if (!locations) continue;
+
+      for (const loc of locations) {
+        const key = `${loc.fileName}:${loc.textSpan.start}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const sf = program.getSourceFile(loc.fileName);
+        if (!sf || sf.isDeclarationFile) continue;
+
+        const relFile = path
+          .relative(workspaceRoot, loc.fileName)
+          .replace(/\\/g, "/");
+        const { line, character } = sf.getLineAndCharacterOfPosition(
+          loc.textSpan.start
+        );
+        const lineText =
+          sf.getFullText().split(/\r?\n/)[line]?.trim() ?? "";
+
+        results.push({
+          file: relFile,
+          line: line + 1,
+          character,
+          start: loc.textSpan.start,
+          length: loc.textSpan.length,
+          text: lineText,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Find all call-site locations for a function/method, including argument info.
+   */
+  findCallSites(
+    symbolName: string
+  ): Array<{
+    file: string;
+    line: number;
+    text: string;
+    args: Array<{ index: number; expression: string }>;
+  }> {
+    const ts = this.getTs();
+    this.ensureProgram();
+    const results: Array<{
+      file: string;
+      line: number;
+      text: string;
+      args: Array<{ index: number; expression: string }>;
+    }> = [];
+
+    for (const [rel, sf] of this.sourceFiles) {
+      const fullText = sf.getFullText();
+      const lines = fullText.split(/\r?\n/);
+
+      ts.forEachChild(sf, function visit(node) {
+        if (ts.isCallExpression(node)) {
+          let calleeName: string | undefined;
+
+          // Direct call: foo()
+          if (ts.isIdentifier(node.expression)) {
+            calleeName = node.expression.text;
+          }
+          // Method call: obj.foo()
+          else if (
+            ts.isPropertyAccessExpression(node.expression) &&
+            ts.isIdentifier(node.expression.name)
+          ) {
+            calleeName = node.expression.name.text;
+          }
+
+          if (calleeName === symbolName) {
+            const { line } = sf.getLineAndCharacterOfPosition(
+              node.getStart()
+            );
+            const lineText = lines[line]?.trim() ?? "";
+            const args = node.arguments.map((arg, i) => ({
+              index: i,
+              expression: arg.getText(sf).substring(0, 120), // cap length
+            }));
+
+            results.push({
+              file: rel,
+              line: line + 1,
+              text: lineText,
+              args,
+            });
+          }
+        }
+        ts.forEachChild(node, visit);
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get function/method signature: parameter names, types, return type.
+   */
+  getFunctionSignature(
+    symbolName: string
+  ): Array<{
+    file: string;
+    line: number;
+    params: Array<{ name: string; type: string; optional: boolean }>;
+    returnType: string;
+  }> {
+    const ts = this.getTs();
+    this.ensureProgram();
+    const checker = this.checker!;
+    const results: Array<{
+      file: string;
+      line: number;
+      params: Array<{ name: string; type: string; optional: boolean }>;
+      returnType: string;
+    }> = [];
+
+    for (const [rel, sf] of this.sourceFiles) {
+      ts.forEachChild(sf, function visit(node) {
+        let name: string | undefined;
+        let signatureNode:
+          | import("typescript").FunctionDeclaration
+          | import("typescript").MethodDeclaration
+          | import("typescript").ArrowFunction
+          | undefined;
+
+        if (
+          ts.isFunctionDeclaration(node) &&
+          node.name?.text === symbolName
+        ) {
+          name = node.name.text;
+          signatureNode = node;
+        } else if (
+          ts.isMethodDeclaration(node) &&
+          ts.isIdentifier(node.name) &&
+          node.name.text === symbolName
+        ) {
+          name = node.name.text;
+          signatureNode = node;
+        } else if (
+          ts.isVariableDeclaration(node) &&
+          ts.isIdentifier(node.name) &&
+          node.name.text === symbolName &&
+          node.initializer &&
+          ts.isArrowFunction(node.initializer)
+        ) {
+          name = node.name.text;
+          signatureNode = node.initializer;
+        }
+
+        if (name && signatureNode) {
+          const { line } = sf.getLineAndCharacterOfPosition(
+            signatureNode.getStart()
+          );
+          const params = signatureNode.parameters.map((p) => {
+            const pName = p.name.getText(sf);
+            const pType = p.type
+              ? checker.typeToString(checker.getTypeFromTypeNode(p.type))
+              : checker.typeToString(
+                  checker.getTypeAtLocation(p)
+                );
+            const optional = !!p.questionToken || !!p.initializer;
+            return { name: pName, type: pType, optional };
+          });
+
+          const sig = checker.getSignatureFromDeclaration(signatureNode);
+          const returnType = sig
+            ? checker.typeToString(checker.getReturnTypeOfSignature(sig))
+            : "unknown";
+
+          results.push({ file: rel, line: line + 1, params, returnType });
+        }
+
+        ts.forEachChild(node, visit);
+      });
+    }
+
+    return results;
   }
 }
 

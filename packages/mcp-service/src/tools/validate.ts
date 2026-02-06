@@ -10,6 +10,10 @@
  *  - Re-export path consistency
  *  - TODO markers scan
  *  - TypeScript typecheck (optional, via tsService)
+ *  - [NEW] Behavioral pattern checks:
+ *    - Unthrottled canvas/DOM event listeners
+ *    - Expensive API calls without caching
+ *    - Resource leaks (registered resources not cleaned up in deactivate)
  */
 
 import * as fs from "node:fs/promises";
@@ -86,6 +90,104 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
         `${todos.length} TODO marker(s) in ${implRel}:` +
           todos.map((t) => `\n    L${t.line}: ${t.text}`).join("")
       );
+    }
+
+    // ─── Behavioral pattern checks ───
+
+    // 6a. Unthrottled event listeners
+    const eventListenerMatches = [
+      ...text.matchAll(
+        /addEventListener\s*\(\s*["'](mousemove|pointermove|scroll|wheel|resize|touchmove)["']/g
+      ),
+    ];
+    if (eventListenerMatches.length > 0) {
+      // Check if there's a RAF throttle or debounce nearby
+      const hasThrottle =
+        /requestAnimationFrame|throttle|debounce|rafId|animationFrame/i.test(text);
+      if (!hasThrottle) {
+        const events = eventListenerMatches.map((m) => m[1]).join(", ");
+        problems.push(
+          `⚠ Behavioral: addEventListener('${events}') without RAF/throttle/debounce in ${implRel}`
+        );
+      }
+    }
+
+    // 6b. Expensive API calls without caching in activate
+    const expensiveAPIs = [
+      "getEventAtPosition",
+      "getEventsInRange",
+      "getEventAtPoint",
+      "getCandidatesByTime",
+      "getResizeHandle",
+      "getInteractionTarget",
+    ];
+    const activateBlockMatch = text.match(
+      /activate\s*[\(:][\s\S]*?(?=deactivate|$)/
+    );
+    if (activateBlockMatch) {
+      const activateBlock = activateBlockMatch[0];
+      for (const api of expensiveAPIs) {
+        const callCount = (
+          activateBlock.match(new RegExp(`\\b${api}\\s*\\(`, "g")) ?? []
+        ).length;
+        if (callCount > 0) {
+          const hasCaching =
+            /cache|cached|memoize|lastResult|_cached/i.test(activateBlock);
+          if (!hasCaching) {
+            problems.push(
+              `⚠ Behavioral: activate calls expensive '${api}' (${callCount}×) without caching in ${implRel}`
+            );
+          }
+        }
+      }
+    }
+
+    // 6c. Resource leak detection — addEventListener without removeEventListener in deactivate
+    const addListenerCalls = [
+      ...text.matchAll(
+        /(\w+)\.addEventListener\s*\(\s*["'](\w+)["']\s*,\s*(\w+|this\.\w+)/g
+      ),
+    ];
+    if (addListenerCalls.length > 0 && hasDeactivate) {
+      const deactivateMatch = text.match(
+        /deactivate\s*[\(:][\s\S]*$/
+      );
+      const deactivateBlock = deactivateMatch?.[0] ?? "";
+      for (const match of addListenerCalls) {
+        const eventName = match[2];
+        const handler = match[3];
+        const hasRemove =
+          deactivateBlock.includes(`removeEventListener`) &&
+          (deactivateBlock.includes(`'${eventName}'`) ||
+            deactivateBlock.includes(`"${eventName}"`));
+        if (!hasRemove) {
+          problems.push(
+            `⚠ Behavioral: addEventListener('${eventName}', ${handler}) not cleaned up in deactivate — ${implRel}`
+          );
+        }
+      }
+
+      // Check for RAF cleanup
+      if (/requestAnimationFrame/.test(text)) {
+        const hasRafCancel =
+          /cancelAnimationFrame/.test(deactivateBlock);
+        if (!hasRafCancel) {
+          problems.push(
+            `⚠ Behavioral: requestAnimationFrame used but cancelAnimationFrame not called in deactivate — ${implRel}`
+          );
+        }
+      }
+
+      // Check for setInterval/setTimeout cleanup
+      if (/setInterval|setTimeout/.test(text)) {
+        const hasClearTimer =
+          /clearInterval|clearTimeout/.test(deactivateBlock);
+        if (!hasClearTimer) {
+          problems.push(
+            `⚠ Behavioral: setInterval/setTimeout used but not cleared in deactivate — ${implRel}`
+          );
+        }
+      }
     }
   }
 

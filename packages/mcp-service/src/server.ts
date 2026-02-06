@@ -9,6 +9,8 @@ import { typeQuery } from "./tools/typeQuery.js";
 import { consistencyCheck } from "./tools/consistencyCheck.js";
 import { perfAnnotate } from "./tools/perfAnnotate.js";
 import { migrationHelper } from "./tools/migrationHelper.js";
+import { renameSymbol } from "./tools/renameSymbol.js";
+import { impactAnalysis } from "./tools/impactAnalysis.js";
 import { ok, fail } from "./types.js";
 
 async function main() {
@@ -283,6 +285,91 @@ async function main() {
     async (input) => {
       try {
         return ok(await migrationHelper(input));
+      } catch (err) {
+        return fail(err);
+      }
+    }
+  );
+
+  // ─── P0: Rename Symbol ───
+
+  server.registerTool(
+    "timeline_rename_symbol",
+    {
+      title: "Rename Symbol",
+      description:
+        "Cross-file semantic rename using TypeScript LanguageService. " +
+        "Automatically renames all references (definitions, calls, imports, re-exports, type references). " +
+        "Warns about string/comment references. Supports dry-run mode.",
+      inputSchema: {
+        symbol: z
+          .string()
+          .min(1)
+          .describe("The current symbol name to rename"),
+        newName: z
+          .string()
+          .min(1)
+          .regex(
+            /^[A-Za-z_$][A-Za-z0-9_$]*$/,
+            "newName must be a valid JS identifier"
+          )
+          .describe("The new name for the symbol"),
+        scope: z
+          .enum(["all", "value-only", "type-only"])
+          .optional()
+          .default("all")
+          .describe(
+            "'all' = rename everywhere, 'value-only' = skip type references, 'type-only' = only type references"
+          ),
+        dryRun: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            "If true, show what would be renamed without modifying files"
+          ),
+      },
+    },
+    async (input) => {
+      try {
+        return ok(await renameSymbol(input));
+      } catch (err) {
+        return fail(err);
+      }
+    }
+  );
+
+  // ─── P1: Impact Analysis ───
+
+  server.registerTool(
+    "timeline_impact_analysis",
+    {
+      title: "Impact Analysis",
+      description:
+        "Symbol-level impact analysis for interface contract changes. " +
+        "Lists all call sites with arguments, traces parameter origins, " +
+        "compares actual arguments against expected parameter types, " +
+        "and flags potential mismatches. Ideal for coordinate-system or " +
+        "signature changes.",
+      inputSchema: {
+        symbol: z
+          .string()
+          .min(1)
+          .describe("The function/method name to analyze"),
+        changeType: z
+          .enum([
+            "parameter-semantics",
+            "parameter-type",
+            "return-type",
+            "signature-shape",
+            "removal",
+          ])
+          .describe("The kind of change being made"),
+      },
+    },
+    async (input) => {
+      try {
+        return ok(await impactAnalysis(input));
       } catch (err) {
         return fail(err);
       }
