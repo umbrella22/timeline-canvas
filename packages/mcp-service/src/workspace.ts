@@ -25,13 +25,6 @@ export const IGNORED_DIRS = new Set([
   ".rspress",
 ]);
 
-export const DEFAULT_SEARCH_ROOTS = [
-  "packages/timeline/src",
-  "docs",
-  "packages/mcp-service/src",
-];
-export const DEFAULT_REPO_MAP_ROOTS = ["packages/timeline/src", "docs"];
-
 export function resolveInWorkspace(relativePath: string): string {
   const cleaned = relativePath.replace(/\\/g, "/");
   const resolved = path.resolve(workspaceRoot, cleaned);
@@ -53,63 +46,4 @@ export async function pathExists(filePath: string): Promise<boolean> {
 
 export function toPosixPath(p: string): string {
   return p.replace(/\\/g, "/");
-}
-
-export async function listFilesRecursive(params: {
-  roots: string[];
-  extensions: string[];
-  maxFiles: number;
-}): Promise<string[]> {
-  const exts = new Set(
-    params.extensions.map((e) => e.replace(/^\./, "").toLowerCase())
-  );
-  const maxFiles = Math.max(1, Math.min(50_000, params.maxFiles));
-  const out: string[] = [];
-
-  async function walkDir(absDir: string, relDir: string): Promise<void> {
-    if (out.length >= maxFiles) return;
-    const entries = await fs.readdir(absDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (out.length >= maxFiles) return;
-      const name = entry.name;
-      if (entry.isDirectory()) {
-        if (IGNORED_DIRS.has(name)) continue;
-        await walkDir(
-          path.join(absDir, name),
-          relDir ? `${relDir}/${name}` : name
-        );
-      } else if (entry.isFile()) {
-        const ext = name.split(".").pop()?.toLowerCase() ?? "";
-        if (!exts.has(ext)) continue;
-        const rel = relDir ? `${relDir}/${name}` : name;
-        out.push(toPosixPath(rel));
-      }
-    }
-  }
-
-  for (const root of params.roots) {
-    const abs = resolveInWorkspace(root);
-    if (!(await pathExists(abs))) continue;
-    await walkDir(abs, toPosixPath(root));
-    if (out.length >= maxFiles) break;
-  }
-
-  return out;
-}
-
-export async function findFirstLine(params: {
-  file: string;
-  pattern: RegExp;
-}): Promise<number | undefined> {
-  const abs = resolveInWorkspace(params.file);
-  if (!(await pathExists(abs))) return undefined;
-  const stat = await fs.stat(abs);
-  if (stat.size > 800_000) return undefined;
-  const text = await fs.readFile(abs, "utf8");
-  if (text.includes("\u0000")) return undefined;
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    if (params.pattern.test(lines[i])) return i + 1;
-  }
-  return undefined;
 }

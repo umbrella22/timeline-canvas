@@ -1,6 +1,8 @@
 # timeline-canvas MCP Server（面向 Copilot Chat）
 
-这个 MCP server 通过 **stdio** 暴露一组面向本仓库的工具，让 AI 能直接“生成内置插件骨架 + 自动挂到导出 + 做基础校验 + 触发仓库脚本”。
+这个 MCP server 通过 **stdio** 暴露一组面向本仓库的工具，让 AI 能进行**项目级语义分析**——包括插件脚手架、深度校验、符号依赖图、类型查询、一致性检查、性能标注和迁移辅助。
+
+> 搜索、读取文件、执行脚本等通用操作请直接使用 VS Code 内置工具（`grep_search`、`read_file`、`run_in_terminal` 等）。
 
 ## 快速开始（在本仓库内使用）
 
@@ -8,6 +10,7 @@
 
 - Node.js 已安装（建议使用仓库约定的版本，例如 Node 22）
 - 已启用 pnpm（仓库根目录的 package.json 已声明 packageManager）
+- TypeScript >= 5.0（语义分析工具的可选 peerDependency，已随仓库安装）
 
 在仓库根目录执行：
 
@@ -20,40 +23,45 @@
 
 ## 工具（Tools）
 
-### 快速定位（减少反复读源码）
+### P0 — 脚手架 & 校验
 
-- `timeline_repo_map`
-  - 输出“关键文件地图”（core/managers/renderers/plugins/docs），用于快速判断应该去哪个文件看
+- **`timeline_scaffold_plugin`**
+  - 基于模板文件生成内置插件骨架（非字符串拼接）
+  - 支持 `features` 选择（renderLayer / eventHandler / config / lifecycle / init）
+  - 可选生成测试文件骨架（`withTest: true`）
+  - 自动在 `src/plugins/builtin/` 生成实现文件、`src/builtin-plugin/` 生成 re-export、`src/index.ts` 添加导出
 
-- `timeline_search`
-  - 在 `src/`、`docs/` 范围内搜索，返回：文件路径 + 行列号 + 少量上下文片段
-  - 支持 `literal` / `regex`，并有 `maxResults`、`contextLines` 限流，避免大段输出
+- **`timeline_validate_plugin`**
+  - 深度校验插件完整性：文件存在、导出符号、metadata 字段（name/version/type）、activate/deactivate 配对、re-export 路径一致性、TODO 标记扫描
+  - 不传参数时校验全部内置插件
 
-- `timeline_read_excerpt`
-  - 按行号读取小范围 excerpt（默认最多 200 行），用于精确查看某段实现/注释
+- **`timeline_list_builtin_plugins`**
+  - 列出 `src/plugins/builtin` 下的所有插件名
 
-- `timeline_trace_entrypoints`
-  - 输出“入口链路导航”（Timeline → managers → handlers → render pipeline → plugin types/docs）并给出行号提示
-  - 适合在你只知道“哪里出问题”但不知道“从哪个文件开始看”时先用它
+### P1 — 语义分析
 
-- `timeline_scaffold_builtin_plugin`
-  - 在 `src/plugins/builtin/` 生成插件实现文件
-  - 在 `src/builtin-plugin/` 生成 re-export 文件（用于 package export map）
-  - 在 `src/index.ts` 自动添加导出
+- **`timeline_dependency_graph`**
+  - 基于 TypeScript Compiler API 查询符号依赖图
+  - 支持 `dependents` / `dependencies` / `both` 方向，区分 value/type 导入
+  - 可配置递归深度（1~5 层）
 
-- `timeline_validate_builtin_plugin`
-  - 校验：文件是否存在、导出符号是否存在、`src/index.ts` 是否已导出
+- **`timeline_type_query`**
+  - 查看 interface / type / class / enum 的完整定义
+  - 可选追踪指定 member 的读/写位置
 
-- `timeline_list_builtin_plugins`
-  - 列出 `src/plugins/builtin` 下的插件名
+- **`timeline_consistency_check`**
+  - 5 类项目特定一致性规则：`plugin-exports`、`render-layers`、`state-fields`、`change-types`、`boundary-conditions`
+  - 可选传入 `checks` 数组只跑部分检查
 
-- `timeline_run_repo_script`
-  - 允许执行的脚本：`lint` / `build` / `typecheck` / `docs:*`
-  - 只做 allowlist，避免 AI 任意执行命令
+### P2 — 性能 & 迁移
 
-- `timeline_run_mcp_script`
-  - 允许执行的脚本：`start` / `dev` / `typecheck`
-  - 在 `packages/mcp-service` 目录内执行（MCP 自身的自检/启动）
+- **`timeline_perf_annotate`**
+  - 静态分析渲染热路径（循环内 O(N) 操作、GC 压力、缺失可见性裁剪、Canvas save/restore 不配对等）
+  - 支持 `render` / `highlight` / `interaction` / `all` 子系统选择
+
+- **`timeline_migration_helper`**
+  - 对比代码导出与文档内容，检测 API 同步问题
+  - 支持 `api` / `types` / `plugins` 三种 scope
 
 ## 启动（本地）
 
@@ -93,25 +101,19 @@
 
 ### 方案 B：通过 npx 启动（适用于已发布到 npm 的版本）
 
-本 MCP server 已发布到 npm（`timeline-canvas-mcp@1.0.0`），推荐使用 `npx` 直接启动：
+本 MCP server 已发布到 npm（`timeline-canvas-mcp@2.0.0`），推荐使用 `npx` 直接启动：
 
 - Command：`npx`
-- Args：`-y timeline-canvas-mcp@1.0.0`
+- Args：`-y timeline-canvas-mcp@2.0.0`
 
 ### 可复制的配置示例
-
-不同版本的 VS Code / Copilot Chat 对 MCP server 的配置入口与设置键名可能不完全一致。
-下面给的是一个“stdio server 条目”的**通用结构**：你可以在 UI 里新增 MCP server 时逐项填入，或在能编辑的配置 JSON 中按字段映射。
 
 ```json
 {
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": [
-        "-y",
-        "timeline-canvas-mcp@1.0.0"
-      ],
+      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -126,8 +128,9 @@
 
 完成 VS Code / Copilot Chat 的 MCP 配置后，建议做一次最小验证：
 
-- 让 Copilot Chat 运行 `timeline_repo_map`：应能返回仓库关键文件地图
 - 让 Copilot Chat 运行 `timeline_list_builtin_plugins`：应能列出 `src/plugins/builtin` 下的插件
+- 让 Copilot Chat 运行 `timeline_validate_plugin`（不传参数）：应返回所有内置插件的校验报告
+- 让 Copilot Chat 运行 `timeline_consistency_check`：应返回项目一致性检查结果
 
 如果工具列表看不到上述工具，通常是 VS Code 还没加载到该 MCP server（见下方排查）。
 
@@ -137,3 +140,4 @@
 - `npx` 卡住或提示确认：为 `npx` 增加 `-y`（仓库 .vscode/mcp.json 已包含）
 - 报错 `Path escapes workspace`：说明 `cwd` 或 `MCP_WORKSPACE_ROOT` 指错了，确保它是仓库根目录
 - Windows 下找不到 `pnpm`：确认你的 VS Code 环境 PATH 可用（必要时重启 VS Code），或改用能找到的完整命令路径
+- 语义分析工具报错：确认 TypeScript >= 5.0 已安装（`pnpm install` 后应自动满足）

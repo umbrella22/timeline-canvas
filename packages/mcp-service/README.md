@@ -1,9 +1,31 @@
 # timeline-canvas MCP Server
 
-This MCP server exposes repo-specific tools over stdio to help an AI agent scaffold and validate builtin plugins.
+This MCP server exposes project-specific **semantic analysis** tools over stdio, designed for use with Copilot Chat and AI CLI agents.
 
-- Repo scripts: allowlisted via `timeline_run_repo_script`
-- MCP folder scripts: allowlisted via `timeline_run_mcp_script`
+## Tools (8 total)
+
+### P0 — Scaffolding & Validation
+
+| Tool | Description |
+|---|---|
+| `timeline_scaffold_plugin` | Template-based plugin scaffolding with feature selection and optional test generation |
+| `timeline_validate_plugin` | Deep plugin validation (metadata, activate/deactivate pairing, TODO scan, re-export consistency) |
+| `timeline_list_builtin_plugins` | List all builtin plugin names |
+
+### P1 — Semantic Analysis
+
+| Tool | Description |
+|---|---|
+| `timeline_dependency_graph` | Symbol dependency graph via TS Compiler API (dependents / dependencies / both) |
+| `timeline_type_query` | Type definition inspection + member usage tracking |
+| `timeline_consistency_check` | 5 project-specific consistency rules (plugin-exports, render-layers, state-fields, change-types, boundary-conditions) |
+
+### P2 — Performance & Migration
+
+| Tool | Description |
+|---|---|
+| `timeline_perf_annotate` | Static analysis of rendering hot paths (O(N) in loops, GC pressure, missing visibility culling) |
+| `timeline_migration_helper` | API export vs documentation sync check |
 
 ## Quick start (inside this repo)
 
@@ -25,7 +47,6 @@ Key points:
 
 ```json
 {
-
   "mcpServers": {
     "timeline-canvas": {
       "command": "pnpm",
@@ -42,11 +63,10 @@ Key points:
 
 ```json
 {
-
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@1.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -57,6 +77,6 @@ Key points:
 
 ## Verify
 
-Ask Copilot Chat to run `timeline_repo_map` or `timeline_list_builtin_plugins`.
+Ask Copilot Chat to run `timeline_list_builtin_plugins` or `timeline_validate_plugin` (no args = validate all).
 
-See the full tool list in [packages/mcp-service/README_CN.md](README_CN.md).
+See the full tool documentation in [README_CN.md](README_CN.md) or [docs/guide/mcp.md](../../docs/guide/mcp.md).

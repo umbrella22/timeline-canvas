@@ -1,8 +1,8 @@
 {
   "name": "timeline-canvas-mcp",
   "type": "module",
-  "version": "1.1.0",
-  "description": "MCP server for timeline-canvas repo",
+  "version": "2.0.0",
+  "description": "MCP server for timeline-canvas repo — semantic analysis and engineering quality tools",
   "bin": {
     "timeline-canvas-mcp": "./bin/timeline-canvas-mcp.js"
   },
@@ -21,6 +21,14 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.3",
     "zod": "^4.2.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "tsx": "^4.21.0"

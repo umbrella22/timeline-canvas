@@ -6,7 +6,7 @@
 			"cwd": "${input:cwd}",
 			"args": [
 				"-y",
-				"timeline-canvas-mcp@1.0.0"
+				"timeline-canvas-mcp@2.0.0"
 			],
 			"env": {
 				"MCP_WORKSPACE_ROOT": "${input:cwd}"

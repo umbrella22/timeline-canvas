@@ -2,314 +2,289 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { DEFAULT_REPO_MAP_ROOTS, DEFAULT_SEARCH_ROOTS } from "./workspace.js";
-import { readLinesBounded } from "./readExcerpt.js";
-import { searchWorkspace } from "./search.js";
-import { buildRepoMap } from "./repoMap.js";
-import { traceEntrypoints } from "./trace.js";
-import {
-  listBuiltinPlugins,
-  scaffoldBuiltinPlugin,
-  validateBuiltinPlugin,
-} from "./pluginScaffold.js";
-import { runMcpScript, runRepoScript } from "./scripts.js";
+import { scaffoldPlugin, listBuiltinPlugins } from "./tools/scaffold.js";
+import { validatePlugin } from "./tools/validate.js";
+import { dependencyGraph } from "./tools/dependencyGraph.js";
+import { typeQuery } from "./tools/typeQuery.js";
+import { consistencyCheck } from "./tools/consistencyCheck.js";
+import { perfAnnotate } from "./tools/perfAnnotate.js";
+import { migrationHelper } from "./tools/migrationHelper.js";
+import { ok, fail } from "./types.js";
 
 async function main() {
   const server = new McpServer({
     name: "timeline-canvas-mcp",
-    version: "0.1.0",
+    version: "2.0.0",
   });
 
+  // ─── P0: Scaffold Plugin (rewrite) ───
+
   server.registerTool(
-    "timeline_scaffold_builtin_plugin",
+    "timeline_scaffold_plugin",
     {
-      title: "Scaffold Builtin Plugin",
+      title: "Scaffold Plugin",
       description:
-        "Create a new builtin plugin (src/plugins/builtin + src/builtin-plugin re-export) and wire export in src/index.ts.",
+        "Create a new builtin plugin with template-based generation. " +
+        "Generates implementation, re-export, index.ts wiring, and optional test file. " +
+        "Supports feature selection for different plugin skeletons.",
       inputSchema: {
         exportName: z
           .string()
           .min(1)
           .regex(
             /^[A-Za-z_$][A-Za-z0-9_$]*$/,
-            "exportName must be a valid identifier"
+            "exportName must be a valid JS identifier"
+          )
+          .describe("The exported symbol name (e.g. MyPlugin)"),
+        pluginType: z
+          .enum([
+            "render",
+            "event_handler",
+            "data_source",
+            "theme",
+            "tool",
+            "extension",
+          ])
+          .describe("The plugin type category"),
+        features: z
+          .array(
+            z.enum(["renderLayer", "eventHandler", "config", "lifecycle", "init"])
+          )
+          .optional()
+          .default([])
+          .describe(
+            "Optional features to include in the skeleton code"
           ),
-        pluginType: z.enum([
-          "render",
-          "event_handler",
-          "data_source",
-          "theme",
-          "tool",
-          "extension",
-        ]),
-        metadataName: z.string().min(1).optional(),
+        metadataName: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Plugin metadata name (defaults to kebab-case of exportName)"),
         description: z.string().min(1).optional(),
         version: z.string().min(1).optional().default("1.0.0"),
-        withReexport: z.boolean().optional().default(true),
-        withIndexExport: z.boolean().optional().default(true),
+        withReexport: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Create re-export in builtin-plugin/"),
+        withIndexExport: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Add export to src/index.ts"),
+        withTest: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Generate a test file skeleton"),
       },
     },
     async (input) => {
       try {
-        const text = await scaffoldBuiltinPlugin(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await scaffoldPlugin(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );
 
+  // ─── P0: Validate Plugin (enhanced) ───
+
   server.registerTool(
-    "timeline_validate_builtin_plugin",
+    "timeline_validate_plugin",
     {
-      title: "Validate Builtin Plugin",
+      title: "Validate Plugin",
       description:
-        "Validate builtin plugin wiring: file exists, export symbol exists, and src/index.ts exports it.",
+        "Validate builtin plugin integrity: file existence, export wiring, " +
+        "metadata fields, activate/deactivate pairs, re-export consistency, " +
+        "and TODO markers. Pass no name to check ALL builtin plugins.",
       inputSchema: {
-        exportName: z
+        name: z
           .string()
           .min(1)
-          .regex(
-            /^[A-Za-z_$][A-Za-z0-9_$]*$/,
-            "exportName must be a valid identifier"
-          ),
+          .optional()
+          .describe("Plugin name to validate. Omit to validate all."),
       },
     },
     async (input) => {
       try {
-        const text = await validateBuiltinPlugin(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await validatePlugin(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );
+
+  // ─── List Builtin Plugins ───
 
   server.registerTool(
     "timeline_list_builtin_plugins",
     {
       title: "List Builtin Plugins",
-      description: "List builtin plugin names under src/plugins/builtin.",
+      description: "List all builtin plugin names under src/plugins/builtin.",
       inputSchema: {},
     },
     async () => {
       try {
-        const text = await listBuiltinPlugins();
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await listBuiltinPlugins());
+      } catch (err) {
+        return fail(err);
       }
     }
   );
 
-  server.registerTool(
-    "timeline_run_repo_script",
-    {
-      title: "Run Repo Script",
-      description:
-        "Run an allowlisted pnpm script in this repo (lint/build/typecheck/docs).",
-      inputSchema: {
-        script: z.enum([
-          "lint",
-          "build",
-          "dev",
-          "docs:dev",
-          "docs:build",
-          "typecheck",
-        ]),
-      },
-    },
-    async (input) => {
-      try {
-        const text = await runRepoScript(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
+  // ─── P1: Dependency Graph ───
 
   server.registerTool(
-    "timeline_run_mcp_script",
+    "timeline_dependency_graph",
     {
-      title: "Run MCP Script",
+      title: "Dependency Graph",
       description:
-        "Run an allowlisted pnpm script in packages/mcp-service (start/dev/typecheck).",
+        "Query symbol dependency relationships using TypeScript semantic analysis. " +
+        "Find who depends on a symbol (dependents), what it depends on (dependencies), or both. " +
+        "Distinguishes value vs type imports.",
       inputSchema: {
-        script: z.enum(["start", "dev", "typecheck"]),
-      },
-    },
-    async (input) => {
-      try {
-        const text = await runMcpScript(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "timeline_repo_map",
-    {
-      title: "Repo Map",
-      description:
-        "Summarize key files (packages/timeline/docs/plugins/renderers/managers) to help quickly orient and locate likely code locations without bulk reading.",
-      inputSchema: {
-        roots: z
-          .array(z.string().min(1))
+        symbol: z
+          .string()
+          .min(1)
+          .describe("Class, function, interface, or variable name to query"),
+        direction: z
+          .enum(["dependents", "dependencies", "both"])
+          .describe(
+            "'dependents' = who uses it, 'dependencies' = what it uses, 'both' = bidirectional"
+          ),
+        depth: z
+          .number()
+          .int()
+          .min(1)
+          .max(5)
           .optional()
-          .default(DEFAULT_REPO_MAP_ROOTS),
-        maxEntries: z.number().int().min(50).max(2000).optional().default(800),
+          .default(1)
+          .describe("Recursion depth (default 1)"),
       },
     },
     async (input) => {
       try {
-        const text = await buildRepoMap(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await dependencyGraph(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );
 
+  // ─── P1: Type Query ───
+
   server.registerTool(
-    "timeline_search",
+    "timeline_type_query",
     {
-      title: "Search Workspace",
+      title: "Type Query",
       description:
-        "Search across workspace roots with line+column and small snippets. Designed for fast issue localization without rereading large files.",
+        "Inspect TypeScript type definitions and member usage patterns. " +
+        "Shows full interface/type/class/enum definition with member types. " +
+        "Optionally tracks where a specific member is read or written.",
       inputSchema: {
-        query: z.string().min(1),
-        mode: z.enum(["literal", "regex"]).optional().default("literal"),
-        caseSensitive: z.boolean().optional().default(false),
-        roots: z
-          .array(z.string().min(1))
+        type: z
+          .string()
+          .min(1)
+          .describe("Type/interface/class/enum name to inspect"),
+        member: z
+          .string()
+          .min(1)
           .optional()
-          .default(DEFAULT_SEARCH_ROOTS),
-        extensions: z
-          .array(z.string().min(1))
+          .describe("Optional member name to find read/write usages of"),
+      },
+    },
+    async (input) => {
+      try {
+        return ok(await typeQuery(input));
+      } catch (err) {
+        return fail(err);
+      }
+    }
+  );
+
+  // ─── P1: Consistency Check ───
+
+  server.registerTool(
+    "timeline_consistency_check",
+    {
+      title: "Consistency Check",
+      description:
+        "Run project-specific consistency validations: " +
+        "plugin-exports, render-layers, state-fields, change-types, boundary-conditions. " +
+        "Detects structural mismatches that grep cannot find.",
+      inputSchema: {
+        checks: z
+          .array(
+            z.enum([
+              "plugin-exports",
+              "render-layers",
+              "state-fields",
+              "change-types",
+              "boundary-conditions",
+            ])
+          )
           .optional()
-          .default(["ts", "tsx", "md", "mdx"]),
-        maxResults: z.number().int().min(1).max(200).optional().default(30),
-        contextLines: z.number().int().min(0).max(10).optional().default(2),
+          .describe("Specific checks to run. Omit for all checks."),
       },
     },
     async (input) => {
       try {
-        const matches = await searchWorkspace(input);
-        if (matches.length === 0) {
-          return { content: [{ type: "text", text: "No matches." }] };
-        }
-        const lines: string[] = [];
-        for (const m of matches) {
-          lines.push(`${m.file}:${m.line}:${m.col}`);
-          for (const s of m.snippet) {
-            const mark = s.line === m.line ? ">" : " ";
-            lines.push(`${mark} ${String(s.line).padStart(4, " ")}: ${s.text}`);
-          }
-          lines.push("---");
-        }
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await consistencyCheck(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );
 
+  // ─── P2: Performance Annotate ───
+
   server.registerTool(
-    "timeline_read_excerpt",
+    "timeline_perf_annotate",
     {
-      title: "Read Excerpt",
+      title: "Performance Annotate",
       description:
-        "Read a small line range from a file (bounded) to avoid large file rereads.",
+        "Static analysis of rendering hot paths. " +
+        "Detects O(N) operations in loops, GC-pressure allocations, " +
+        "missing visibility culling, and other performance anti-patterns.",
       inputSchema: {
-        file: z.string().min(1),
-        startLine: z.number().int().min(1),
-        endLine: z.number().int().min(1),
-        maxLines: z.number().int().min(1).max(500).optional().default(200),
+        target: z
+          .enum(["render", "highlight", "interaction", "all"])
+          .describe("Which subsystem to analyze"),
       },
     },
     async (input) => {
       try {
-        const res = await readLinesBounded(input);
-        if (!res.ok) {
-          return {
-            content: [{ type: "text", text: `Error: ${res.error}` }],
-            isError: true,
-          };
-        }
-        const text = res.lines
-          .map((l) => `${String(l.line).padStart(4, " ")}: ${l.text}`)
-          .join("\n");
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await perfAnnotate(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );
 
+  // ─── P2: Migration Helper ───
+
   server.registerTool(
-    "timeline_trace_entrypoints",
+    "timeline_migration_helper",
     {
-      title: "Trace Entrypoints",
+      title: "Migration Helper",
       description:
-        "Generate a navigation-friendly trace of key runtime entrypoints (Timeline → managers → handlers → render pipeline → plugin types/docs) with line hints.",
+        "Compare current exports with documentation to detect sync issues: " +
+        "new exports not yet documented, documented APIs that were removed, " +
+        "and PluginType enum vs scaffold template mismatches.",
       inputSchema: {
-        includeDocs: z.boolean().optional().default(true),
+        scope: z
+          .enum(["api", "types", "plugins"])
+          .describe(
+            "'api' = all exports, 'types' = type exports, 'plugins' = plugin exports + PluginType check"
+          ),
       },
     },
     async (input) => {
       try {
-        const text = await traceEntrypoints(input);
-        return { content: [{ type: "text", text }] };
-      } catch (err: any) {
-        return {
-          content: [
-            { type: "text", text: `Error: ${err?.message ?? String(err)}` },
-          ],
-          isError: true,
-        };
+        return ok(await migrationHelper(input));
+      } catch (err) {
+        return fail(err);
       }
     }
   );

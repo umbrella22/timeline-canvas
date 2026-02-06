@@ -6,6 +6,7 @@ const commonOptions: UserConfig = {
   format: ["esm"],
   target: "node20",
   clean: true,
+  copy: [{ from: "src/templates", to: "templates" }],
 };
 
 export default defineConfig(({ watch }) => {
