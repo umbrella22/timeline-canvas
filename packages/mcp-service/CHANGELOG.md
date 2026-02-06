@@ -1,5 +1,22 @@
 # timeline-canvas-mcp
 
+## 2.1.0
+
+### New Features
+
+- **新增**：`timeline_rename_symbol` — 基于 TypeScript LanguageService 的跨文件语义重命名，支持 dry-run 预览、scope 过滤（all/value-only/type-only），自动处理定义、调用、import、re-export、类型引用
+- **新增**：`timeline_impact_analysis` — 符号级影响分析，支持 5 种变更类型（parameter-semantics / parameter-type / return-type / signature-shape / removal），展示调用点实参、参数语义一致性检测
+
+### Enhancements
+
+- **增强**：`timeline_perf_annotate` 新增跨模块重复调用检测（cross-module redundant calls），识别同一事件链路中 expensive 方法被多处调用的情况，新增交互状态文件扫描目标
+- **增强**：`timeline_validate_plugin` 新增行为模式检查：未经 RAF 节流的高频事件监听、activate 中未缓存的 expensive API 调用、deactivate 中未清理的资源（removeEventListener / cancelAnimationFrame / clearInterval）
+
+### Internal
+
+- `TsService` 新增 LanguageService 实例及 `findRenameLocations()`、`findCallSites()`、`getFunctionSignature()` 方法
+- 新增类型定义：`RenameSymbolInput`、`ImpactAnalysisInput`、`CallSite`、`ArgumentInfo`
+
 ## 2.0.0
 
 ### Major Changes
