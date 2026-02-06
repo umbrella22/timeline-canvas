@@ -6,6 +6,7 @@ import type {
   Track,
   TimelineEvent,
   LoadDataFormat,
+  InteractionTarget,
 } from "../types";
 import {
   DEFAULT_CONFIG,
@@ -901,6 +902,118 @@ export class Timeline {
     return this.state.statusText;
   }
 
+  /**
+   * 统一命中：一次查询同时检测 resize handle 和事件体命中
+   * 内部使用 O(n) max-scan 代替排序，降低 CPU 开销
+   * @param canvasX 画布坐标 X（不含 scroll 偏移）
+   * @param canvasY 画布坐标 Y（不含 scroll 偏移）
+   */
+  public getInteractionTarget(canvasX: number, canvasY: number): InteractionTarget {
+    const result: InteractionTarget = {
+      trackIndex: null,
+      eventIndex: null,
+      resizeEdge: null,
+    };
+
+    const logicalY = canvasY + this.state.scrollY;
+    if (logicalY < this.config.timelineHeight) return result;
+
+    const trackIndex = Math.floor(
+      (logicalY -
+        this.config.timelineHeight -
+        this.config.firstTrackTopMargin) /
+        (this.config.trackHeight + this.config.trackMargin)
+    );
+    if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return result;
+
+    result.trackIndex = trackIndex;
+    const track = this.state.tracks[trackIndex];
+    const eventVerticalPadding = Math.max(5, this.config.trackHeight * 0.0625);
+    const trackY =
+      this.config.timelineHeight +
+      this.config.firstTrackTopMargin +
+      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
+      this.state.scrollY;
+
+    if (
+      canvasY < trackY + eventVerticalPadding ||
+      canvasY > trackY + this.config.trackHeight - eventVerticalPadding
+    ) {
+      return result;
+    }
+
+    const mouseTime =
+      (canvasX + this.state.scrollX - this.config.startPaddingTime) /
+        (this.config.secondWidth * this.state.zoomLevel) +
+      this.config.startTime;
+
+    const handleWidth = this.config.resizeHandleWidth;
+    const margin =
+      handleWidth / (this.config.secondWidth * this.state.zoomLevel);
+
+    // 用较大的 margin 获取候选，同时满足 resize handle 和事件体需求
+    const candidates = this.eventIndexManager.getCandidatesByTime(
+      trackIndex,
+      mouseTime,
+      margin
+    );
+
+    if (candidates.length === 0) return result;
+
+    // O(n) max-scan：追踪最高 z-order（eventIndex 最大）的命中
+    let bestResizeIndex: number | null = null;
+    let bestResizeEdge: "left" | "right" | null = null;
+    let bestEventIndex: number | null = null;
+
+    for (const eventIndex of candidates) {
+      const event = track.events[eventIndex];
+      const eventX =
+        this.config.startPaddingTime +
+        (event.startTime - this.config.startTime) *
+          this.config.secondWidth *
+          this.state.zoomLevel -
+        this.state.scrollX;
+      const eventWidth =
+        event.duration * this.config.secondWidth * this.state.zoomLevel;
+
+      // 检测 resize handle（优先级高于事件体）
+      if (
+        canvasX >= eventX - handleWidth / 2 &&
+        canvasX <= eventX + handleWidth / 2
+      ) {
+        if (bestResizeIndex === null || eventIndex > bestResizeIndex) {
+          bestResizeIndex = eventIndex;
+          bestResizeEdge = "left";
+        }
+      } else if (
+        canvasX >= eventX + eventWidth - handleWidth / 2 &&
+        canvasX <= eventX + eventWidth + handleWidth / 2
+      ) {
+        if (bestResizeIndex === null || eventIndex > bestResizeIndex) {
+          bestResizeIndex = eventIndex;
+          bestResizeEdge = "right";
+        }
+      }
+
+      // 检测事件体
+      if (canvasX >= eventX && canvasX <= eventX + eventWidth) {
+        if (bestEventIndex === null || eventIndex > bestEventIndex) {
+          bestEventIndex = eventIndex;
+        }
+      }
+    }
+
+    // resize handle 优先级高于事件体
+    if (bestResizeIndex !== null) {
+      result.eventIndex = bestResizeIndex;
+      result.resizeEdge = bestResizeEdge;
+    } else if (bestEventIndex !== null) {
+      result.eventIndex = bestEventIndex;
+    }
+
+    return result;
+  }
+
   public getEventAtPosition(
     x: number,
     y: number
@@ -939,7 +1052,8 @@ export class Timeline {
     );
 
     if (candidates.length > 0) {
-      candidates.sort((a, b) => b - a);
+      // O(n) max-scan 替代 sort：找到 eventIndex 最大（z-order 最高）的命中
+      let bestHit: number | null = null;
       for (const eventIndex of candidates) {
         const event = track.events[eventIndex];
         const eventX =
@@ -951,11 +1065,14 @@ export class Timeline {
         const eventWidth =
           event.duration * this.config.secondWidth * this.state.zoomLevel;
 
-        const isInRange = x >= eventX && x <= eventX + eventWidth;
-
-        if (isInRange) {
-          return { trackIndex, eventIndex };
+        if (x >= eventX && x <= eventX + eventWidth) {
+          if (bestHit === null || eventIndex > bestHit) {
+            bestHit = eventIndex;
+          }
         }
+      }
+      if (bestHit !== null) {
+        return { trackIndex, eventIndex: bestHit };
       }
     }
     return null;
@@ -1001,7 +1118,9 @@ export class Timeline {
       margin
     );
     if (candidates.length > 0) {
-      candidates.sort((a, b) => b - a);
+      // O(n) max-scan 替代 sort：找到 eventIndex 最大（z-order 最高）的 resize handle 命中
+      let bestIndex: number | null = null;
+      let bestEdge: "left" | "right" | null = null;
       for (const eventIndex of candidates) {
         const event = track.events[eventIndex];
         const eventX =
@@ -1012,13 +1131,23 @@ export class Timeline {
           this.state.scrollX;
         const eventWidth =
           event.duration * this.config.secondWidth * this.state.zoomLevel;
-        if (x >= eventX - handleWidth / 2 && x <= eventX + handleWidth / 2)
-          return { trackIndex, eventIndex, edge: "left" };
-        if (
+        if (x >= eventX - handleWidth / 2 && x <= eventX + handleWidth / 2) {
+          if (bestIndex === null || eventIndex > bestIndex) {
+            bestIndex = eventIndex;
+            bestEdge = "left";
+          }
+        } else if (
           x >= eventX + eventWidth - handleWidth / 2 &&
           x <= eventX + eventWidth + handleWidth / 2
-        )
-          return { trackIndex, eventIndex, edge: "right" };
+        ) {
+          if (bestIndex === null || eventIndex > bestIndex) {
+            bestIndex = eventIndex;
+            bestEdge = "right";
+          }
+        }
+      }
+      if (bestIndex !== null) {
+        return { trackIndex, eventIndex: bestIndex, edge: bestEdge! };
       }
     }
     return null;

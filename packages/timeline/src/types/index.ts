@@ -220,6 +220,18 @@ export interface HoveredSplitLine {
   splitTime: number;
 }
 
+/**
+ * 统一命中：一次查询同时返回 resize handle 和事件体的命中信息
+ */
+export interface InteractionTarget {
+  /** 鼠标所在的轨道索引，若不在任何轨道上则为 null */
+  trackIndex: number | null;
+  /** 命中的事件索引（z-order 最高），若未命中任何事件则为 null */
+  eventIndex: number | null;
+  /** 若命中了 resize handle，标识是左边还是右边；否则为 null */
+  resizeEdge: "left" | "right" | null;
+}
+
 export interface ContextMenuEvent {
   trackIndex: number;
   eventIndex: number;

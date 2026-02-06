@@ -86,8 +86,12 @@ export function EventTooltipPlugin(
     activate(context) {
       const canvas = context.timeline.getCanvas();
 
-      // 鼠标移动事件处理
-      const handleMouseMove = (e: MouseEvent) => {
+      // RAF 节流：避免高刷新率显示器下每帧触发多次 hit-test
+      let rafPending = false;
+      let pendingMouseEvent: MouseEvent | null = null;
+
+      // 鼠标移动事件处理（实际逻辑）
+      const processMouseMove = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
         const canvasX = e.clientX - rect.left;
         const canvasY = e.clientY - rect.top;
@@ -168,6 +172,21 @@ export function EventTooltipPlugin(
           }
         } else {
           clearTooltip();
+        }
+      };
+
+      // RAF 节流的 mousemove handler
+      const handleMouseMove = (e: MouseEvent) => {
+        pendingMouseEvent = e;
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(() => {
+            rafPending = false;
+            if (pendingMouseEvent) {
+              processMouseMove(pendingMouseEvent);
+              pendingMouseEvent = null;
+            }
+          });
         }
       };
 

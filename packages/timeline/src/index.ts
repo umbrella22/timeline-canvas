@@ -27,5 +27,6 @@ export type {
   EventEditData,
   TimeIndicatorMoveData,
   ZoomData,
+  InteractionTarget,
 } from "./types";
 export { formatTime, getCurrentTime } from "./utils";

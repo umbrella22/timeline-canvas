@@ -201,33 +201,34 @@ export class IdleState extends BaseState {
     // 如果点击在时间轴区域,不处理
     if (logicalY < config.timelineHeight) return null;
 
+    // 统一命中：一次查询同时检测 resize handle 和事件体
+    const hitResult = this.timeline.getInteractionTarget(canvasX, canvasY);
+
     // 检查是否点击了事件的调整手柄
-    if (config.enableEventResize && !isReadOnly) {
-      const handle = this.timeline.getResizeHandle(logicalX, logicalY);
-      if (handle) {
-        const event = state.tracks[handle.trackIndex].events[handle.eventIndex];
-        if (event.readonly) {
-          canvas.style.cursor = "not-allowed";
-          return null;
-        }
-
-        state.resizingEvent = {
-          trackIndex: handle.trackIndex,
-          eventIndex: handle.eventIndex,
-          edge: handle.edge,
-          startX: logicalX,
-          originalStartTime: event.startTime,
-          originalDuration: event.duration,
-        };
-
-        return this.createResizingState();
+    if (config.enableEventResize && !isReadOnly && hitResult.resizeEdge) {
+      const event =
+        state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
+      if (event.readonly) {
+        canvas.style.cursor = "not-allowed";
+        return null;
       }
+
+      state.resizingEvent = {
+        trackIndex: hitResult.trackIndex!,
+        eventIndex: hitResult.eventIndex!,
+        edge: hitResult.resizeEdge,
+        startX: logicalX,
+        originalStartTime: event.startTime,
+        originalDuration: event.duration,
+      };
+
+      return this.createResizingState();
     }
 
     // 8. 检查是否点击了事件
-    const clickedEvent = this.timeline.getEventAtPosition(canvasX, canvasY);
-    if (clickedEvent) {
-      const { trackIndex, eventIndex } = clickedEvent;
+    if (hitResult.eventIndex !== null && hitResult.trackIndex !== null) {
+      const trackIndex = hitResult.trackIndex;
+      const eventIndex = hitResult.eventIndex;
       const event = state.tracks[trackIndex].events[eventIndex];
 
       // 双击检测
@@ -393,13 +394,16 @@ export class IdleState extends BaseState {
       }
     }
 
+    // 统一命中测试：一次查询同时检测 resize handle 和事件体
+    const hitResult = this.timeline.getInteractionTarget(canvasX, canvasY);
+
     // 2. 内容区域的交互
     if (logicalY >= config.timelineHeight && !config.readOnly) {
       // 2.1 检查调整大小手柄
       if (config.enableEventResize) {
-        const handle = this.timeline.getResizeHandle(logicalX, logicalY);
-        if (handle) {
-          const evt = state.tracks[handle.trackIndex].events[handle.eventIndex];
+        if (hitResult.resizeEdge) {
+          const evt =
+            state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
           if (evt.readonly) {
             state.hoveredResizeHandle = null;
             canvas.style.cursor = "not-allowed";
@@ -408,7 +412,11 @@ export class IdleState extends BaseState {
             return null;
           }
 
-          state.hoveredResizeHandle = handle;
+          state.hoveredResizeHandle = {
+            trackIndex: hitResult.trackIndex!,
+            eventIndex: hitResult.eventIndex!,
+            edge: hitResult.resizeEdge,
+          };
           canvas.style.cursor = "ew-resize";
           this.timeline.hideSplitLine();
           this.timeline.notifyChange("interaction:hover");
@@ -419,12 +427,13 @@ export class IdleState extends BaseState {
 
       // 2.2 检查事件切割线
       if (config.enableEventSplit) {
-        const clickedEvent = this.timeline.getEventAtPosition(
-          logicalX,
-          logicalY
-        );
-        if (clickedEvent) {
-          const { trackIndex, eventIndex } = clickedEvent;
+        if (
+          hitResult.eventIndex !== null &&
+          hitResult.trackIndex !== null &&
+          !hitResult.resizeEdge
+        ) {
+          const trackIndex = hitResult.trackIndex;
+          const eventIndex = hitResult.eventIndex;
           const event = state.tracks[trackIndex].events[eventIndex];
 
           if (event.readonly) {
@@ -494,10 +503,16 @@ export class IdleState extends BaseState {
       }
     }
 
-    // 4. 事件悬停
-    const hoveredEvent = this.timeline.getEventAtPosition(canvasX, canvasY);
-    if (hoveredEvent) {
-      const { trackIndex, eventIndex } = hoveredEvent;
+    // 4. 事件悬停（复用 hitResult，无需额外 hit-test）
+    if (
+      hitResult.eventIndex !== null &&
+      hitResult.trackIndex !== null &&
+      !hitResult.resizeEdge
+    ) {
+      const { trackIndex, eventIndex } = {
+        trackIndex: hitResult.trackIndex,
+        eventIndex: hitResult.eventIndex,
+      };
       const event = state.tracks[trackIndex].events[eventIndex];
       // 只读模式下仍然可以点击选中，所以显示 pointer
       canvas.style.cursor = "pointer";
