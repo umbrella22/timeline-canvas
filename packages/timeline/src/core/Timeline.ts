@@ -172,6 +172,7 @@ export class Timeline {
       this.callbacks
     );
     this.changeScheduler.setRenderManager(this.renderManager);
+    this.changeScheduler.setEventIndexManager(this.eventIndexManager);
     this.changeScheduler.setDrawFunction(() => this.draw());
 
     this.init();

@@ -85,7 +85,9 @@ export class EventIndexManager {
       const idx = sorted[i];
       const ev = track.events[idx];
       if (ev.startTime > time + margin) continue;
-      if (ev.endTime < time - margin) break;
+      // 不能用 break：按 startTime 排序时 endTime 不单调，
+      // break 会跳过 startTime 更小但 endTime 覆盖 time 的长事件
+      if (ev.endTime < time - margin) continue;
       candidates.push(idx);
     }
     // Also check right side in case of future-start events still within margin

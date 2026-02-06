@@ -4,6 +4,7 @@ import type {
   TimelineCallbacks,
 } from "../../types";
 import type { RenderManager } from "./RenderManager";
+import type { EventIndexManager } from "./EventIndexManager";
 import { cloneEvent } from "../../utils";
 import { getLogger } from "./Logger";
 
@@ -89,6 +90,7 @@ export class ChangeScheduler {
   private config: TimelineConfig;
   private callbacks: TimelineCallbacks;
   private renderManager: RenderManager | null = null;
+  private eventIndexManager: EventIndexManager | null = null;
   private drawFn: (() => void) | null = null;
 
   /** 变更处理器映射表 */
@@ -116,6 +118,13 @@ export class ChangeScheduler {
    */
   public setRenderManager(renderManager: RenderManager): void {
     this.renderManager = renderManager;
+  }
+
+  /**
+   * 设置事件索引管理器（延迟注入，用于优化高亮列表生成）
+   */
+  public setEventIndexManager(eventIndexManager: EventIndexManager): void {
+    this.eventIndexManager = eventIndexManager;
   }
 
   /**
@@ -484,6 +493,11 @@ export class ChangeScheduler {
 
   /**
    * 检测高亮列表是否变化
+   *
+   * 注意：此方法依赖于列表中不存在重复的 {trackIndex, eventIndex} 对。
+   * 当 length 相同且 newKeys ⊆ oldKeys 时，由于两个 Set 大小相同，
+   * 必然 oldKeys ⊆ newKeys，所以只需单向检查即可。
+   * detectHighlightedEvents() 保证不会产生重复对。
    */
   private hasHighlightChanged(
     oldList: Array<{ trackIndex: number; eventIndex: number }>,
@@ -491,21 +505,22 @@ export class ChangeScheduler {
   ): boolean {
     if (oldList.length !== newList.length) return true;
 
-    const createKey = (trackIndex: number, eventIndex: number) =>
-      `${trackIndex}-${eventIndex}`;
-
+    const MAX_EVENTS_PER_TRACK = 1_000_000;
     const oldKeys = new Set(
-      oldList.map((e) => createKey(e.trackIndex, e.eventIndex))
-    );
-    const newKeys = new Set(
-      newList.map((e) => createKey(e.trackIndex, e.eventIndex))
+      oldList.map((e) => e.trackIndex * MAX_EVENTS_PER_TRACK + e.eventIndex)
     );
 
-    return !Array.from(newKeys).every((key) => oldKeys.has(key));
+    return newList.some(
+      (e) => !oldKeys.has(e.trackIndex * MAX_EVENTS_PER_TRACK + e.eventIndex)
+    );
   }
 
   /**
    * 检测被时间指示器高亮的事件
+   *
+   * 使用 EventIndexManager 的索引加速查询，避免全量扫描。
+   * 边界条件统一为 position > startTime && position < endTime（严格开区间），
+   * 与渲染侧 EventsRenderer 的判断保持一致。
    */
   private detectHighlightedEvents(
     position: number
@@ -514,16 +529,43 @@ export class ChangeScheduler {
     const highlightedEvents: Array<{ trackIndex: number; eventIndex: number }> =
       [];
 
-    for (
-      let trackIndex = 0;
-      trackIndex < this.state.tracks.length;
-      trackIndex++
-    ) {
-      const track = this.state.tracks[trackIndex];
-      for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
-        const event = track.events[eventIndex];
-        if (position >= event.startTime && position < event.endTime) {
-          highlightedEvents.push({ trackIndex, eventIndex });
+    if (this.eventIndexManager) {
+      // 使用索引查询优化：仅检查 time 附近的候选事件
+      for (
+        let trackIndex = 0;
+        trackIndex < this.state.tracks.length;
+        trackIndex++
+      ) {
+        const candidates = this.eventIndexManager.getCandidatesByTime(
+          trackIndex,
+          position,
+          0
+        );
+        const track = this.state.tracks[trackIndex];
+        for (const eventIndex of candidates) {
+          const event = track.events[eventIndex];
+          if (position > event.startTime && position < event.endTime) {
+            highlightedEvents.push({ trackIndex, eventIndex });
+          }
+        }
+      }
+    } else {
+      // 回退：全量扫描
+      for (
+        let trackIndex = 0;
+        trackIndex < this.state.tracks.length;
+        trackIndex++
+      ) {
+        const track = this.state.tracks[trackIndex];
+        for (
+          let eventIndex = 0;
+          eventIndex < track.events.length;
+          eventIndex++
+        ) {
+          const event = track.events[eventIndex];
+          if (position > event.startTime && position < event.endTime) {
+            highlightedEvents.push({ trackIndex, eventIndex });
+          }
         }
       }
     }

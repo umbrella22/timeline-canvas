@@ -79,18 +79,12 @@ export class EventsRenderer {
         state.highlightedEvent &&
         state.highlightedEvent.trackIndex === trackIndex &&
         state.highlightedEvent.eventIndex === eventIndex;
-      const isInHighlightList = state.timeIndicatorHighlightedEvents.some(
-        (h) => h.trackIndex === trackIndex && h.eventIndex === eventIndex
-      );
       const indicatorPosition = state.timeIndicatorPosition;
-      const isIndicatorInRange =
-        indicatorPosition > event.startTime &&
-        indicatorPosition < event.endTime;
       const isTimeIndicatorHighlighted =
         config.enableTimeIndicator &&
         !state.isManualSelection &&
-        isInHighlightList &&
-        isIndicatorInRange;
+        indicatorPosition > event.startTime &&
+        indicatorPosition < event.endTime;
       const shouldHighlight =
         isSelected || isHighlighted || isTimeIndicatorHighlighted;
       ctx.save();
