@@ -691,6 +691,7 @@ export class Timeline {
             ],
           ...(eventData.readonly && { readonly: eventData.readonly }),
           ...(eventData.customData && { customData: eventData.customData }),
+          ...(eventData.media && { media: eventData.media }),
         };
         track.events.push(event);
       }
