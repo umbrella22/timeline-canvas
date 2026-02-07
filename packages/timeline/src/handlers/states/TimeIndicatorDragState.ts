@@ -48,7 +48,8 @@ export class TimeIndicatorDragState extends BaseState {
     }
 
     newTime = Math.max(config.startTime, Math.min(config.endTime, newTime));
-    this.timeline.setTimeIndicator(newTime, false);
+    // 拖拽过程使用轻量路径：不触发 onTimeIndicatorMove 回调、不 setStatus
+    this.timeline.setTimeIndicatorDuringDrag(newTime);
 
     return null;
   }
@@ -58,11 +59,8 @@ export class TimeIndicatorDragState extends BaseState {
 
     if (state.draggingTimeIndicator) {
       state.draggingTimeIndicator = false;
-      this.timeline.setStatus(
-        `时间指示器已放置: ${this.timeline.formatTime(
-          state.timeIndicatorPosition
-        )}`
-      );
+      // commit：触发完整的 setTimeIndicator（含回调、高亮计算、scrollToTimeIndicator）
+      this.timeline.setTimeIndicator(state.timeIndicatorPosition, false);
     }
 
     return this.createIdleState();

@@ -504,15 +504,16 @@ export class ChangeScheduler {
     newList: Array<{ trackIndex: number; eventIndex: number }>
   ): boolean {
     if (oldList.length !== newList.length) return true;
-
-    const MAX_EVENTS_PER_TRACK = 1_000_000;
-    const oldKeys = new Set(
-      oldList.map((e) => e.trackIndex * MAX_EVENTS_PER_TRACK + e.eventIndex)
-    );
-
-    return newList.some(
-      (e) => !oldKeys.has(e.trackIndex * MAX_EVENTS_PER_TRACK + e.eventIndex)
-    );
+    // O(n) 原地比较，避免分配 Set/map 减轻 GC 压力
+    for (let i = 0; i < oldList.length; i++) {
+      if (
+        oldList[i].trackIndex !== newList[i].trackIndex ||
+        oldList[i].eventIndex !== newList[i].eventIndex
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -544,6 +545,7 @@ export class ChangeScheduler {
         const track = this.state.tracks[trackIndex];
         for (const eventIndex of candidates) {
           const event = track.events[eventIndex];
+          if (!event) continue;
           if (position > event.startTime && position < event.endTime) {
             highlightedEvents.push({ trackIndex, eventIndex });
           }
@@ -582,12 +584,15 @@ export class ChangeScheduler {
 
     if (this.callbacks.onTimeIndicatorHighlight) {
       const position = this.state.timeIndicatorPosition;
-      const highlightData = this.state.timeIndicatorHighlightedEvents.map(
-        ({ trackIndex, eventIndex }) => {
+      const highlightData = this.state.timeIndicatorHighlightedEvents
+        .filter(({ trackIndex, eventIndex }) => {
+          const track = this.state.tracks[trackIndex];
+          return track && eventIndex < track.events.length;
+        })
+        .map(({ trackIndex, eventIndex }) => {
           const event = this.state.tracks[trackIndex].events[eventIndex];
           return { trackIndex, eventIndex, event: cloneEvent(event) };
-        }
-      );
+        });
       this.callbacks.onTimeIndicatorHighlight({
         position,
         highlightedEvents: highlightData,

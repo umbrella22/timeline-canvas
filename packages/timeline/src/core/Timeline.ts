@@ -711,6 +711,8 @@ export class Timeline {
       this.config.startTime,
       Math.min(this.config.endTime, seconds)
     );
+    // 位置未变则跳过整条渲染链路
+    if (seconds === this.state.timeIndicatorPosition) return true;
     this.state.timeIndicatorPosition = seconds;
     this.scrollToTimeIndicator(seconds);
     // 使用调度器处理高亮计算和回调触发
@@ -724,6 +726,95 @@ export class Timeline {
     return true;
   }
 
+  /**
+   * 拖拽过程中的轻量时间指示器更新
+   *
+   * 与 setTimeIndicator 的区别：
+   * - 触发 "timeIndicator:drag" 而非 "timeIndicator:move"（不触发 onTimeIndicatorMove / emitTimeIndicatorHighlight 回调）
+   * - 不调用 setStatus
+   * - 使用节流的边界滚动而非每帧滚动
+   */
+  public setTimeIndicatorDuringDrag(seconds: number): void {
+    seconds = Math.max(
+      this.config.startTime,
+      Math.min(this.config.endTime, seconds)
+    );
+    this.state.timeIndicatorPosition = seconds;
+    // 仅在越界时节流滚动
+    this.scrollToTimeIndicatorThrottled(seconds);
+    this.notifyChange("timeIndicator:drag");
+  }
+
+  /** 上一次边界滚动的时间戳 */
+  private _lastEdgeScrollTime = 0;
+  /** 边界滚动节流间隔（ms） */
+  private static readonly EDGE_SCROLL_THROTTLE = 80;
+  /** 距画布边缘多少 px 内触发滚动 */
+  private static readonly EDGE_SCROLL_MARGIN = 30;
+
+  /**
+   * 拖拽过程中的节流边界滚动
+   * 仅当指示器距离画布边缘 < EDGE_SCROLL_MARGIN 时才调整 scrollX，
+   * 且受 EDGE_SCROLL_THROTTLE 节流。
+   */
+  private scrollToTimeIndicatorThrottled(seconds: number): void {
+    const now = performance.now();
+    if (now - this._lastEdgeScrollTime < Timeline.EDGE_SCROLL_THROTTLE) return;
+
+    const timeIndicatorX = getTimeX(
+      seconds,
+      this.config.startTime,
+      this.config.startPaddingTime,
+      this.config.secondWidth,
+      this.state.zoomLevel,
+      this.state.scrollX
+    );
+    const canvasWidth = this.renderManager.getCanvasLogicalWidth();
+    const margin = Timeline.EDGE_SCROLL_MARGIN;
+
+    if (timeIndicatorX >= margin && timeIndicatorX <= canvasWidth - margin) {
+      // 在安全区域内，无需滚动
+      return;
+    }
+
+    this._lastEdgeScrollTime = now;
+    const scrollMargin = 50; // 滚动后保留的边距
+    const timeAtZeroScroll = getTimeX(
+      seconds,
+      this.config.startTime,
+      this.config.startPaddingTime,
+      this.config.secondWidth,
+      this.state.zoomLevel,
+      0
+    );
+    const maxScrollX = this.renderManager.computeMaxScrollX(
+      this.state.zoomLevel
+    );
+
+    if (timeIndicatorX < margin) {
+      this.state.scrollX = Math.max(
+        0,
+        Math.min(maxScrollX, timeAtZeroScroll - scrollMargin)
+      );
+    } else {
+      this.state.scrollX = Math.max(
+        0,
+        Math.min(maxScrollX, timeAtZeroScroll - (canvasWidth - scrollMargin))
+      );
+    }
+
+    this.markDirty([
+      "background",
+      "tracks",
+      "timeline",
+      "guideLines",
+      "indicator",
+      "scrollbar",
+      "interaction",
+      "overlay",
+    ]);
+  }
+
   private scrollToTimeIndicator(seconds: number): void {
     const timeIndicatorX = getTimeX(
       seconds,
@@ -735,6 +826,7 @@ export class Timeline {
     );
     const canvasWidth = this.renderManager.getCanvasLogicalWidth();
     const margin = 50;
+    let needsScroll = false;
     if (timeIndicatorX < margin) {
       const targetScrollX =
         getTimeX(
@@ -749,6 +841,7 @@ export class Timeline {
         this.state.zoomLevel
       );
       this.state.scrollX = Math.max(0, Math.min(maxScrollX, targetScrollX));
+      needsScroll = true;
     } else if (timeIndicatorX > canvasWidth - margin) {
       const targetScrollX =
         getTimeX(
@@ -764,17 +857,21 @@ export class Timeline {
         this.state.zoomLevel
       );
       this.state.scrollX = Math.max(0, Math.min(maxScrollX, targetScrollX));
+      needsScroll = true;
     }
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
+    // 仅在实际发生滚动时才标记所有层脏
+    if (needsScroll) {
+      this.markDirty([
+        "background",
+        "tracks",
+        "timeline",
+        "guideLines",
+        "indicator",
+        "scrollbar",
+        "interaction",
+        "overlay",
+      ]);
+    }
   }
 
   public zoom(factor: number): void {

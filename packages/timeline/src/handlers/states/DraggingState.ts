@@ -210,15 +210,20 @@ export class DraggingState extends BaseState {
           state.tracks[targetTrackIndex].events.length - 1;
         state.selectedTrack = targetTrackIndex;
 
-        if (
-          state.selectedEvent &&
-          state.selectedEvent.trackIndex === trackIndex &&
-          state.selectedEvent.eventIndex === eventIndex
-        ) {
-          state.selectedEvent = {
-            trackIndex: targetTrackIndex,
-            eventIndex: state.tracks[targetTrackIndex].events.length - 1,
-          } as SelectedEvent;
+        if (state.selectedEvent && state.selectedEvent.trackIndex === trackIndex) {
+          if (state.selectedEvent.eventIndex === eventIndex) {
+            // 被选中的事件就是被拖拽的事件，跟随移动
+            state.selectedEvent = {
+              trackIndex: targetTrackIndex,
+              eventIndex: state.tracks[targetTrackIndex].events.length - 1,
+            } as SelectedEvent;
+          } else if (state.selectedEvent.eventIndex > eventIndex) {
+            // splice 导致源轨道后续事件索引前移，需修正
+            state.selectedEvent = {
+              ...state.selectedEvent,
+              eventIndex: state.selectedEvent.eventIndex - 1,
+            } as SelectedEvent;
+          }
         }
 
         this.timeline.invalidateIndexTrack(targetTrackIndex);

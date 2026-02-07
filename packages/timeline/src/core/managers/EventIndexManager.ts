@@ -39,7 +39,11 @@ export class EventIndexManager {
   }
 
   private ensureSorted(trackIndex: number): number[] {
-    if (this.batching && this.sortedIndices.has(trackIndex)) {
+    if (
+      this.batching &&
+      this.sortedIndices.has(trackIndex) &&
+      !this.dirtyTracks.has(trackIndex)
+    ) {
       return this.sortedIndices.get(trackIndex)!;
     }
     if (
