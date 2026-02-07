@@ -41,7 +41,7 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
           x: x - pos.x,
           y: y - pos.y,
         });
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         e.preventDefault();
       }
     };
@@ -64,8 +64,9 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
       nx = Math.max(0, Math.min(rect.width - size.width, nx));
       ny = Math.max(0, Math.min(rect.height - size.height, ny));
       context.api.setData("perfOverlayPos", { x: nx, y: ny });
+      context.timeline.markDirty(["overlay"]);
       context.timeline.draw();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
     };
     const onMouseUp = (_e: MouseEvent) => {

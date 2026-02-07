@@ -1,7 +1,5 @@
 # Renderers 文件夹结构说明
 
-渲染器文件夹已按照功能进行了重新组织，分为两个子文件夹：
-
 ## 📁 core/ - 核心渲染系统
 
 包含渲染架构的核心组件：
@@ -22,31 +20,3 @@
 - **ScrollbarRenderer.ts** - 滚动条渲染器
 - **InteractionRenderer.ts** - 交互层渲染器（拖拽预览、选中状态）
 - **index.ts** - 统一导出所有图层渲染器
-
-## 🎯 使用方式
-
-所有导出仍然可以通过主 `index.ts` 访问：
-
-```typescript
-// 导入核心渲染系统
-import { RenderPipeline, createRenderContext } from "./renderers";
-
-// 导入图层渲染器
-import { TimelineRenderer, TracksRenderer } from "./renderers";
-```
-
-## 📊 优势
-
-1. **清晰的职责划分** - 每个文件夹有明确的用途
-2. **更好的可维护性** - 文件按功能分组，易于查找和修改
-3. **代码复用减少** - 渲染逻辑直接在 Renderer 类中，无需包装
-4. **扩展性强** - 新增渲染器时只需在 layers/ 文件夹添加即可
-
-## 🔄 迁移进度
-
-- ✅ **TimelineRenderer** - 已完全迁移
-- ✅ **IndicatorRenderer** - 已完全迁移
-- ✅ **GuideLinesRenderer** - 已完全迁移
-- ✅ **ScrollbarRenderer** - 已完全迁移
-- ✅ **TracksRenderer** - 已完全迁移（使用独立的 EventsRenderer）
-- ✅ **InteractionRenderer** - 已完全独立
