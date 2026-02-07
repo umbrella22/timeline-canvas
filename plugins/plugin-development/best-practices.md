@@ -1,8 +1,4 @@
-# 最佳实践
-
-## 9. 最佳实践
-
-### 9.1 命名规范
+## 命名规范
 
 ```javascript
 // 插件名称使用 PascalCase
@@ -24,7 +20,7 @@ const config = {
 };
 ```
 
-### 9.2 配置设计
+## 配置设计
 
 ```javascript
 const MyPlugin = (userConfig = {}) => {
@@ -52,7 +48,7 @@ const MyPlugin = (userConfig = {}) => {
 };
 ```
 
-### 9.3 兼容性处理
+## 兼容性处理
 
 ```javascript
 activate(context) {
@@ -73,7 +69,7 @@ activate(context) {
 }
 ```
 
-### 9.4 文档化
+## 文档化
 
 ```javascript
 /**
@@ -96,9 +92,9 @@ const GridPlugin = (config = {}) => ({
 });
 ```
 
-## 7. 性能优化
+## 性能优化
 
-### 7.1 渲染优化
+### 渲染优化
 
 ```javascript
 render(ctx, canvas, config, state) {
@@ -114,7 +110,7 @@ render(ctx, canvas, config, state) {
 }
 ```
 
-### 7.2 事件处理优化
+### 事件处理优化
 
 ```javascript
 // 使用防抖
@@ -128,7 +124,7 @@ renderOverlay: throttle(function(ctx, canvas, config, state) {
 }, 16),
 ```
 
-### 7.3 内存管理
+### 内存管理
 
 ```javascript
 destroy(context) {
@@ -146,9 +142,9 @@ destroy(context) {
 }
 ```
 
-## 8. 错误处理
+## 错误处理
 
-### 8.1 错误捕获
+### 错误捕获
 
 ```javascript
 activate(context) {
@@ -161,7 +157,7 @@ activate(context) {
 }
 ```
 
-### 8.2 验证错误
+### 验证错误
 
 ```javascript
 validateEventMove(payload) {

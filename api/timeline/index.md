@@ -1,23 +1,21 @@
-# Timeline API 总览
-
-Timeline 类是核心类，提供了时间轴的所有功能。
+Timeline 类是核心类，提供了时间轴的主要能力（数据管理、视图控制、插件与事件回调）。
 
 ## 构造函数
 
-```typescript
+```ts
 class Timeline {
-  constructor(canvasOrId: string | HTMLCanvasElement, config: TimelineConfig);
+  constructor(canvasId: string, options?: TimelineOptions);
 }
 ```
 
 ### 参数
 
-* `canvasOrId`: 画布元素或其 `id`
-* `config`: 时间轴配置对象（秒制时间系统）
+* `canvasId`: 画布元素的 `id`
+* `options`: 时间轴配置与回调（秒制时间系统，见 [类型定义](/timeline-canvas/api/timeline/types.md)）
 
 ### 示例
 
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,

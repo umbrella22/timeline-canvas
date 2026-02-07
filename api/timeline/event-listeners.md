@@ -1,10 +1,8 @@
-# 事件监听 API
-
 ## 回调事件（推荐）
 
 在初始化配置中传入回调：
 
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
   onEventAdd: (data) => console.log("事件已添加", data),
   onEventUpdate: (data) => console.log("事件已更新", data),

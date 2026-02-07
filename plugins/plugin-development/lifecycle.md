@@ -1,12 +1,10 @@
-# 插件生命周期
-
-## 3. 生命周期流程
+## 生命周期流程
 
 ```
 加载插件 → init() → activate() → 运行阶段 → deactivate() → destroy()
 ```
 
-## 3.2 各阶段详解
+## 各阶段详解
 
 ### init() 阶段
 
@@ -14,7 +12,7 @@
 * **用途**: 初始化插件内部状态、验证依赖、设置默认值
 * **注意**: 此时插件尚未激活，不应注册事件处理器
 
-```javascript
+```ts
 init(context) {
   // 初始化插件数据
   context.api.setData('initialized', true);
@@ -33,7 +31,7 @@ init(context) {
 * **用途**: 注册事件处理器、渲染层、设置监听器
 * **注意**: 这是插件开始工作的主要阶段
 
-```javascript
+```ts
 activate(context) {
   // 注册事件处理器
   context.api.registerEventHandler('render:overlay', this.renderOverlay);

@@ -1,10 +1,10 @@
-# 使用与示例
+本页以“可复制粘贴”的方式覆盖常用配置、交互与插件用法。
 
 ## 基础配置
 
 ### 时间轴配置（秒制系统）
 
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
@@ -31,7 +31,7 @@ Timeline Canvas 使用相对时间系统（秒-based），而不是绝对时间�
 
 #### 时间转换示例
 
-```javascript
+```ts
 // 时间配置示例（秒-based 系统）：
 const timelineConfig = {
   startTime: 0, // 时间起点（0秒）
@@ -61,7 +61,7 @@ const events = [
 * 工作时间（9-18 点）：startTime: 32400, endTime: 64800 (9*3600, 18*3600)
 * 跨午夜事件：startTime: 82800, endTime: 90000 (23 小时到次日 1 小时)
 
-```javascript
+```ts
 // 加载数据（每个轨道包含 events 列表）
 timeline.loadData({
   tracks: [
@@ -84,7 +84,7 @@ timeline.loadData({
 
 ### 缩放与时间指示器
 
-```javascript
+```ts
 // 按因子缩放
 timeline.zoom(1.2);
 timeline.zoom(0.8);
@@ -95,7 +95,7 @@ timeline.setTimeIndicator(600);
 
 ### 事件操作
 
-```javascript
+```ts
 // 添加事件（轨道索引、开始/结束秒数、标题等）
 timeline.addEvent(0, 1200, 1500, "新任务");
 
@@ -110,7 +110,7 @@ timeline.deleteEvent(0, 0);
 
 ### 性能监控插件
 
-```javascript
+```ts
 import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
 
 // 基础使用
@@ -123,37 +123,42 @@ timeline.usePlugin(PerformanceOverlayPlugin);
 
 ### 上下文菜单插件
 
-```javascript
+```ts
 import { ContextMenuPlugin } from "timeline-canvas/plugins";
 
-timeline.usePlugin(
-  ContextMenuPlugin({
-    useHtml: true, // 是否使用 HTML 渲染菜单
-    htmlTemplate: "<div>...</div>", // 可选的 HTML 模板
-  })
-);
+timeline.config.enableContextMenu = true;
+timeline.config.contextMenuItems = [
+  { type: "detail", name: "查看详情" },
+  { type: "delete", name: "删除" },
+];
 
-// 菜单项内容目前主要通过 TimelineConfig.contextMenuItems 配置
+await timeline.usePlugin(ContextMenuPlugin());
+
+// 如需用 HTML 完全接管菜单渲染，传入 htmlTemplate（也可通过 config.contextMenuHtml 配置）
+await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
 ```
 
 ### 主题插件
 
-```javascript
+```ts
 import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas/plugins";
 
 // 使用亮色主题
-timeline.usePlugin(LightThemePlugin);
+await timeline.usePlugin(LightThemePlugin);
 
 // 或者使用暗色主题
-timeline.usePlugin(DarkThemePlugin);
+await timeline.usePlugin(DarkThemePlugin);
+
+// 也可以使用内置便捷方法切换主题
+await timeline.setTheme("dark");
 ```
 
 ### 媒体插件
 
-```javascript
+```ts
 import { EventMediaPlugin } from "timeline-canvas/plugins";
 
-timeline.usePlugin(EventMediaPlugin());
+await timeline.usePlugin(EventMediaPlugin());
 
 // 加载带有媒体的事件
 timeline.loadData({
@@ -187,7 +192,7 @@ timeline.loadData({
 
 ## 事件监听（推荐：配置回调）
 
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
   onEventAdd: (data) => console.log("事件已添加", data),
   onEventUpdate: (data) => console.log("事件已更新", data),
@@ -266,7 +271,4 @@ window.addEventListener("resize", () => {
     timeline.setCanvasSize(container.clientWidth, container.clientHeight);
   }
 });
-```
-
-```
 ```

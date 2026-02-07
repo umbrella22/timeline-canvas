@@ -1,12 +1,10 @@
-# 视图控制 API
-
 ## setZoomLevel
 
 `setZoomLevel(zoomLevel: number)`
 
 设置缩放级别。
 
-```javascript
+```ts
 timeline.setZoomLevel(2);
 ```
 
@@ -16,7 +14,7 @@ timeline.setZoomLevel(2);
 
 按因子缩放。
 
-```javascript
+```ts
 timeline.zoom(1.2); // 放大 20%
 timeline.zoom(0.8); // 缩小 20%
 ```
@@ -27,7 +25,7 @@ timeline.zoom(0.8); // 缩小 20%
 
 设置时间指示器位置（秒）。
 
-```javascript
+```ts
 timeline.setTimeIndicator(18000);
 ```
 
@@ -37,7 +35,7 @@ timeline.setTimeIndicator(18000);
 
 设置画布尺寸。
 
-```javascript
+```ts
 timeline.setCanvasSize(800, 600);
 ```
 
@@ -47,7 +45,7 @@ timeline.setCanvasSize(800, 600);
 
 根据容器大小自动调整画布尺寸。
 
-```javascript
+```ts
 timeline.adjustCanvasSize();
 ```
 
@@ -57,7 +55,7 @@ timeline.adjustCanvasSize();
 
 获取画布元素。
 
-```javascript
+```ts
 const canvas = timeline.getCanvas();
 ```
 
@@ -67,7 +65,7 @@ const canvas = timeline.getCanvas();
 
 标记画布图层为脏，触发重绘。如果不指定图层，将重绘所有图层。
 
-```javascript
+```ts
 // 重绘所有图层
 timeline.markDirty();
 
@@ -81,7 +79,7 @@ timeline.markDirty(["tracks", "indicator"]);
 
 通知状态变更，由调度器自动处理脏层标记、派生状态计算和回调触发。
 
-```javascript
+```ts
 timeline.notifyChange("data:load");
 ```
 
@@ -91,7 +89,7 @@ timeline.notifyChange("data:load");
 
 开始批量变更操作。在此期间的变更不会立即触发重绘，直到调用 `endChangeBatch`。
 
-```javascript
+```ts
 timeline.beginChangeBatch();
 // 执行多次变更...
 timeline.endChangeBatch();
@@ -109,7 +107,7 @@ timeline.endChangeBatch();
 
 获取各图层最后一次渲染的时间戳。
 
-```javascript
+```ts
 const times = timeline.getLastLayerTimes();
 console.log(times);
 ```
@@ -120,7 +118,7 @@ console.log(times);
 
 获取指定缩放级别下的内容宽度。
 
-```javascript
+```ts
 const width = timeline.getContentWidthForZoom(1.0);
 ```
 
@@ -130,7 +128,7 @@ const width = timeline.getContentWidthForZoom(1.0);
 
 检查是否显示了水平滚动条。
 
-```javascript
+```ts
 if (timeline.hasHorizontalScrollbar()) {
   // ...
 }
@@ -142,6 +140,6 @@ if (timeline.hasHorizontalScrollbar()) {
 
 获取可用高度（减去滚动条等占用的高度）。
 
-```javascript
+```ts
 const height = timeline.getAvailableHeight();
 ```

@@ -1,20 +1,18 @@
-# MutexGuardPlugin
-
 事件互斥插件，防止同一互斥组的事件在时间上重叠。
 
 ## 基本用法
 
-```javascript
+```ts
 import { MutexGuardPlugin } from "timeline-canvas/plugins";
 
-timeline.usePlugin(MutexGuardPlugin());
+await timeline.usePlugin(MutexGuardPlugin());
 ```
 
 ## 配置互斥组
 
 在事件的 `customData` 中设置 `mutex` 属性，指定该事件所属的互斥组。
 
-```javascript
+```ts
 timeline.loadData({
   tracks: [
     {

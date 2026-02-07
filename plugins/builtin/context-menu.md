@@ -1,43 +1,33 @@
-# ContextMenuPlugin
-
-右键菜单插件，支持 Canvas 和 HTML 两种渲染模式。
+> 右键菜单插件。菜单项由 `TimelineConfig.contextMenuItems` 驱动，可选用 HTML 模板接管渲染。
 
 ## 基本用法
 
-```javascript
+```ts
 import { ContextMenuPlugin } from "timeline-canvas/plugins";
 
-timeline.usePlugin(ContextMenuPlugin());
+await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## 配置选项
+## 开启与菜单项
 
-```javascript
-timeline.usePlugin(
-  ContextMenuPlugin({
-    useHtml: true, // 是否使用 HTML 渲染菜单
-    htmlTemplate: "<div>...</div>", // 可选的 HTML 模板
-  })
-);
+```ts
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+  contextMenuItems: [
+    { type: "edit", name: "编辑" },
+    { type: "delete", name: "删除" },
+    { type: "export", name: "导出" },
+  ],
+  onContextMenu: ({ menuType, trackIndex, eventIndex, event }) => {
+    console.log(menuType, trackIndex, eventIndex, event);
+  },
+});
 ```
 
-## 菜单项配置
+## HTML 接管（可选）
 
-```typescript
-interface MenuItem {
-  type?: string; // 'separator' 等
-  name: string; // 菜单项文本
-}
-```
-
-## 高级用法
-
-```javascript
-// 动态菜单项
-timeline.usePlugin(
-  ContextMenuPlugin({
-    useHtml: true,
-  })
-);
-// 菜单项内容目前主要通过 TimelineConfig.contextMenuItems 配置
+```ts
+await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
 ```

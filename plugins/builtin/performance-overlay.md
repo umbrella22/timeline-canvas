@@ -1,22 +1,24 @@
-# PerformanceOverlayPlugin
-
 性能监控插件，显示 FPS、内存使用等性能指标。
 
 ## 基本用法
 
-```javascript
+```ts
 import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
 
-timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(PerformanceOverlayPlugin);
 ```
 
 ## 配置选项
 
-```javascript
-timeline.usePlugin(PerformanceOverlayPlugin);
-// 性能监控的开关和调试模式由 TimelineConfig 控制：
-// enablePerformanceMonitor: true
-// debug: true
+```ts
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enablePerformanceMonitor: true,
+  debug: true,
+});
+
+await timeline.usePlugin(PerformanceOverlayPlugin);
 ```
 
 ## 配置接口

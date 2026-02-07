@@ -1,0 +1,3424 @@
+---
+url: /timeline-canvas/en/guide/getting-started.md
+---
+
+
+Timeline Canvas is a high-performance, plugin-driven Canvas timeline component. It uses a seconds-based relative time model (all times are offsets in seconds from the start).
+
+## Basic Usage
+
+> Minimal runnable flow: create a canvas → initialize `Timeline` → load data → (optional) load plugins.
+
+### 1. Install
+
+```bash
+npm install timeline-canvas
+# or
+yarn add timeline-canvas
+# or
+pnpm add timeline-canvas
+```
+
+### 2. Create a Canvas
+
+```html
+<canvas id="timelineCanvas" style="width: 100%; height: 600px;"></canvas>
+```
+
+### 3. Initialize the Timeline (Seconds-based)
+
+```ts
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  startTime: 0,
+  endTime: 3600,
+  canvasHeight: 600,
+  trackHeight: 46,
+  trackMargin: 10,
+});
+```
+
+### 4. Load Data (Seconds-based)
+
+```ts
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 900,
+          title: "Frontend Development",
+          description: "Build the UI",
+        },
+      ],
+    },
+    {
+      events: [
+        {
+          startTime: 1800,
+          endTime: 2700,
+          title: "Design Review",
+          description: "UI/UX design review meeting",
+        },
+      ],
+    },
+  ],
+});
+```
+
+### 5. Add Plugins (Optional)
+
+> `usePlugin()` returns `Promise<boolean>` to indicate whether the plugin was loaded successfully.
+
+```ts
+import {
+  ContextMenuPlugin,
+  LightThemePlugin,
+  PerformanceOverlayPlugin,
+} from "timeline-canvas/plugins";
+
+timeline.config.enableContextMenu = true;
+timeline.config.contextMenuItems = [
+  { type: "detail", name: "View details" },
+  { type: "delete", name: "Delete" },
+];
+
+await timeline.usePlugin(LightThemePlugin);
+await timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(ContextMenuPlugin());
+```
+
+## Further Reading
+
+- [Usage & Examples](./usage)
+- [Configuration](./configuration)
+- [Built-in Plugins](../plugins/builtin)
+- [Timeline API](../api/timeline)
+
+## Architecture Overview (Optional)
+
+```mermaid
+graph TB
+    %% Application
+    subgraph "Application"
+        APP[Application]
+        USER[User Interaction]
+    end
+
+    %% Core
+    subgraph "Timeline Core"
+        TL[Timeline<br/>Main Controller]
+
+        subgraph "Managers"
+            PM[PluginManager<br/>Plugins]
+            RM[RenderManager<br/>Rendering]
+            SM[StateManager<br/>State]
+            EM[EventIndexManager<br/>Event Index]
+            VM[ViewportManager<br/>Viewport]
+            LM[Logger<br/>Logging]
+            EH[ErrorHandler<br/>Errors]
+        end
+
+        subgraph "Handlers"
+            MH[MouseHandler<br/>Mouse]
+            WH[WheelHandler<br/>Wheel]
+        end
+
+        subgraph "State Machine"
+            IS[InteractionState<br/>Interaction]
+            IDLE[IdleState<br/>Idle]
+            DRAG[DraggingState<br/>Dragging]
+            RESIZE[ResizingState<br/>Resizing]
+            SCROLL[ScrollingState<br/>Scrolling]
+            INDICATOR[TimeIndicatorDragState<br/>Indicator Drag]
+        end
+    end
+
+    %% Rendering
+    subgraph "Rendering"
+        RP[RenderPipeline<br/>Pipeline]
+
+        subgraph "Renderers"
+            TIMELINE_R[TimelineRenderer<br/>Timeline]
+            TRACKS_R[TracksRenderer<br/>Tracks]
+            GUIDELINES_R[GuideLinesRenderer<br/>Guides]
+            INDICATOR_R[IndicatorRenderer<br/>Indicator]
+            INTERACTION_R[InteractionRenderer<br/>Interaction]
+            SCROLLBAR_R[ScrollbarRenderer<br/>Scrollbar]
+        end
+
+        subgraph "Render Context"
+            RC[RenderContext<br/>Context]
+            RT[Renderer Types<br/>Types]
+        end
+    end
+
+    %% Plugins
+    subgraph "Plugins"
+        PLUGIN_API[PluginAPI<br/>Interface]
+        PLUGIN_CTX[PluginContext<br/>Context]
+
+        subgraph "Plugin Types"
+            THEME_P[Theme Plugin]
+            RENDER_P[Render Plugin]
+            EVENT_P[Event Plugin]
+            TOOL_P[Tool Plugin]
+            EXTENSION_P[Extension Plugin]
+        end
+
+        subgraph "Built-in Plugins"
+            DARK[DarkThemePlugin]
+            LIGHT[LightThemePlugin]
+            CONTEXT_MENU[ContextMenuPlugin]
+            PERFORMANCE[PerformanceOverlayPlugin]
+            EVENT_MEDIA[EventMediaPlugin]
+            EVENT_TOOLTIP[EventTooltipPlugin]
+            MUTEX_GUARD[MutexGuardPlugin]
+        end
+    end
+
+    %% Data
+    subgraph "Data"
+        CONFIG[TimelineConfig<br/>Config]
+        STATE[TimelineState<br/>State]
+        TYPES[Types]
+        UTILS[Utilities]
+    end
+
+    %% 连接关系
+    APP --> TL
+    USER --> MH
+    USER --> WH
+
+    TL --> PM
+    TL --> RM
+    TL --> SM
+    TL --> EM
+    TL --> MH
+    TL --> WH
+
+    MH --> IS
+    IS --> IDLE
+    IS --> DRAG
+    IS --> RESIZE
+    IS --> SCROLL
+    IS --> INDICATOR
+
+    RM --> RP
+    RP --> TIMELINE_R
+    RP --> TRACKS_R
+    RP --> GUIDELINES_R
+    RP --> INDICATOR_R
+    RP --> INTERACTION_R
+    RP --> SCROLLBAR_R
+
+    PM --> PLUGIN_API
+    PLUGIN_API --> PLUGIN_CTX
+    PLUGIN_CTX --> THEME_P
+    PLUGIN_CTX --> RENDER_P
+    PLUGIN_CTX --> EVENT_P
+    PLUGIN_CTX --> TOOL_P
+    PLUGIN_CTX --> EXTENSION_P
+
+    THEME_P --> DARK
+    THEME_P --> LIGHT
+    RENDER_P --> CONTEXT_MENU
+    RENDER_P --> PERFORMANCE
+    EVENT_P --> EVENT_MEDIA
+    EVENT_P --> EVENT_TOOLTIP
+    TOOL_P --> MUTEX_GUARD
+
+    CONFIG --> TL
+    STATE --> TL
+    TYPES --> TL
+    UTILS --> TL
+
+    %% Styles
+    classDef app fill:#f5f5f5,stroke:#666,stroke-width:1px
+    classDef core fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef manager fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef handler fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef state fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef render fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef plugin fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef data fill:#fafafa,stroke:#9e9e9e,stroke-width:1px
+    classDef builtin fill:#fff8e1,stroke:#ffa000,stroke-width:2px
+
+    class APP,USER app
+    class TL core
+    class PM,RM,SM,EM,VM,LM,EH manager
+    class MH,WH handler
+    class IS,IDLE,DRAG,RESIZE,SCROLL,INDICATOR state
+    class RP,TIMELINE_R,TRACKS_R,GUIDELINES_R,INDICATOR_R,INTERACTION_R,SCROLLBAR_R,RC,RT render
+    class PLUGIN_API,PLUGIN_CTX,THEME_P,RENDER_P,EVENT_P,TOOL_P,EXTENSION_P plugin
+    class CONFIG,STATE,TYPES,UTILS data
+    class DARK,LIGHT,CONTEXT_MENU,PERFORMANCE,EVENT_MEDIA,EVENT_TOOLTIP,MUTEX_GUARD builtin
+```
+
+## Using MCP in VS Code (Optional)
+
+If you use VS Code + Copilot Chat and want AI to help via tool calls (e.g., generating plugin scaffolding, running validations, or triggering allowlist scripts), see:
+
+- [MCP Service (Copilot Chat)](./mcp)
+
+## Full Example (Seconds-based, Same as the Demo)
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timeline Canvas Example</title>
+  <style>
+    #timeline-container {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="timelineCanvas"></canvas>
+
+  <script type="module">
+    import { Timeline } from 'timeline-canvas';
+    import {
+      ContextMenuPlugin,
+      LightThemePlugin,
+      PerformanceOverlayPlugin,
+    } from 'timeline-canvas/plugins';
+
+    const timeline = new Timeline('timelineCanvas', {
+      startTime: 0,
+      endTime: 3600,
+      enableContextMenu: true,
+      contextMenuItems: [
+        { type: 'detail', name: 'View details' },
+        { type: 'delete', name: 'Delete' },
+      ],
+    });
+
+    // Load sample data (seconds-based)
+    timeline.loadData({
+      tracks: [{ events: [{ startTime: 0, endTime: 900, title: 'Phase 1 Development' }] }]
+    });
+
+    // Add plugins
+    await timeline.usePlugin(LightThemePlugin);
+    await timeline.usePlugin(PerformanceOverlayPlugin);
+    await timeline.usePlugin(ContextMenuPlugin());
+
+    // Switch theme at runtime
+    // Switch to dark theme
+    setTimeout(() => void timeline.setTheme('dark'), 1000);
+  </script>
+</body>
+</html>
+```
+
+
+
+---
+url: /timeline-canvas/en/guide/configuration.md
+---
+
+
+> Timeline Canvas uses a seconds-based relative time model. For the most accurate configuration types, refer to the TypeScript definitions: see [Type Definitions](../api/timeline/types).
+
+## TimelineConfig Interface
+
+Timeline Canvas uses a seconds-based time model. All time values are relative seconds from the timeline start.
+
+```typescript
+interface TimelineConfig {
+  // Time range
+  startTime: number;
+  endTime: number;
+  startPaddingTime: number;
+  endPaddingTime: number;
+  secondWidth: number;
+
+  // Layout & sizing
+  canvasHeight?: number;
+  timelineHeight: number;
+  trackHeight: number;
+  trackMargin: number;
+  firstTrackTopMargin: number;
+
+  // Feature toggles
+  enableEventResize: boolean;
+  enableEventSplit: boolean;
+  enableTimeIndicator: boolean;
+  enableContextMenu: boolean;
+  debug: boolean;
+  enablePerformanceMonitor: boolean;
+  readOnly: boolean;
+
+  // Track auto-management
+  autoAddTrack: boolean;
+  autoRemoveEmptyLastTrack: boolean;
+
+  // Event config
+  minEventDuration: number;
+  resizeHandleWidth: number;
+  showEventDurationLabel: boolean;
+  formatEventDuration: ((duration: number) => string) | null;
+
+  // Auto-fit
+  autoFitOnInit: boolean;
+  minAutoFitZoom: number;
+  maxAutoFitZoom: number;
+
+  // Snapping
+  snapInterval: number;
+  snapToSeconds: boolean;
+  secondPrecisionZoomThreshold: number;
+
+  // Time indicator
+  timeIndicatorWidth: number;
+  timeIndicatorSnapThreshold: number;
+  timeIndicatorHeadSize: number;
+  timeIndicatorTriangleHeight: number;
+
+  // Guide lines
+  guideLineSnapThreshold: number;
+
+  // Text & block styles
+  eventTextStyle: EventTextStyle;
+  eventBlockStyle: EventBlockStyle;
+  colors: TimelineColors;
+
+  // Context menu
+  contextMenuItems: ContextMenuItem[];
+  contextMenuStyle: ContextMenuStyle;
+  contextMenuHtml?: string | HTMLElement;
+
+  // Callbacks
+  onEventAdd?: (data: EventAddData) => void;
+  onEventUpdate?: (data: EventUpdateData) => void;
+  onEventDelete?: (data: EventDeleteData) => void;
+  onEventMove?: (data: EventMoveData) => void;
+  onEventClick?: (data: EventClickData) => void;
+  onEventEdit?: (data: EventEditData) => void;
+  onTimeIndicatorHighlight?: (data: TimeIndicatorHighlightData) => void;
+  onContextMenu?: (data: ContextMenuData) => void;
+  onTrackAdd?: (track: Track) => void;
+  onTrackRemove?: (track: Track) => void;
+  onTimeIndicatorMove?: (data: TimeIndicatorMoveData) => void;
+  onZoom?: (data: ZoomData) => void;
+  onStatusChange?: (statusText: string) => void;
+  onEventHighlight?: (data: EventHighlightData) => void;
+}
+```
+
+## Style Interfaces
+
+### EventTextStyle
+
+```typescript
+interface EventTextStyle {
+  titleFontSize: number | "auto";
+  timeFontSize: number | "auto";
+  titleFontFamily: string;
+  timeFontFamily: string;
+  titleFontWeight: string;
+  timeFontWeight: string;
+  titleColor: string | null;
+  timeColor: string | null;
+  textAlign: "left" | "center" | "right";
+  verticalAlign: "top" | "middle" | "bottom";
+  titleOffsetY: number;
+  timeOffsetY: number;
+  showTitle: boolean;
+  showTime: boolean;
+  minHeightForTitle: number;
+  minHeightForTime: number;
+}
+```
+
+### EventBlockStyle
+
+```typescript
+interface EventBlockStyle {
+  borderRadius: number;
+  enableSelectionGlow: boolean;
+  selectionGlowBlur: number;
+}
+```
+
+### TimelineColors
+
+```typescript
+interface TimelineColors {
+  canvasBackground: string;
+  timelineBackground: string;
+  trackBackground: string;
+  trackBackgroundSelected: string;
+  trackBackgroundOdd?: string;
+  trackBackgroundEven?: string;
+  timelineText: string;
+  timelineGrid: string;
+  timelineSubGrid: string;
+  trackText: string;
+  eventColors: string[];
+  eventText: string;
+  eventBorder: string;
+  eventBorderSelected: string;
+  eventOverlay: string;
+  dragPreviewValid: string;
+  dragPreviewInvalid: string;
+  dragPreviewBorderValid: string;
+  dragPreviewBorderInvalid: string;
+  timeIndicator: string;
+  guideLine: string;
+  guideLineLabel: string;
+  dragTimeReferenceLine: string;
+  dragTimeReferenceLabel: string;
+  dragTimeReferenceLabelBackground: string;
+  scrollbarTrack: string;
+  scrollbarHandle: string;
+  scrollbarHandleHover: string;
+  scrollbarHandleHighlight: string;
+  scrollbarBorder: string;
+  contextMenuBackground: string;
+  contextMenuBorder: string;
+  contextMenuText: string;
+  contextMenuHoverBackground: string;
+  contextMenuHoverText: string;
+  eventDurationLabel: string;
+}
+```
+
+## Full Configuration Example (Same as the Demo)
+
+```javascript
+const timeline = new Timeline("timelineCanvas", {
+  // Time range (seconds)
+  startTime: 0,
+  endTime: 3600,
+  endPaddingTime: 60,
+
+  // Layout & sizing
+  secondWidth: 0.022,
+  canvasHeight: 600,
+  trackHeight: 46,
+  trackMargin: 10,
+  firstTrackTopMargin: 16,
+  timelineHeight: 60,
+
+  // Feature toggles
+  enableEventResize: true,
+  enableEventSplit: true,
+  enableTimeIndicator: true,
+  enableContextMenu: true,
+  debug: false,
+
+  // Track auto-management
+  autoAddTrack: true,
+  autoRemoveEmptyLastTrack: true,
+
+  // Event config
+  minEventDuration: 0.25,
+  resizeHandleWidth: 8,
+  minAutoFitZoom: 14.0,
+
+  // Snapping
+  snapInterval: 15,
+  snapToSeconds: true,
+  secondPrecisionZoomThreshold: 1.0,
+
+  // Text & block styles (example)
+  eventTextStyle: { showTitle: true, showTime: false },
+  eventBlockStyle: { borderRadius: 2, enableSelectionGlow: false },
+
+  // Callbacks (example)
+  onEventClick: (data) => console.log("Event click", data),
+  onZoom: (data) => console.log("Zoom", data),
+});
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/context-menu.md
+---
+
+
+> Context menu plugin. Menu items are driven by `TimelineConfig.contextMenuItems`. Optionally, you can take over rendering with an HTML template.
+
+## Basic Usage
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(ContextMenuPlugin());
+```
+
+## Enable & Menu Items
+
+```ts
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+  contextMenuItems: [
+    { type: "edit", name: "Edit" },
+    { type: "delete", name: "Delete" },
+    { type: "export", name: "Export" },
+  ],
+  onContextMenu: ({ menuType, trackIndex, eventIndex, event }) => {
+    console.log(menuType, trackIndex, eventIndex, event);
+  },
+});
+```
+
+## HTML Override (Optional)
+
+```ts
+await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/event-tooltip.md
+---
+
+
+Event tooltip plugin. Shows details when you hover over an event.
+
+## Basic Usage
+
+```ts
+import { EventTooltipPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(EventTooltipPlugin());
+```
+
+## Options
+
+```ts
+await timeline.usePlugin(
+  EventTooltipPlugin({
+    showDelay: 300,
+    maxWidth: 300,
+    backgroundColor: "#333",
+    textColor: "#fff",
+    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+  })
+);
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/light-theme.md
+---
+
+
+Light theme plugin. Applies a light color palette and draws the background layer.
+
+## Basic Usage
+
+```ts
+import { LightThemePlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(LightThemePlugin);
+
+// Or use the convenience method
+await timeline.setTheme("light");
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/dark-theme.md
+---
+
+
+Dark theme plugin. Applies a dark color palette and draws the background layer.
+
+## Basic Usage
+
+```ts
+import { DarkThemePlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(DarkThemePlugin);
+
+// Or use the convenience method
+await timeline.setTheme("dark");
+```
+
+## Switching Themes at Runtime
+
+```ts
+import { Timeline } from "timeline-canvas";
+import { LightThemePlugin } from "timeline-canvas/plugins";
+
+// Set default theme at initialization
+const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
+
+// Switch at runtime
+await timeline.setTheme("dark");
+// Switch back to light
+await timeline.setTheme("light");
+```
+
+Tip: For a custom theme, follow the plugin development guide to implement your own theme plugin.
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/performance-overlay.md
+---
+
+
+Performance overlay plugin. Displays FPS, memory usage, and other metrics.
+
+## Basic Usage
+
+```ts
+import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(PerformanceOverlayPlugin);
+```
+
+## Configuration
+
+```ts
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enablePerformanceMonitor: true,
+  debug: true,
+});
+
+await timeline.usePlugin(PerformanceOverlayPlugin);
+```
+
+## Notes
+
+This plugin does not currently take a direct options object. It relies on `TimelineConfig.enablePerformanceMonitor` and `TimelineConfig.debug`.
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/event-media.md
+---
+
+
+Event media plugin. Renders images or waveforms inside event blocks.
+
+## Basic Usage
+
+```ts
+import { EventMediaPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(EventMediaPlugin());
+```
+
+## Data Format
+
+```ts
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 900,
+          title: "Media Event",
+          media: {
+            images: [
+              { src: "path/to/image.jpg", fit: "cover", opacity: 0.8 },
+            ],
+            waveform: {
+              data: [0.1, 0.5, -0.2],
+              color: "#1890ff",
+              opacity: 0.6,
+            },
+          },
+        },
+      ],
+    },
+  ],
+});
+```
+
+## Media Type Definition
+
+```typescript
+interface EventMedia {
+  images?: Array<{
+    src: string;
+    fit?: "cover" | "contain" | "stretch";
+    opacity?: number;
+  }>;
+  waveform?: {
+    data: Float32Array | number[];
+    color?: string;
+    backgroundColor?: string;
+    opacity?: number;
+  };
+}
+```
+
+## Advanced Usage
+
+```ts
+// Mixed media types
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 100,
+          title: "Audio/Video Event",
+          media: {
+            images: [
+              {
+                src: "thumbnail.jpg",
+                fit: "cover",
+                opacity: 0.3,
+              },
+            ],
+            waveform: {
+              data: audioSamples, // Float32Array or number[]
+              color: "#ff6b6b",
+              opacity: 0.8,
+            },
+          },
+        },
+      ],
+    },
+  ],
+});
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/mutex-guard.md
+---
+
+
+Event mutex plugin. Prevents events in the same mutex group from overlapping in time.
+
+## Basic Usage
+
+```ts
+import { MutexGuardPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(MutexGuardPlugin());
+```
+
+## Configure Mutex Groups
+
+Set `customData.mutex` on an event to specify which mutex group(s) it belongs to.
+
+```ts
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 100,
+          title: "Task A",
+          customData: { mutex: ["group1"] }, // belongs to group1
+        },
+        {
+          startTime: 50,
+          endTime: 150,
+          title: "Task B",
+          customData: { mutex: ["group1"] }, // also in group1; cannot overlap with Task A
+        },
+      ],
+    },
+  ],
+});
+```
+
+## How It Works
+
+When the user moves or resizes an event, the plugin checks whether the target range overlaps with other events in the same mutex group. If it does, the action will be blocked or rolled back.
+
+
+
+---
+url: /timeline-canvas/en/plugins/builtin/index.md
+---
+
+
+Timeline Canvas includes a set of built-in plugins. You can load them via `timeline.usePlugin()`.
+
+## 📋 Plugin Directory
+
+### Essentials
+
+- [ContextMenuPlugin](./context-menu) - context menu plugin
+- [EventTooltipPlugin](./event-tooltip) - event tooltip plugin
+- [LightThemePlugin](./light-theme) - light theme plugin
+- [DarkThemePlugin](./dark-theme) - dark theme plugin
+- [PerformanceOverlayPlugin](./performance-overlay) - performance overlay plugin
+
+### Media
+
+- [EventMediaPlugin](./event-media) - event media plugin
+
+### Utilities
+
+- [MutexGuardPlugin](./mutex-guard) - event mutex plugin
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/data-management.md
+---
+
+
+## loadData(data: LoadDataFormat)
+
+Load timeline data (seconds-based).
+
+```ts
+timeline.loadData({
+  timeIndicatorPosition: 0,
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 900,
+          title: "Day Shift",
+          description: "Morning work block",
+        },
+      ],
+    },
+  ],
+});
+```
+
+## addEvent
+
+`addEvent(trackIndex: number, startTime: number, endTime: number, title: string, description?: string, customData?: any, readonly?: boolean)`
+
+Add an event to the specified track.
+
+```ts
+timeline.addEvent(0, 1200, 1800, "Auto-generated event", "Example description", {
+  note: "example",
+});
+```
+
+## updateEvent
+
+`updateEvent(trackIndex: number, eventIndex: number, updates: Partial<TimelineEvent>)`
+
+Update an event.
+
+```ts
+timeline.updateEvent(0, 1, {
+  title: "Updated title",
+});
+```
+
+## deleteEvent
+
+`deleteEvent(trackIndex: number, eventIndex: number)`
+
+Delete an event.
+
+```ts
+timeline.deleteEvent(0, 1);
+```
+
+## addTrack
+
+`addTrack()`
+
+Add a new empty track.
+
+```ts
+timeline.addTrack();
+```
+
+## removeTrack
+
+`removeTrack()`
+
+Remove the last track.
+
+```ts
+timeline.removeTrack();
+```
+
+## autoRemoveEmptyLastTrack
+
+`autoRemoveEmptyLastTrack()`
+
+Automatically remove the last empty track (if any).
+
+```ts
+timeline.autoRemoveEmptyLastTrack();
+```
+
+## setEndTime
+
+`setEndTime(endTime: number)`
+
+Set the timeline end time (seconds).
+
+```ts
+timeline.setEndTime(86400); // set end time to 24 hours
+```
+
+## getEndTime
+
+`getEndTime(): number`
+
+Get the timeline end time (seconds).
+
+```ts
+const endTime = timeline.getEndTime(); // returns seconds
+```
+
+## beginIndexBatch
+
+`beginIndexBatch()`
+
+Begin batch index updates. Useful when adding/updating many events to improve performance.
+
+```ts
+timeline.beginIndexBatch();
+// bulk add/update events...
+timeline.endIndexBatch();
+```
+
+## endIndexBatch
+
+`endIndexBatch()`
+
+End batch index updates and rebuild the index.
+
+## invalidateIndexTrack
+
+`invalidateIndexTrack(trackIndex: number)`
+
+Invalidate the index for a given track; it will be rebuilt on the next query.
+
+```ts
+timeline.invalidateIndexTrack(0);
+```
+
+## invalidateIndexAll
+
+`invalidateIndexAll()`
+
+Invalidate the index for all tracks.
+
+```ts
+timeline.invalidateIndexAll();
+```
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/view-control.md
+---
+
+
+## setZoomLevel
+
+`setZoomLevel(zoomLevel: number)`
+
+Set the zoom level.
+
+```ts
+timeline.setZoomLevel(2);
+```
+
+## zoom
+
+`zoom(factor: number)`
+
+Zoom by a factor.
+
+```ts
+timeline.zoom(1.2); // zoom in by 20%
+timeline.zoom(0.8); // zoom out by 20%
+```
+
+## setTimeIndicator
+
+`setTimeIndicator(seconds: number, applySnap?: boolean)`
+
+Set the time indicator position (seconds).
+
+```ts
+timeline.setTimeIndicator(18000);
+```
+
+## setCanvasSize
+
+`setCanvasSize(width: number, height: number)`
+
+Set canvas size.
+
+```ts
+timeline.setCanvasSize(800, 600);
+```
+
+## adjustCanvasSize
+
+`adjustCanvasSize()`
+
+Automatically adjust the canvas size based on the container.
+
+```ts
+timeline.adjustCanvasSize();
+```
+
+## getCanvas
+
+`getCanvas(): HTMLCanvasElement`
+
+Get the canvas element.
+
+```ts
+const canvas = timeline.getCanvas();
+```
+
+## markDirty
+
+`markDirty(layerIds?: string[])`
+
+Mark layers as dirty to trigger a redraw. If no layers are provided, all layers will be redrawn.
+
+```ts
+// Redraw all layers
+timeline.markDirty();
+
+// Redraw specific layers only
+timeline.markDirty(["tracks", "indicator"]);
+```
+
+## notifyChange
+
+`notifyChange(change: ChangeType)`
+
+Notify a state change. The scheduler will handle dirty-layer marking, derived state computation, and callbacks.
+
+```ts
+timeline.notifyChange("data:load");
+```
+
+## beginChangeBatch
+
+`beginChangeBatch()`
+
+Begin a batch change session. Changes will not trigger redraws immediately until `endChangeBatch` is called.
+
+```ts
+timeline.beginChangeBatch();
+// perform multiple changes...
+timeline.endChangeBatch();
+```
+
+## endChangeBatch
+
+`endChangeBatch()`
+
+End a batch change session.
+
+## getLastLayerTimes
+
+`getLastLayerTimes(): Record<string, number>`
+
+Get the last render timestamp for each layer.
+
+```ts
+const times = timeline.getLastLayerTimes();
+console.log(times);
+```
+
+## getContentWidthForZoom
+
+`getContentWidthForZoom(zoomLevel: number): number`
+
+Get content width for a given zoom level.
+
+```ts
+const width = timeline.getContentWidthForZoom(1.0);
+```
+
+## hasHorizontalScrollbar
+
+`hasHorizontalScrollbar(): boolean`
+
+Check whether the horizontal scrollbar is shown.
+
+```ts
+if (timeline.hasHorizontalScrollbar()) {
+  // ...
+}
+```
+
+## getAvailableHeight
+
+`getAvailableHeight(): number`
+
+Get available height (minus scrollbars and other reserved space).
+
+```ts
+const height = timeline.getAvailableHeight();
+```
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/plugin-management.md
+---
+
+
+## usePlugin
+
+`usePlugin(plugin: any): Promise<boolean>`
+
+Use a plugin.
+
+```ts
+// Some built-in plugins are factory functions (call to pass options)
+await timeline.usePlugin(ContextMenuPlugin());
+
+// Some built-in plugins are plugin objects (pass directly)
+await timeline.usePlugin(PerformanceOverlayPlugin);
+```
+
+## removePlugin
+
+`removePlugin(pluginId: string): Promise<boolean>`
+
+Remove a plugin.
+
+```ts
+await timeline.removePlugin("performance-overlay@1.0.0");
+```
+
+## setTheme
+
+`setTheme(theme: 'light' | 'dark'): Promise<boolean>`
+
+Switch built-in themes at runtime.
+
+```ts
+// Set default theme at initialization
+const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
+
+// Switch to dark theme
+await timeline.setTheme("dark");
+
+// Switch back to light theme
+await timeline.setTheme("light");
+```
+
+## getLoadedPlugins
+
+`getLoadedPlugins(): any[]`
+
+Get the list of loaded plugins.
+
+```ts
+const plugins = timeline.getLoadedPlugins();
+console.log("Loaded plugins:", plugins);
+```
+
+## isPluginLoaded
+
+`isPluginLoaded(pluginName: string): boolean`
+
+Check whether a plugin is loaded.
+
+```ts
+if (timeline.isPluginLoaded("performance-overlay")) {
+  console.log("Performance overlay plugin is loaded");
+}
+```
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/event-listeners.md
+---
+
+
+## Callbacks (Recommended)
+
+Pass callbacks in the initialization options:
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  onEventAdd: (data) => console.log("Event added", data),
+  onEventUpdate: (data) => console.log("Event updated", data),
+  onEventDelete: (data) => console.log("Event deleted", data),
+  onEventMove: (data) => console.log("Event moved", data),
+  onEventClick: (data) => console.log("Event clicked", data),
+  onEventEdit: (data) => console.log("Event edited", data),
+  onTimeIndicatorHighlight: (data) => console.log("Time indicator highlight", data),
+  onContextMenu: (data) => console.log("Context menu triggered", data),
+  onTrackAdd: (track) => console.log("Track added", track),
+  onTrackRemove: (track) => console.log("Track removed", track),
+  onTimeIndicatorMove: (data) => console.log("Time indicator moved", data),
+  onZoom: (data) => console.log("Zoom changed", data),
+  onStatusChange: (text) => console.log("Status", text),
+});
+```
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/types.md
+---
+
+
+## TimelineEvent
+
+```ts
+interface TimelineEvent {
+  id: number;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  title: string;
+  description: string;
+  color: string;
+  readonly?: boolean;
+  customData?: Record<string, any>;
+  media?: {
+    images?: Array<{
+      src: string;
+      fit?: "cover" | "contain" | "stretch";
+      opacity?: number;
+    }>;
+    waveform?: {
+      data: Float32Array | number[];
+      color?: string;
+      backgroundColor?: string;
+      opacity?: number;
+    };
+  };
+}
+```
+
+## TimelineConfig (Key Fields)
+
+```ts
+interface TimelineConfig {
+  canvasHeight?: number;
+  timelineHeight: number;
+  trackHeight: number;
+  trackMargin: number;
+  firstTrackTopMargin: number;
+  secondWidth: number;
+  startTime: number;
+  endTime: number;
+  startPaddingTime: number;
+  endPaddingTime: number;
+  autoFitOnInit: boolean;
+  minAutoFitZoom: number;
+  maxAutoFitZoom: number;
+  timeUnit: string;
+  timeFormat: string;
+  snapInterval: number;
+  snapToSeconds: boolean;
+  secondPrecisionZoomThreshold: number;
+  enableTimeIndicator: boolean;
+  enableEventResize: boolean;
+  enableEventSplit: boolean;
+  enableContextMenu: boolean;
+  minEventDuration: number;
+  resizeHandleWidth: number;
+  debug: boolean;
+  enablePerformanceMonitor: boolean;
+  autoAddTrack: boolean;
+  autoRemoveEmptyLastTrack: boolean;
+  readOnly: boolean;
+  showEventDurationLabel: boolean;
+  eventTextStyle: EventTextStyle;
+  eventBlockStyle: EventBlockStyle;
+  colors: TimelineColors;
+  contextMenuItems: ContextMenuItem[];
+  contextMenuStyle: ContextMenuStyle;
+  contextMenuHtml?: string | HTMLElement;
+  // callbacks...
+}
+```
+
+## LoadDataFormat
+
+```ts
+interface LoadDataFormat {
+  timeIndicatorPosition?: number;
+  tracks: Array<{
+    events: Array<{
+      startTime?: number;
+      endTime?: number;
+      duration?: number;
+      title: string;
+      description?: string;
+      color?: string;
+      readonly?: boolean;
+      customData?: Record<string, any>;
+      media?: {
+        images?: Array<{
+          src: string;
+          fit?: "cover" | "contain" | "stretch";
+          opacity?: number;
+        }>;
+        waveform?: {
+          data: Float32Array | number[];
+          color?: string;
+          backgroundColor?: string;
+          opacity?: number;
+        };
+      };
+    }>;
+  }>;
+}
+```
+
+
+
+---
+url: /timeline-canvas/en/api/timeline/index.md
+---
+
+
+`Timeline` is the core class that provides the primary capabilities of the timeline (data management, view control, plugins, and event callbacks).
+
+## Constructor
+
+```ts
+class Timeline {
+  constructor(canvasId: string, options?: TimelineOptions);
+}
+```
+
+### Parameters
+
+- `canvasId`: the `id` of the canvas element
+- `options`: timeline config and callbacks (seconds-based, see [Type Definitions](./types))
+
+### Example
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  startTime: 0,
+  endTime: 3600,
+  canvasHeight: 600,
+  trackHeight: 46,
+  trackMargin: 10,
+});
+```
+
+## 📋 API Directory
+
+### [Data Management](./data-management)
+
+- `loadData` - load data
+- `addEvent` - add an event
+- `updateEvent` - update an event
+- `deleteEvent` - delete an event
+- `addTrack` - add a track
+- `removeTrack` - remove a track
+- `setEndTime` - set end time
+- `beginIndexBatch` - start batch indexing
+- `endIndexBatch` - end batch indexing
+
+### [View Control](./view-control)
+
+- `setZoomLevel` - set zoom level
+- `zoom` - zoom
+- `setTimeIndicator` - set time indicator
+- `setCanvasSize` - set canvas size
+- `markDirty` - trigger a redraw
+- `notifyChange` - notify change
+- `beginChangeBatch` - start batch changes
+- `endChangeBatch` - end batch changes
+
+### [Plugin Management](./plugin-management)
+
+- `usePlugin` - use a plugin
+- `removePlugin` - remove a plugin
+- `setTheme` - switch theme
+- `getLoadedPlugins` - get loaded plugins
+
+### [Event Callbacks](./event-listeners)
+
+- `onEventAdd`
+- `onEventUpdate`
+- `onEventClick`
+- ...more callbacks
+
+### [Type Definitions](./types)
+
+- `TimelineEvent`
+- `TimelineConfig`
+- `LoadDataFormat`
+
+
+
+---
+url: /timeline-canvas/en/playground.md
+---
+
+import TimelinePlayground from "../public/components/TimelinePlayground";
+
+Explore the core features of Timeline Canvas.
+
+> Try adding tracks and events, dragging to adjust them, and using the context menu.
+
+<TimelinePlayground lang="en" />
+
+
+
+---
+url: /timeline-canvas/en/advanced/performance.md
+---
+
+
+Timeline Canvas performance mainly comes from three areas: layered rendering, indexed queries, and batch scheduling.
+
+## Monitoring
+
+### PerformanceOverlayPlugin
+
+> Whether the performance panel is enabled is controlled by `TimelineOptions.enablePerformanceMonitor` or `TimelineOptions.debug`.
+
+```ts
+import { Timeline } from "timeline-canvas";
+import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+
+const timeline = new Timeline("timelineCanvas", {
+  enablePerformanceMonitor: true,
+  debug: true,
+});
+
+await timeline.usePlugin(PerformanceOverlayPlugin);
+
+const layerTimes = timeline.getLastLayerTimes();
+console.log(layerTimes);
+```
+
+## 分层渲染与脏检查
+
+Internally, `Timeline` uses `RenderPipeline` to split the canvas into logical layers (background / timeline / tracks / guideLines / indicator / interaction / scrollbar / overlay) and redraw only the affected layers.
+
+### Manual redraw
+
+```ts
+timeline.markDirty();
+timeline.markDirty(["tracks", "indicator"]);
+```
+
+### Recommendation: drive redraw via change notifications
+
+When you manually mutate `timeline.config` or `timeline.state`, prefer calling `notifyChange(changeType)` so the scheduler can decide dirty-layer marking, derived state computation, and callback triggering.
+
+```ts
+timeline.config.readOnly = true;
+timeline.notifyChange("config:readOnly");
+```
+
+## Batch updates
+
+### Batch changes (reduce redraws)
+
+```ts
+timeline.beginChangeBatch();
+
+timeline.addTrack();
+for (let i = 0; i < 1000; i++) {
+  timeline.addEvent(0, i * 10, i * 10 + 5, `Event ${i}`);
+}
+
+timeline.endChangeBatch();
+```
+
+### Batch indexing (heavy writes)
+
+> For large add/update/delete operations, use index batching to reduce index rebuild overhead.
+
+```ts
+timeline.beginIndexBatch();
+for (let i = 0; i < 1000; i++) {
+  timeline.addEvent(0, i * 10, i * 10 + 5, `Event ${i}`);
+}
+timeline.endIndexBatch();
+```
+
+## Media rendering (EventMediaPlugin)
+
+EventMediaPlugin renders images/waveforms inside event blocks and uses caching to reduce repeated decoding and draw cost.
+
+```ts
+import { EventMediaPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(EventMediaPlugin());
+
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 30,
+          title: "Waveform",
+          media: { waveform: { data: [0.1, 0.5, -0.2] } },
+        },
+      ],
+    },
+  ],
+});
+```
+
+
+
+---
+url: /timeline-canvas/en/guide/installation.md
+---
+
+
+This page covers development/build commands for this repository (which is different from installing the `timeline-canvas` npm package).
+
+## Requirements
+
+- Node.js >= 20.17.0
+- npm >= 9.0.0 or pnpm >= 10.0.0
+
+## Install Dependencies
+
+```bash
+# npm
+npm install
+
+# pnpm
+pnpm install
+```
+
+## Development
+
+```bash
+# Start dev server
+npm run dev
+
+# pnpm
+pnpm dev
+```
+
+## Build
+
+### Core Library
+
+```bash
+# Build the core library
+npm run build
+
+# Output goes to dist/
+# - timeline-core.js - core (includes the plugin system)
+# - timeline-core.min.js - minified build
+```
+
+### Docs
+
+```bash
+# Build docs
+npm run docs:build
+
+# Output goes to doc_build/
+```
+
+## Build Configuration
+
+### tsdown.config.ts
+
+The project uses tsdown for builds. Example config:
+
+```typescript
+export default defineConfig({
+  entry: [
+    "src/index.ts", // main entry
+    "src/plugins/builtin/*.ts", // plugin entries
+  ],
+  format: ["esm", "cjs", "umd"],
+  dts: true,
+  clean: true,
+  minify: true,
+  external: ["three"], // externals
+});
+```
+
+### Standalone Plugin Entries
+
+Each plugin has its own entry so you can load it on demand:
+
+```typescript
+// standalone plugin build entries
+export const pluginEntries = {
+  ContextMenuPlugin: "src/plugins/builtin/ContextMenuPlugin.ts",
+  PerformanceOverlayPlugin: "src/plugins/builtin/PerformanceOverlayPlugin.ts",
+  LightThemePlugin: "src/plugins/builtin/LightThemePlugin.ts",
+  DarkThemePlugin: "src/plugins/builtin/DarkThemePlugin.ts",
+  EventMediaPlugin: "src/plugins/builtin/EventMediaPlugin.ts",
+  MutexGuardPlugin: "src/plugins/builtin/MutexGuardPlugin.ts",
+};
+```
+
+## npm Package Layout
+
+```
+timeline-canvas/
+├── dist/
+│   ├── timeline-core.js
+│   ├── timeline-core.min.js
+│   ├── timeline-core.d.ts
+│   └── plugins/
+│       ├── ContextMenuPlugin.js
+│       ├── PerformanceOverlayPlugin.js
+│       ├── LightThemePlugin.js
+│       ├── DarkThemePlugin.js
+│       ├── EventMediaPlugin.js
+│       ├── MutexGuardPlugin.js
+│       └── *.d.ts
+├── package.json
+└── README.md
+```
+
+
+
+---
+url: /timeline-canvas/en/guide/mcp.md
+---
+
+
+> This repository provides a stdio MCP server so Copilot Chat / AI CLI can interact with the repo via tool calls.
+
+This page covers how to start it, configuration examples, and recommended workflows.
+
+- **Scaffolding**: Generate built-in plugin skeletons from templates, with feature selection and optional test stubs
+- **Validation**: Deep plugin integrity checks (metadata fields, activate/deactivate pairing, TODO scan)
+- **Semantic queries**: Symbol dependency graphs, type definitions, and member reference tracking (via TypeScript Compiler API)
+- **Consistency checks**: 5 categories of project-specific rules (plugin exports, render layers, state fields, change types, boundary conditions)
+- **Performance analysis**: Static annotation of render hot paths (O(N) work in loops, GC pressure, missing visibility culling, etc.)
+- **Migration helper**: Cross-check API exports against docs
+
+## Prerequisites
+
+- Node.js (use the repo’s recommended version)
+- pnpm
+- VS Code + GitHub Copilot Chat
+
+## Startup
+
+This is a **stdio MCP server**, usually started and managed by VS Code / Copilot Chat.
+
+### Option A: Local Development (Recommended)
+
+Use this when you work inside this repo and want to use/debug MCP without relying on an npm release.
+
+1. Install dependencies at the repo root:
+
+```bash
+pnpm install
+```
+
+1. Start it via the workspace script:
+
+```bash
+pnpm mcp
+```
+
+Equivalent command:
+
+```bash
+pnpm -C packages/mcp-service start
+```
+
+### Option B: npx (for a published version)
+
+This MCP server is published to npm (`timeline-canvas-mcp@2.0.0`). You can start it via `npx` (add `-y` to avoid interactive prompts).
+
+## VS Code / Copilot Chat Configuration (stdio)
+
+The repo includes a reference config you can copy: `.vscode/mcp.json`.
+
+Key points:
+
+- Start the server via stdio (not HTTP)
+- Ensure the server can locate the repo root (`cwd` or `MCP_WORKSPACE_ROOT`)
+
+Below are generic examples (the UI/keys may vary slightly by VS Code version):
+
+### Using pnpm (recommended for local)
+
+```json
+{
+  "mcpServers": {
+    "timeline-canvas": {
+      "command": "pnpm",
+      "args": ["-C", "packages/mcp-service", "start"],
+      "env": {
+        "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+### Using npx (published version)
+
+```json
+{
+  "mcpServers": {
+    "timeline-canvas": {
+      "command": "npx",
+      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "env": {
+        "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+## Generic Configuration for AI CLIs (stdio, minimal setup)
+
+As long as your AI CLI **supports MCP and can start a stdio server** (i.e., communicate via a process’ stdin/stdout), you can typically reuse the same startup parameters:
+
+- `command`: `npx` (or `pnpm`)
+- `args`: `-y timeline-canvas-mcp@2.0.0` (or `-C packages/mcp-service start`)
+- `env.MCP_WORKSPACE_ROOT`: points to the repo root (critical)
+
+> Tip: If you upgrade the npm package version later, also update `timeline-canvas-mcp@x.y.z` here and in the repo examples (e.g. `.vscode/mcp.json`).
+
+### Shape A: key is `mcpServers`
+
+Many clients use a structure like this (replace `${workspaceFolder}` with whatever workspace variable your client supports, or use an absolute path):
+
+```json
+{
+  "mcpServers": {
+    "timeline-canvas": {
+      "command": "npx",
+      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "env": {
+        "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+### Shape B: key is `servers` (same as this repo’s example)
+
+Some clients use `servers` with `type: "stdio"`:
+
+```jsonc
+{
+  "servers": {
+    "timeline-canvas": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+### Local repo startup (without relying on npm)
+
+If your AI CLI can run local commands directly, start via pnpm (best for development/debugging inside the repo):
+
+```json
+{
+  "command": "pnpm",
+  "args": ["-C", "packages/mcp-service", "start"],
+  "env": {
+    "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
+  }
+}
+```
+
+## Verify It Works
+
+After configuring, do a minimal verification in Copilot Chat:
+
+- Call `timeline_list_builtin_plugins`: it should list plugins under `packages/timeline/src/plugins/builtin`
+- Call `timeline_validate_plugin` (no args): it should return validation reports for all built-in plugins
+- Call `timeline_consistency_check`: it should return the project consistency check results
+
+## Recommended Workflows
+
+Below are common workflows you’ll likely use most in Copilot Chat.
+
+> Note: Use VS Code built-in tools for generic actions like searching, reading files, and running scripts. MCP tools focus on repo-level semantic analysis that built-ins can’t provide.
+
+### 1) Understand dependencies of a class/interface (before refactoring)
+
+1. Find who depends on `ChangeScheduler`:
+
+```json
+{ "symbol": "ChangeScheduler", "direction": "dependents" }
+```
+
+2. Find what `ChangeScheduler` depends on:
+
+```json
+{ "symbol": "ChangeScheduler", "direction": "dependencies" }
+```
+
+3. Query both directions:
+
+```json
+{ "symbol": "ChangeScheduler", "direction": "both" }
+```
+
+### 2) Inspect a type definition and member usage
+
+1. View the full `TimelineState` definition and all fields:
+
+```json
+{ "type": "TimelineState" }
+```
+
+2. See where `scrollX` is read/written:
+
+```json
+{ "type": "TimelineState", "member": "scrollX" }
+```
+
+### 3) Scaffold a built-in plugin and validate it
+
+1. Generate a plugin skeleton with a render layer and lifecycle hooks:
+
+```json
+{
+  "exportName": "MyPlugin",
+  "pluginType": "render",
+  "features": ["renderLayer", "lifecycle"],
+  "description": "My custom render plugin",
+  "withTest": true
+}
+```
+
+2. Validate the plugin immediately:
+
+```json
+{ "name": "MyPlugin" }
+```
+
+3. Validate all built-in plugins (no args):
+
+```json
+{}
+```
+
+### 4) Project health checks
+
+1. Run all consistency checks:
+
+```json
+{}
+```
+
+2. Run only selected checks:
+
+```json
+{ "checks": ["plugin-exports", "state-fields"] }
+```
+
+### 5) Performance optimization help
+
+1. Analyze render hot paths:
+
+```json
+{ "target": "render" }
+```
+
+2. Analyze all subsystems:
+
+```json
+{ "target": "all" }
+```
+
+### 6) Check API ↔ docs sync
+
+```json
+{ "scope": "api" }
+```
+
+## Troubleshooting
+
+- Tools not showing up / calls failing: try Reload Window and confirm the MCP server is enabled
+- `npx` stuck waiting for confirmation: ensure you pass `-y`
+- `Path escapes workspace`: check whether `cwd` / `MCP_WORKSPACE_ROOT` points to the repo root
+
+## Tool List
+
+Below is the full set of tools exposed by MCP server v2.0 in this repo (8 tools). All return values are plain text.
+
+> **Compared to v1.0**: Removed 6 tools that overlapped with VS Code built-ins (`timeline_search`, `timeline_read_excerpt`, `timeline_repo_map`, `timeline_trace_entrypoints`, `timeline_run_repo_script`, `timeline_run_mcp_script`) and added 5 semantic analysis tools.
+
+---
+
+### `timeline_scaffold_plugin`
+
+**Priority: P0 | Category: Scaffolding**
+
+Purpose: Generate a new built-in plugin skeleton from templates and automatically wire up exports. Supports feature selection and optional test scaffolding.
+
+What it does:
+
+- Generate plugin implementation files under `packages/timeline/src/plugins/builtin/` (template-based, not string-concatenated)
+- Generate re-export entries under `packages/timeline/src/builtin-plugin/`
+- Automatically add exports to `packages/timeline/src/index.ts`
+- Optionally generate test scaffolding
+
+Inputs:
+
+- `exportName: string`: export name (must be a valid identifier, e.g. `FooPlugin`)
+- `pluginType: "render" | "event_handler" | "data_source" | "theme" | "tool" | "extension"`
+- `features?: ("renderLayer" | "eventHandler" | "config" | "lifecycle" | "init")[]`: optional features that shape the generated code
+- `metadataName?: string`: optional metadata name (defaults to kebab-case of `exportName`)
+- `description?: string`: optional plugin description
+- `version?: string` (default: `"1.0.0"`): plugin version
+- `withReexport?: boolean` (default: `true`): whether to generate re-export files
+- `withIndexExport?: boolean` (default: `true`): whether to update `index.ts`
+- `withTest?: boolean` (default: `false`): whether to generate test scaffolding
+
+Output: list of created files + next-step suggestions.
+
+Example:
+
+```json
+{
+  "exportName": "MyPlugin",
+  "pluginType": "render",
+  "features": ["renderLayer", "lifecycle"],
+  "description": "My custom render plugin",
+  "withTest": true
+}
+```
+
+---
+
+### `timeline_validate_plugin`
+
+**Priority: P0 | Category: Validation**
+
+Purpose: Deep validation of built-in plugin integrity. Pass a plugin name to validate a single plugin, or omit to validate all.
+
+Checks:
+
+- Whether implementation and re-export files exist
+- Whether exported symbols are correct
+- Whether `src/index.ts` exports it
+- Whether `PluginMetadata` contains required fields (name, version, type)
+- Whether `activate` / `deactivate` are properly paired
+- Whether re-export paths match `plugins/builtin`
+- Whether there are leftover TODO markers
+
+Inputs:
+
+- `name?: string`: plugin name. If omitted, checks all built-in plugins.
+
+Output: per-check validation report.
+
+Example:
+
+```json
+{ "name": "ContextMenuPlugin" }
+```
+
+Validate all (no args):
+
+```json
+{}
+```
+
+---
+
+### `timeline_list_builtin_plugins`
+
+**Priority: P0 | Category: Query**
+
+Purpose: List all plugin names under `packages/timeline/src/plugins/builtin`.
+
+Inputs: none.
+
+Output: plugin name list.
+
+---
+
+### `timeline_dependency_graph`
+
+**Priority: P1 | Category: Semantic query**
+
+Purpose: Query a symbol dependency graph. Uses TypeScript Compiler API to parse imports and distinguishes value imports vs type-only imports. Useful for estimating refactor impact.
+
+Inputs:
+
+- `symbol: string`: class/function/interface name, etc.
+- `direction: "dependents" | "dependencies" | "both"`: query direction
+  - `"dependents"`: who depends on it
+  - `"dependencies"`: what it depends on
+  - `"both"`: both directions
+- `depth?: number` (default: `1`, range 1~5): recursion depth
+
+Output: dependency list grouped by file, annotated with `[value]` / `[type]` import kind.
+
+Example:
+
+```json
+{ "symbol": "ChangeScheduler", "direction": "dependents" }
+```
+
+---
+
+### `timeline_type_query`
+
+**Priority: P1 | Category: Semantic query**
+
+Purpose: View full definitions of interface/type/class/enum and, optionally, where a given member is read/written.
+
+Inputs:
+
+- `type: string`: type name (e.g. `TimelineState`, `PluginType`)
+- `member?: string`: optional member name; when provided, also outputs read/write locations
+
+Output: type definition (file, line numbers, member list) + optional member usage list.
+
+Example:
+
+```json
+{ "type": "TimelineState", "member": "scrollX" }
+```
+
+---
+
+### `timeline_consistency_check`
+
+**Priority: P1 | Category: Consistency**
+
+Purpose: Run project-specific consistency rules to detect structural issues that grep can’t catch.
+
+Checks (5 categories):
+
+| Check | Description |
+|---|---|
+| `plugin-exports` | built-in plugins ↔ re-export ↔ `index.ts` export consistency |
+| `render-layers` | whether LayerType definitions match the actual render pipeline |
+| `state-fields` | whether all TimelineState fields are initialized in StateManager |
+| `change-types` | whether each ChangeType enum value has matching handling logic |
+| `boundary-conditions` | whether interval checks use consistent `>=` vs `>` rules |
+
+Inputs:
+
+- `checks?: string[]`: specify which checks to run. Omit to run all.
+
+Output: pass/fail status and details for each check.
+
+Example:
+
+```json
+{ "checks": ["plugin-exports", "state-fields"] }
+```
+
+---
+
+### `timeline_perf_annotate`
+
+**Priority: P2 | Category: Performance**
+
+Purpose: Static analysis of render hot paths to annotate potential performance issues.
+
+Rules:
+
+- 循环内的 O(N) 操作（`.some`、`.find`、`.filter`、`.indexOf` → 可能 O(N²)）
+- 循环内的对象/数组分配（GC 压力）
+- 循环内的字符串拼接
+- iterating over all events without visibility culling
+- 每帧创建 Date 对象
+- Canvas save/restore 不配对风险
+
+Inputs:
+
+- `target: "render" | "highlight" | "interaction" | "all"`: which subsystem to analyze
+
+Output: hotspots sorted by severity (HIGH / MEDIUM / LOW), each with file, line number, description, and suggestion.
+
+Example:
+
+```json
+{ "target": "render" }
+```
+
+---
+
+### `timeline_migration_helper`
+
+**Priority: P2 | Category: Migration**
+
+Purpose: Compare current code exports with documentation content to detect sync issues.
+
+Detects:
+
+- 新增的导出但未在文档中提及
+- 文档中引用但已删除/重命名的 API
+- whether PluginType enum values are in sync with scaffold templates
+
+Inputs:
+
+- `scope: "api" | "types" | "plugins"`
+  - `"api"`: check all exports
+  - `"types"`: check type exports only
+  - `"plugins"`: check plugin exports + PluginType consistency
+
+Output: diff list + auto-generated update suggestions.
+
+Example:
+
+```json
+{ "scope": "api" }
+```
+
+
+
+---
+url: /timeline-canvas/en/guide/usage.md
+---
+
+
+This page provides copy-paste friendly examples covering common configuration, interactions, and plugin usage.
+
+## Basic Configuration
+
+### Timeline Configuration (Seconds-based)
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  startTime: 0,
+  endTime: 3600,
+  secondWidth: 0.022,
+  trackHeight: 46,
+  trackMargin: 10,
+  enableEventResize: true,
+  enableEventSplit: true,
+  enableTimeIndicator: true,
+});
+```
+
+### Event Time Model
+
+Timeline Canvas uses a seconds-based time model. All time values are relative seconds from the timeline start, not absolute timestamps.
+
+#### How the time model works
+
+Timeline Canvas uses relative time (seconds-based), not absolute timestamps:
+
+- **startTime**: timeline start, usually `0` seconds
+- **endTime**: timeline end in seconds
+- **Event time**: all events use `startTime` and `endTime` as seconds from the start
+
+#### Time conversion examples
+
+```ts
+// Timeline config example (seconds-based):
+const timelineConfig = {
+  startTime: 0, // start (0s)
+  endTime: 3600, // end (1 hour = 3600s)
+};
+
+// Event time examples:
+const events = [
+  {
+    startTime: 0, // starts at 0s
+    endTime: 900, // ends at 15m (15*60=900s)
+    title: "Day Shift",
+  },
+  {
+    startTime: 1800, // starts at 30m (30*60=1800s)
+    endTime: 3600, // ends at 1h (1*3600=3600s)
+    title: "Night Shift",
+  },
+];
+```
+
+#### Common conversions
+
+- 1 minute = 60 seconds
+- 1 hour = 3600 seconds
+- 1 day = 86400 seconds
+- Work hours (9–18): `startTime: 32400`, `endTime: 64800` (9*3600, 18*3600)
+- Crossing midnight: `startTime: 82800`, `endTime: 90000` (23:00 to next day 01:00)
+
+```ts
+// Load data (each track contains an `events` list)
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 900,
+          title: "Development Phase",
+          description: "Core feature development",
+        },
+      ],
+    },
+    { events: [{ startTime: 1800, endTime: 1800, title: "Requirements Review" }] },
+  ],
+});
+```
+
+## Interactions
+
+### Zoom & Time Indicator
+
+```ts
+// Zoom by a factor
+timeline.zoom(1.2);
+timeline.zoom(0.8);
+
+// Set time indicator position (seconds)
+timeline.setTimeIndicator(600);
+```
+
+### Event Operations
+
+```ts
+// Add an event (track index, start/end seconds, title, etc.)
+timeline.addEvent(0, 1200, 1500, "New Task");
+
+// Update an event (track index + event index)
+timeline.updateEvent(0, 0, { title: "Updated Title" });
+
+// Delete an event (track index + event index)
+timeline.deleteEvent(0, 0);
+```
+
+## Plugin Examples
+
+### Performance Overlay Plugin
+
+```ts
+import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+
+// Basic usage
+timeline.usePlugin(PerformanceOverlayPlugin);
+
+// The performance overlay and debug mode are controlled by TimelineConfig:
+// enablePerformanceMonitor: true
+// debug: true
+```
+
+### Context Menu Plugin
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/plugins";
+
+timeline.config.enableContextMenu = true;
+timeline.config.contextMenuItems = [
+  { type: "detail", name: "View details" },
+  { type: "delete", name: "Delete" },
+];
+
+await timeline.usePlugin(ContextMenuPlugin());
+
+// If you want to fully take over menu rendering with HTML, pass `htmlTemplate` (or use `config.contextMenuHtml`)
+await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
+```
+
+### Theme Plugins
+
+```ts
+import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas/plugins";
+
+// Use light theme
+await timeline.usePlugin(LightThemePlugin);
+
+// Or use dark theme
+await timeline.usePlugin(DarkThemePlugin);
+
+// Or use the convenience method to switch themes
+await timeline.setTheme("dark");
+```
+
+### Media Plugin
+
+```ts
+import { EventMediaPlugin } from "timeline-canvas/plugins";
+
+await timeline.usePlugin(EventMediaPlugin());
+
+// Load events with media
+timeline.loadData({
+  tracks: [
+    {
+      events: [
+        {
+          startTime: 0,
+          endTime: 3600,
+          title: "Media Event",
+          media: {
+            images: [
+              {
+                src: "path/to/image.jpg",
+                fit: "cover", // 'cover', 'contain', 'stretch'
+                opacity: 0.8,
+              },
+            ],
+            waveform: {
+              data: [0.1, 0.5, -0.2], // audio sample data
+              color: "#1890ff",
+              opacity: 0.6,
+            },
+          },
+        },
+      ],
+    },
+  ],
+});
+```
+
+## Event Callbacks (Recommended)
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  onEventAdd: (data) => console.log("Event added", data),
+  onEventUpdate: (data) => console.log("Event updated", data),
+  onEventDelete: (data) => console.log("Event deleted", data),
+  onEventMove: (data) => console.log("Event moved", data),
+  onEventClick: (data) => console.log("Event clicked", data),
+  onEventEdit: (data) => console.log("Event edited", data),
+  onTimeIndicatorHighlight: (data) => console.log("Time indicator highlight", data),
+  onContextMenu: (data) => console.log("Context menu triggered", data),
+  onTrackAdd: (track) => console.log("Track added", track),
+  onTrackRemove: (track) => console.log("Track removed", track),
+  onTimeIndicatorMove: (data) => console.log("Time indicator moved", data),
+  onZoom: (data) => console.log("Zoom changed", data),
+  onStatusChange: (text) => console.log("Status", text),
+});
+```
+
+### Callback Payload Reference
+
+```typescript
+// Event add callback payload
+interface EventAddData {
+  trackIndex: number;
+  event: TimelineEvent;
+}
+
+// Event update callback payload
+interface EventUpdateData {
+  type?: "resize" | "split";
+  trackIndex: number;
+  eventIndex: number;
+  event: TimelineEvent;
+  oldEvent?: TimelineEvent;
+  firstEvent?: TimelineEvent; // only present when type is "split"
+  secondEvent?: TimelineEvent; // only present when type is "split"
+}
+
+// Event click callback payload
+interface EventClickData {
+  trackIndex: number;
+  eventIndex: number;
+  event: TimelineEvent;
+  trackName: string;
+  formattedTimeRange: string;
+}
+
+// Context menu callback payload
+interface ContextMenuData {
+  menuType: string;
+  trackIndex: number;
+  eventIndex: number;
+  event: TimelineEvent;
+}
+```
+
+## Theme Switching
+
+```javascript
+// Initialize with light theme
+timeline.usePlugin(LightThemePlugin);
+
+// Switch to dark theme at runtime
+timeline.setTheme("dark");
+
+// Switch back to light
+timeline.setTheme("light");
+```
+
+## Responsive Layout
+
+```javascript
+// Resize manually
+window.addEventListener("resize", () => {
+  const container = document.getElementById("timeline-container");
+  if (container) {
+    timeline.setCanvasSize(container.clientWidth, container.clientHeight);
+  }
+});
+```
+
+
+
+---
+url: /timeline-canvas/en/index.md
+---
+
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/advanced.md
+---
+
+
+## Inter-plugin communication
+
+```javascript
+// Communicate via shared data or exposed methods
+const SharedStorePlugin = () => ({
+  activate(context) {
+    context.api.setData("shared:messages", []);
+  },
+  pushMessage(context, message) {
+    const list = context.api.getData("shared:messages") || [];
+    list.push(message);
+    context.api.setData("shared:messages", list);
+  },
+});
+```
+
+## Chaining via priority
+
+```javascript
+// Use plugin priority to control execution order
+const ValidationPlugin = () => ({
+  metadata: { priority: PluginPriority.HIGH },
+  validateEventMove(payload) {
+    return this.performValidation(payload);
+  },
+});
+```
+
+## Dynamic plugin loading
+
+```javascript
+// Conditional loading
+const ConditionalPlugin = () => ({
+  init(context) {
+    // Check conditions
+    if (context.timeline.config.enableAdvancedFeatures) {
+      // Dynamically load an advanced plugin
+      import("./advanced-plugin.js").then((module) => {
+        context.timeline.usePlugin(module.default);
+      });
+    }
+  },
+});
+```
+
+## Debugging & testing
+
+### Debugging tips
+
+```javascript
+// Add debug output
+const DebugPlugin = () => ({
+  activate(context) {
+    if (context.timeline.config.debug) {
+      console.log("Plugin debug mode is enabled");
+
+      // Register debug events
+      context.api.registerEventHandler("debug:info", (info) => {
+        console.log("Debug info:", info);
+      });
+    }
+  },
+});
+```
+
+### Unit tests
+
+```javascript
+// Plugin test example
+describe("GridPlugin", () => {
+  test("should initialize correctly", () => {
+    const plugin = GridPlugin({ color: "#ff0000" });
+    const mockContext = {
+      api: {
+        setData: jest.fn(),
+        getData: jest.fn(),
+      },
+    };
+
+    plugin.init(mockContext);
+
+    expect(mockContext.api.setData).toHaveBeenCalledWith(
+      "config",
+      expect.objectContaining({
+        color: "#ff0000",
+      })
+    );
+  });
+});
+```
+
+## Publishing & sharing
+
+### Package a plugin
+
+```json
+{
+  "name": "my-timeline-plugin",
+  "version": "1.0.0",
+  "description": "My Timeline Canvas plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "keywords": ["timeline", "canvas", "plugin"],
+  "author": "Your Name",
+  "license": "MIT"
+}
+```
+
+### Write documentation
+
+````markdown
+# My Timeline Plugin
+
+A custom plugin for Timeline Canvas.
+
+## Installation
+
+```bash
+npm install my-timeline-plugin
+```
+````
+
+## 使用
+
+```javascript
+import { Timeline } from "timeline-canvas";
+import MyPlugin from "my-timeline-plugin";
+
+const timeline = new Timeline("canvas");
+timeline.usePlugin(
+  MyPlugin({
+    option: "value",
+  })
+);
+```
+
+## Configuration
+
+| Option | Type   | Default | Description |
+| ------ | ------ | ------ | -------- |
+| option | string | -      | option |
+
+## API
+
+### Methods
+
+- `method()` - method description
+
+## Example
+
+```javascript
+// example code
+```
+
+## License
+
+MIT
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/api.md
+---
+
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Timeline as Timeline
+    participant PM as PluginManager
+    participant Plugin as Plugin Instance
+
+    User->>Timeline: usePlugin(plugin)
+    Timeline->>PM: loadPlugin(plugin)
+
+    PM->>PM: Create PluginContext
+    PM->>Plugin: init(context)
+    PM->>Plugin: activate(context)
+    PM->>PM: Register plugin resources
+
+    PM-->>Timeline: true/false
+    Timeline-->>User: Load result
+
+    Note over User,Plugin: Plugin running...
+
+    User->>Timeline: removePlugin(pluginId)
+    Timeline->>PM: unloadPlugin(pluginId)
+    PM->>Plugin: deactivate(context)
+    PM->>Plugin: destroy(context)
+    PM->>PM: Cleanup plugin resources
+    PM-->>Timeline: true/false
+```
+
+## Plugin Interface
+
+### TimelinePlugin
+
+```typescript
+interface TimelinePlugin {
+  metadata: PluginMetadata;
+  init?: (context: PluginContext) => Promise<void> | void;
+  activate?: (context: PluginContext) => Promise<void> | void;
+  deactivate?: (context: PluginContext) => Promise<void> | void;
+  destroy?: (context: PluginContext) => Promise<void> | void;
+}
+```
+
+### Plugin metadata
+
+```typescript
+interface PluginMetadata {
+  name: string; // plugin name (required)
+  version: string; // version (required)
+  description: string; // description (required)
+  author?: string; // author (optional)
+  type: PluginType; // plugin type (required)
+  priority?: PluginPriority; // priority (optional, default: NORMAL)
+  dependencies?: string[]; // dependencies (optional)
+}
+```
+
+### Plugin context
+
+```typescript
+interface PluginContext {
+  timeline: Timeline; // timeline instance
+  config: any; // config object
+  state: any; // state object
+  api: PluginAPI; // API surface
+}
+```
+
+### Plugin API
+
+```typescript
+interface PluginAPI {
+  // Render layer management
+  registerRenderLayer: (layer: RenderLayer) => void;
+  unregisterRenderLayer: (name: string) => void;
+
+  // Event handler management
+  registerEventHandler: (event: string, handler: Function) => void;
+  unregisterEventHandler: (event: string, handler: Function) => void;
+
+  // Notifications and debugging
+  showNotification: (
+    message: string,
+    type?: "info" | "warning" | "error"
+  ) => void;
+
+  // Data storage
+  getData: (key: string) => any;
+  setData: (key: string, value: any) => void;
+
+  // Performance
+  setPerformanceProvider: (provider: PerformanceProvider) => void;
+  getPerformanceStats: () => Map<string, PerformanceStats>;
+  getFPS: () => number;
+}
+```
+
+## Data Storage
+
+### Plugin data storage
+
+```javascript
+// Store data
+context.api.setData("counter", 0);
+context.api.setData("settings", { theme: "dark", language: "en" });
+
+// Read data
+const counter = context.api.getData("counter");
+const settings = context.api.getData("settings");
+```
+
+### Notes
+
+- Data persists for the plugin’s lifecycle
+- Data is cleaned up automatically when the plugin is unloaded
+- Data is isolated between plugins
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/best-practices.md
+---
+
+
+## Naming Conventions
+
+```javascript
+// Plugin names use PascalCase
+const MyCustomPlugin = () => ({
+  metadata: {
+    name: "MyCustomPlugin", // ✅ correct
+    name: "my_custom_plugin", // ❌ incorrect
+  },
+});
+
+// Event names use lowercase with colon separators
+registerEventHandler("myplugin:custom:event", handler); // ✅ correct
+registerEventHandler("MyPluginCustomEvent", handler); // ❌ incorrect
+
+// Config options use camelCase
+const config = {
+  showGrid: true, // ✅ correct
+  show_grid: true, // ❌ incorrect
+};
+```
+
+## Configuration Design
+
+```javascript
+const MyPlugin = (userConfig = {}) => {
+  // defaults
+  const defaultConfig = {
+    enabled: true,
+    color: "#1890ff",
+    opacity: 0.8,
+  };
+
+  // merge config
+  const config = { ...defaultConfig, ...userConfig };
+
+  return {
+    metadata: {
+      name: "MyPlugin",
+      version: "1.0.0",
+      description: "My custom plugin",
+      type: "extension",
+    },
+    init(context) {
+      context.api.setData("config", config);
+    },
+  };
+};
+```
+
+## Compatibility
+
+```javascript
+activate(context) {
+  // check prerequisites
+  if (!context.timeline.config.enableEventResize) {
+    context.api.showNotification('Event resizing must be enabled', 'warning');
+    return;
+  }
+
+  // check API availability
+  if (typeof context.api.registerEventHandler !== 'function') {
+    console.warn('This version does not support event handlers');
+    return;
+  }
+
+  // register handlers
+  this.registerHandlers(context);
+}
+```
+
+## Documentation
+
+```javascript
+/**
+ * Grid plugin - draw a grid on the timeline background
+ *
+ * @param {Object} config - plugin config
+ * @param {string} config.color - grid color
+ * @param {number} config.spacing - grid spacing
+ * @param {boolean} config.enabled - enabled
+ *
+ * @example
+ * timeline.usePlugin(GridPlugin({
+ *   color: '#e0e0e0',
+ *   spacing: 50,
+ *   enabled: true
+ * }));
+ */
+const GridPlugin = (config = {}) => ({
+  // implementation...
+});
+```
+
+## Performance
+
+### Rendering
+
+```javascript
+render(ctx, canvas, config, state) {
+  // use caching
+  if (!this.cache) {
+    this.cache = this.generateCache(config);
+  }
+
+  // redraw only when needed
+  if (this.needsRedraw(state)) {
+    this.draw(ctx, state);
+  }
+}
+```
+
+### Event handling
+
+```javascript
+// debounce
+validateEventMove: debounce(function(payload) {
+  // validation logic
+}, 100),
+
+// throttle
+renderOverlay: throttle(function(ctx, canvas, config, state) {
+  // render logic
+}, 16),
+```
+
+### Memory management
+
+```javascript
+destroy(context) {
+  // clear caches
+  this.cache = null;
+
+  // clear timers
+  if (this.timer) {
+    clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  // unregister listeners
+  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
+}
+```
+
+## Error handling
+
+### Catch errors
+
+```javascript
+activate(context) {
+  try {
+    this.setupEventHandlers(context);
+  } catch (error) {
+    context.api.showNotification(`Plugin activation failed: ${error.message}`, 'error');
+    console.error('Plugin activation error:', error);
+  }
+}
+```
+
+### Validation errors
+
+```javascript
+validateEventMove(payload) {
+  try {
+    return this.performValidation(payload);
+  } catch (error) {
+    console.error('Validation error:', error);
+    return true; // default to allow when failing
+  }
+}
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/events.md
+---
+
+
+## Event Types
+
+### Render events
+
+- `render:background` - background layer render
+- `render:overlay` - overlay layer render
+- `render:event:media` - event media render
+
+### Validation events
+
+- `validate:event:move` - validate event move
+- `validate:event:add` - validate event add
+- `validate:event:split` - validate event split
+
+### Interaction events
+
+- `event:click` - event click
+- `event:highlight` - event highlight
+- `zoom:change` - zoom level change
+- `track:add` - track added
+- `track:remove` - track removed
+
+## Handlers
+
+### Render handler
+
+```ts
+renderOverlay(ctx, canvas, config, state) {
+  // draw custom content
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+  ctx.fillRect(0, 0, 100, 100);
+}
+```
+
+### Validation handler
+
+```ts
+validateEventMove(payload) {
+  const { fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration } = payload;
+
+  // custom validation logic
+  if (newStartTime < 0) {
+    return false; // block the move
+  }
+
+  return true; // allow the move
+}
+```
+
+## Priority Order
+
+Events are processed in plugin priority order:
+
+1. CRITICAL (200)
+2. HIGH (100)
+3. NORMAL (50)
+4. LOW (0)
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/example.md
+---
+
+
+## Full Example: Grid Plugin
+
+```javascript
+/**
+ * Grid plugin - draw a grid on the timeline background
+ */
+const GridPlugin = (userConfig = {}) => {
+  // defaults
+  const defaultConfig = {
+    color: "#e0e0e0",
+    spacing: 50,
+    opacity: 0.5,
+    enabled: true,
+  };
+
+  // merge config
+  const config = { ...defaultConfig, ...userConfig };
+
+  return {
+    metadata: {
+      name: "GridPlugin",
+      version: "1.0.0",
+      description: "Draw a grid on the timeline background",
+      type: "extension",
+      priority: PluginPriority.NORMAL,
+    },
+
+    init(context) {
+      // store config
+      context.api.setData("config", config);
+      context.api.setData("enabled", config.enabled);
+
+      console.log("Grid plugin initialized");
+    },
+
+    activate(context) {
+      if (!context.api.getData("enabled")) {
+        return;
+      }
+
+      // register render layer
+      context.api.registerRenderLayer({
+        name: "GridPlugin",
+        position: "background",
+        render: this.renderGrid.bind(this),
+      });
+
+      // register event handler
+      context.api.registerEventHandler(
+        "config:changed",
+        this.onConfigChanged.bind(this)
+      );
+
+      console.log("Grid plugin activated");
+    },
+
+    deactivate(context) {
+      // cleanup render layer
+      context.api.unregisterRenderLayer("GridPlugin");
+
+      // cleanup event handler
+      context.api.unregisterEventHandler(
+        "config:changed",
+        this.onConfigChanged
+      );
+
+      console.log("Grid plugin deactivated");
+    },
+
+    destroy(context) {
+      // cleanup data
+      context.api.setData("config", null);
+      context.api.setData("enabled", null);
+
+      console.log("Grid plugin destroyed");
+    },
+
+    renderGrid(ctx, canvas, config, state) {
+      const pluginConfig = ctx.api.getData("config");
+
+      if (!pluginConfig || !pluginConfig.enabled) {
+        return;
+      }
+
+      const { color, spacing, opacity } = pluginConfig;
+
+      // save canvas state
+      ctx.save();
+
+      // set styles
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = opacity;
+
+      // draw vertical lines
+      for (let x = 0; x < canvas.width; x += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+
+      // draw horizontal lines
+      for (let y = 0; y < canvas.height; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // restore canvas state
+      ctx.restore();
+    },
+
+    onConfigChanged(newConfig) {
+      // handle config changes
+      if (newConfig.gridColor !== undefined) {
+        const config = this.getData("config");
+        config.color = newConfig.gridColor;
+        this.setData("config", config);
+      }
+    },
+  };
+};
+
+// use the plugin
+timeline.usePlugin(
+  GridPlugin({
+    color: "#d0d0d0",
+    spacing: 40,
+    opacity: 0.3,
+  })
+);
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/index.md
+---
+
+
+> This section is for developers who want to extend Timeline Canvas, covering lifecycle, APIs, events, and best practices.
+
+```mermaid
+graph TB
+    %% Core
+    subgraph "Timeline Core"
+        TL[Timeline]
+        PM[PluginManager]
+        RM[RenderManager]
+        RP[RenderPipeline]
+    end
+
+    subgraph "Plugin System"
+        PM --> API[PluginAPI]
+        API --> CTX[PluginContext]
+        CTX --> PLUGINS[Plugin Instances]
+    end
+
+    subgraph "Plugin Types"
+        PLUGINS --> THEME[Theme Plugins]
+        PLUGINS --> RENDER[Render Plugins]
+        PLUGINS --> EVENT[Event Plugins]
+        PLUGINS --> TOOL[Tool Plugins]
+        PLUGINS --> EXTENSION[Extension Plugins]
+    end
+
+    subgraph "Built-in Plugins"
+        THEME --> DARK[DarkThemePlugin]
+        THEME --> LIGHT[LightThemePlugin]
+        RENDER --> CONTEXT_MENU[ContextMenuPlugin]
+        RENDER --> PERFORMANCE[PerformanceOverlayPlugin]
+        EVENT --> EVENT_MEDIA[EventMediaPlugin]
+        EVENT --> EVENT_TOOLTIP[EventTooltipPlugin]
+        TOOL --> MUTEX_GUARD[MutexGuardPlugin]
+    end
+
+    subgraph "Rendering"
+        RM --> RP
+        RP --> LAYERS[Layers]
+        LAYERS --> BACKGROUND[Background Layer]
+        LAYERS --> TIMELINE[Timeline Layer]
+        LAYERS --> TRACKS[Tracks Layer]
+        LAYERS --> GUIDELINES[Guidelines Layer]
+        LAYERS --> INDICATOR[Indicator Layer]
+        LAYERS --> INTERACTION[Interaction Layer]
+        LAYERS --> SCROLLBAR[Scrollbar Layer]
+        LAYERS --> OVERLAY[Overlay Layer]
+    end
+
+    %% Data flow
+    PM -->|register layers| RM
+    PM -->|handle events| TL
+    PLUGINS -->|via API| PM
+    RM -->|render calls| LAYERS
+    BACKGROUND -->|plugin render| PM
+    OVERLAY -->|plugin render| PM
+
+    %% 样式定义
+    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef plugin fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef render fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef builtin fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class TL,PM,RM,RP core
+    class API,CTX,PLUGINS,THEME,RENDER,EVENT,TOOL,EXTENSION plugin
+    class RM,RP,LAYERS,BACKGROUND,TIMELINE,TRACKS,GUIDELINES,INDICATOR,INTERACTION,SCROLLBAR,OVERLAY render
+    class DARK,LIGHT,CONTEXT_MENU,PERFORMANCE,EVENT_MEDIA,EVENT_TOOLTIP,MUTEX_GUARD builtin
+```
+
+This tutorial walks you through building a Timeline Canvas plugin from scratch, including lifecycle, API usage, and best practices.
+
+## 1. Plugin Fundamentals
+
+### 1.1 What is a plugin?
+
+Plugins are independent modules that extend Timeline Canvas. They can:
+
+- Add new render layers
+- Listen to and handle events
+- Provide custom validation logic
+- Extend timeline interactions
+
+### 1.2 Plugin types
+
+```typescript
+enum PluginType {
+  RENDER = "render", // render plugin
+  EVENT_HANDLER = "event_handler", // event handler
+  DATA_SOURCE = "data_source", // data source
+  THEME = "theme", // theme
+  TOOL = "tool", // tool
+  EXTENSION = "extension", // extension
+}
+```
+
+### 1.3 Plugin priority
+
+```typescript
+enum PluginPriority {
+  LOW = 0, // low priority
+  NORMAL = 50, // normal
+  HIGH = 100, // high
+  CRITICAL = 200, // critical
+}
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/lifecycle.md
+---
+
+
+## Lifecycle Flow
+
+```
+Load plugin → init() → activate() → running → deactivate() → destroy()
+```
+
+## Stages
+
+### init()
+
+- **When**: called when the plugin is loaded
+- **Purpose**: initialize internal state, validate dependencies, set defaults
+- **Note**: the plugin is not active yet; avoid registering event handlers here
+
+```ts
+init(context) {
+  // initialize plugin data
+  context.api.setData('initialized', true);
+  context.api.setData('config', this.config);
+
+  // validate dependencies
+  if (!context.timeline.config.enableEventResize) {
+    context.api.showNotification('Event resizing must be enabled', 'warning');
+  }
+}
+```
+
+### activate()
+
+- **When**: called when the plugin is activated
+- **Purpose**: register event handlers, render layers, and listeners
+- **Note**: this is the main stage where the plugin starts working
+
+```ts
+activate(context) {
+  // register event handlers
+  context.api.registerEventHandler('render:overlay', this.renderOverlay);
+  context.api.registerEventHandler('validate:event:move', this.validateEventMove);
+
+  // register a render layer
+  context.api.registerRenderLayer({
+    name: 'MyPluginLayer',
+    position: 'overlay',
+    render: this.render.bind(this)
+  });
+
+  console.log('Plugin activated:', this.metadata.name);
+}
+```
+
+### Running
+
+- **Event handling**: respond to various events
+- **Rendering**: draw content in the render loop
+- **State management**: maintain plugin internal state
+
+### deactivate()
+
+- **When**: called when the plugin is deactivated
+- **Purpose**: unregister handlers and remove listeners
+- **Note**: plugin functionality stops at this stage
+
+```javascript
+deactivate(context) {
+  // unregister event handlers
+  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
+  context.api.unregisterEventHandler('validate:event:move', this.validateEventMove);
+
+  console.log('Plugin deactivated:', this.metadata.name);
+}
+```
+
+### destroy()
+
+- **When**: called when the plugin is destroyed
+- **Purpose**: release resources and cleanup data
+- **Note**: this is the final stage of the plugin lifecycle
+
+```javascript
+destroy(context) {
+  // cleanup plugin data
+  context.api.setData('initialized', null);
+  context.api.setData('config', null);
+
+  console.log('Plugin destroyed:', this.metadata.name);
+}
+```
+
+
+
+---
+url: /timeline-canvas/en/plugins/plugin-development/rendering.md
+---
+
+
+## Render layer interface
+
+```typescript
+interface RenderLayer {
+  name: string; // layer name
+  position: "background" | "overlay"; // layer position
+  render: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: any,
+    state: any
+  ) => void;
+}
+```
+
+## Layer positions
+
+- `background` - render before event blocks (bottom-most)
+- `overlay` - render after event blocks (top-most)
+
+> **Note**: Core layers (timeline scale, track background, event blocks, guidelines, etc.) are managed by the internal `RenderPipeline`. Plugins can currently draw only in `background` (bottom) and `overlay` (top). To change core rendering, you’ll need to modify the source for now (or wait for more hooks in the future).
+
+## Example
+
+```ts
+registerRenderLayer({
+  name: "GridPlugin",
+  position: "background",
+  render(ctx, canvas, config, state) {
+    // draw a grid
+    ctx.strokeStyle = config.colors.grid || "#e0e0e0";
+    ctx.lineWidth = 1;
+
+    // draw vertical lines
+    for (let x = 0; x < canvas.width; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+  },
+});
+```
+
+

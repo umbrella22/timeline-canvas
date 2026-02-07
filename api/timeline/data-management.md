@@ -1,10 +1,8 @@
-# 数据管理 API
-
 ## loadData(data: LoadDataFormat)
 
 加载时间轴数据（秒制时间）。
 
-```javascript
+```ts
 timeline.loadData({
   timeIndicatorPosition: 0,
   tracks: [
@@ -28,7 +26,7 @@ timeline.loadData({
 
 在指定轨道添加事件。
 
-```javascript
+```ts
 timeline.addEvent(0, 1200, 1800, "自动生成的事件", "示例描述", {
   note: "示例",
 });
@@ -40,7 +38,7 @@ timeline.addEvent(0, 1200, 1800, "自动生成的事件", "示例描述", {
 
 更新事件。
 
-```javascript
+```ts
 timeline.updateEvent(0, 1, {
   title: "更新后的标题",
 });
@@ -52,7 +50,7 @@ timeline.updateEvent(0, 1, {
 
 删除事件。
 
-```javascript
+```ts
 timeline.deleteEvent(0, 1);
 ```
 
@@ -62,7 +60,7 @@ timeline.deleteEvent(0, 1);
 
 添加一个新的空轨道。
 
-```javascript
+```ts
 timeline.addTrack();
 ```
 
@@ -72,7 +70,7 @@ timeline.addTrack();
 
 移除最后一个轨道。
 
-```javascript
+```ts
 timeline.removeTrack();
 ```
 
@@ -82,7 +80,7 @@ timeline.removeTrack();
 
 自动移除最后一个空轨道（如果存在）。
 
-```javascript
+```ts
 timeline.autoRemoveEmptyLastTrack();
 ```
 
@@ -92,7 +90,7 @@ timeline.autoRemoveEmptyLastTrack();
 
 设置时间轴结束时间（秒）。
 
-```javascript
+```ts
 timeline.setEndTime(86400); // 设置结束时间为24小时
 ```
 
@@ -102,7 +100,7 @@ timeline.setEndTime(86400); // 设置结束时间为24小时
 
 获取时间轴结束时间（秒）。
 
-```javascript
+```ts
 const endTime = timeline.getEndTime(); // 返回秒数
 ```
 
@@ -112,7 +110,7 @@ const endTime = timeline.getEndTime(); // 返回秒数
 
 开始批量索引更新。在批量添加或修改大量事件时使用，可以提高性能。
 
-```javascript
+```ts
 timeline.beginIndexBatch();
 // 批量添加事件...
 timeline.endIndexBatch();
@@ -130,7 +128,7 @@ timeline.endIndexBatch();
 
 使指定轨道的索引失效，下次查询时会重新构建。
 
-```javascript
+```ts
 timeline.invalidateIndexTrack(0);
 ```
 
@@ -140,6 +138,6 @@ timeline.invalidateIndexTrack(0);
 
 使所有轨道的索引失效。
 
-```javascript
+```ts
 timeline.invalidateIndexAll();
 ```

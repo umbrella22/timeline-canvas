@@ -32,12 +32,11 @@
 
 ## 演练场
 
-- [演练场](/timeline-canvas/playground.md)
+- [](/timeline-canvas/playground.md)
 
 ## Other
 
 - [性能与监控](/timeline-canvas/advanced/performance.md)
-- [](/timeline-canvas/components/TimelinePlayground.md)
 - [安装与构建](/timeline-canvas/guide/installation.md)
 - [MCP 服务（面向 Copilot Chat / AI CLI）](/timeline-canvas/guide/mcp.md)
 - [使用与示例](/timeline-canvas/guide/usage.md)

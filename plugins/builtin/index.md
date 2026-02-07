@@ -1,5 +1,3 @@
-# 内置插件总览
-
 Timeline Canvas 提供了多个内置插件，可以通过 `timeline.usePlugin()` 方法使用。
 
 ## 📋 插件目录

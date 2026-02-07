@@ -1,5 +1,3 @@
-# 核心 API
-
 ```mermaid
 sequenceDiagram
     participant User as 用户
@@ -28,9 +26,9 @@ sequenceDiagram
     PM-->>Timeline: true/false
 ```
 
-## 2. 插件接口详解
+## 插件接口详解
 
-### 2.1 TimelinePlugin 接口
+### TimelinePlugin 接口
 
 ```typescript
 interface TimelinePlugin {
@@ -42,7 +40,7 @@ interface TimelinePlugin {
 }
 ```
 
-### 2.2 插件元数据
+### 插件元数据
 
 ```typescript
 interface PluginMetadata {
@@ -56,7 +54,7 @@ interface PluginMetadata {
 }
 ```
 
-### 2.3 插件上下文
+### 插件上下文
 
 ```typescript
 interface PluginContext {
@@ -67,7 +65,7 @@ interface PluginContext {
 }
 ```
 
-### 2.4 插件 API
+### 插件 API
 
 ```typescript
 interface PluginAPI {
@@ -96,9 +94,9 @@ interface PluginAPI {
 }
 ```
 
-## 6. 数据存储
+## 数据存储
 
-### 6.1 插件数据存储
+### 插件数据存储
 
 ```javascript
 // 存储数据
@@ -110,7 +108,7 @@ const counter = context.api.getData("counter");
 const settings = context.api.getData("settings");
 ```
 
-### 6.2 数据
+### 数据
 
 * 数据在插件生命周期内持续存在
 * 插件卸载时数据自动清理

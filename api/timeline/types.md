@@ -1,8 +1,6 @@
-# 类型定义
-
 ## TimelineEvent
 
-```typescript
+```ts
 interface TimelineEvent {
   id: number;
   startTime: number;
@@ -31,7 +29,7 @@ interface TimelineEvent {
 
 ## TimelineConfig（关键项）
 
-```typescript
+```ts
 interface TimelineConfig {
   canvasHeight?: number;
   timelineHeight: number;
@@ -75,7 +73,7 @@ interface TimelineConfig {
 
 ## LoadDataFormat
 
-```typescript
+```ts
 interface LoadDataFormat {
   timeIndicatorPosition?: number;
   tracks: Array<{
@@ -88,6 +86,19 @@ interface LoadDataFormat {
       color?: string;
       readonly?: boolean;
       customData?: Record<string, any>;
+      media?: {
+        images?: Array<{
+          src: string;
+          fit?: "cover" | "contain" | "stretch";
+          opacity?: number;
+        }>;
+        waveform?: {
+          data: Float32Array | number[];
+          color?: string;
+          backgroundColor?: string;
+          opacity?: number;
+        };
+      };
     }>;
   }>;
 }

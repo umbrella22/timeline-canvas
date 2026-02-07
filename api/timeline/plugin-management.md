@@ -1,17 +1,15 @@
-# 插件管理 API
-
 ## usePlugin
 
 `usePlugin(plugin: any): Promise<boolean>`
 
 使用插件。
 
-```javascript
+```ts
 // 某些内置插件是“工厂函数”（需要调用以传入配置）
-timeline.usePlugin(ContextMenuPlugin());
+await timeline.usePlugin(ContextMenuPlugin());
 
 // 某些内置插件是“插件对象”（直接传入）
-timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(PerformanceOverlayPlugin);
 ```
 
 ## removePlugin
@@ -20,8 +18,8 @@ timeline.usePlugin(PerformanceOverlayPlugin);
 
 移除插件。
 
-```javascript
-timeline.removePlugin("performance-overlay@1.0.0");
+```ts
+await timeline.removePlugin("performance-overlay@1.0.0");
 ```
 
 ## setTheme
@@ -30,7 +28,7 @@ timeline.removePlugin("performance-overlay@1.0.0");
 
 在运行时切换内置主题。
 
-```javascript
+```ts
 // 初始化时设置默认主题
 const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
 
@@ -47,7 +45,7 @@ await timeline.setTheme("light");
 
 获取已加载的插件列表。
 
-```javascript
+```ts
 const plugins = timeline.getLoadedPlugins();
 console.log("已加载插件:", plugins);
 ```
@@ -58,7 +56,7 @@ console.log("已加载插件:", plugins);
 
 检查插件是否已加载。
 
-```javascript
+```ts
 if (timeline.isPluginLoaded("performance-overlay")) {
   console.log("性能监控插件已加载");
 }

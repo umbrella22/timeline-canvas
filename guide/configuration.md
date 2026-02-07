@@ -1,4 +1,4 @@
-# 配置项
+> Timeline Canvas 使用秒制相对时间系统。配置类型建议以 TypeScript 类型为准：见 [类型定义](/timeline-canvas/api/timeline/types.md)。
 
 ## TimelineConfig 接口
 

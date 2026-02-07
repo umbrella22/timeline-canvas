@@ -1,0 +1,50 @@
+# Timeline Canvas
+
+> Canvas Timeline 使用文档
+
+## Guide
+
+- [Getting Started](/timeline-canvas/en/guide/getting-started.md)
+
+## Config
+
+- [Configuration](/timeline-canvas/en/guide/configuration.md)
+
+## Plugins
+
+- [ContextMenuPlugin](/timeline-canvas/en/plugins/builtin/context-menu.md)
+- [EventTooltipPlugin](/timeline-canvas/en/plugins/builtin/event-tooltip.md)
+- [LightThemePlugin](/timeline-canvas/en/plugins/builtin/light-theme.md)
+- [DarkThemePlugin](/timeline-canvas/en/plugins/builtin/dark-theme.md)
+- [PerformanceOverlayPlugin](/timeline-canvas/en/plugins/builtin/performance-overlay.md)
+- [EventMediaPlugin](/timeline-canvas/en/plugins/builtin/event-media.md)
+- [MutexGuardPlugin](/timeline-canvas/en/plugins/builtin/mutex-guard.md)
+- [Built-in Plugins](/timeline-canvas/en/plugins/builtin/index.md)
+
+## API
+
+- [Data Management API](/timeline-canvas/en/api/timeline/data-management.md)
+- [View Control API](/timeline-canvas/en/api/timeline/view-control.md)
+- [Plugin Management API](/timeline-canvas/en/api/timeline/plugin-management.md)
+- [Event Callbacks API](/timeline-canvas/en/api/timeline/event-listeners.md)
+- [Type Definitions](/timeline-canvas/en/api/timeline/types.md)
+- [Timeline API Overview](/timeline-canvas/en/api/timeline/index.md)
+
+## Playground
+
+- [](/timeline-canvas/en/playground.md)
+
+## Other
+
+- [Performance & Monitoring](/timeline-canvas/en/advanced/performance.md)
+- [Installation & Build](/timeline-canvas/en/guide/installation.md)
+- [MCP Service (for Copilot Chat / AI CLI)](/timeline-canvas/en/guide/mcp.md)
+- [Usage & Examples](/timeline-canvas/en/guide/usage.md)
+- [Advanced Topics](/timeline-canvas/en/plugins/plugin-development/advanced.md)
+- [Core API](/timeline-canvas/en/plugins/plugin-development/api.md)
+- [Best Practices](/timeline-canvas/en/plugins/plugin-development/best-practices.md)
+- [Event System](/timeline-canvas/en/plugins/plugin-development/events.md)
+- [Example Plugin](/timeline-canvas/en/plugins/plugin-development/example.md)
+- [Plugin Development](/timeline-canvas/en/plugins/plugin-development/index.md)
+- [Plugin Lifecycle](/timeline-canvas/en/plugins/plugin-development/lifecycle.md)
+- [Rendering](/timeline-canvas/en/plugins/plugin-development/rendering.md)

@@ -1,4 +1,4 @@
-# 插件开发教程
+> 本章面向“扩展 Timeline Canvas 能力”的开发者，覆盖生命周期、API、事件与最佳实践。
 
 ```mermaid
 graph TB

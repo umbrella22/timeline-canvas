@@ -1,6 +1,4 @@
-# 事件系统
-
-## 4.1 事件类型
+## 事件类型
 
 ### 渲染事件
 
@@ -22,11 +20,11 @@
 * `track:add` - 轨道添加
 * `track:remove` - 轨道移除
 
-## 4.2 事件处理器
+## 事件处理器
 
 ### 渲染事件处理器
 
-```javascript
+```ts
 renderOverlay(ctx, canvas, config, state) {
   // 绘制自定义内容
   ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
@@ -36,7 +34,7 @@ renderOverlay(ctx, canvas, config, state) {
 
 ### 验证事件处理器
 
-```javascript
+```ts
 validateEventMove(payload) {
   const { fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration } = payload;
 
@@ -49,7 +47,7 @@ validateEventMove(payload) {
 }
 ```
 
-## 4.3 事件优先级
+## 事件优先级
 
 事件按照插件优先级顺序执行：
 
