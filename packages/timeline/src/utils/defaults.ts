@@ -87,7 +87,7 @@ export const DEFAULT_CONFIG: Omit<
   | "contextMenuItems"
   | "contextMenuStyle"
 > = {
-  timelineHeight: 60,
+  timelineHeight: 40,
   trackHeight: 80,
   trackMargin: 10,
   firstTrackTopMargin: 10,
@@ -122,4 +122,7 @@ export const DEFAULT_CONFIG: Omit<
   readOnly: false,
   showEventDurationLabel: true,
   formatEventDuration: null,
+  scale: null,
+  scaleSplitCount: 10,
+  getScaleRender: null,
 };

@@ -153,7 +153,7 @@ const TimelinePlayground = () => {
             trackHeight: 46,
             trackMargin: 10,
             firstTrackTopMargin: 16,
-            timelineHeight: 60,
+            timelineHeight: 40,
 
             // Initial config from state
             enableEventResize: config.enableEventResize,

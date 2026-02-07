@@ -115,6 +115,12 @@ export interface TimelineConfig {
   readOnly: boolean;
   showEventDurationLabel: boolean;
   formatEventDuration: ((duration: number) => string) | null;
+  /** 主刻度时间间隔（秒），>0。设置后启用自定义刻度模式 */
+  scale: number | null;
+  /** 每个主刻度之间的细分数，>0 整数 */
+  scaleSplitCount: number;
+  /** 自定义刻度标签渲染回调，参数为该刻度对应的时间（秒） */
+  getScaleRender: ((time: number) => string) | null;
   eventTextStyle: EventTextStyle;
   eventBlockStyle: EventBlockStyle;
   colors: TimelineColors;
@@ -420,6 +426,12 @@ export interface TimelineOptions {
   readOnly?: boolean;
   showEventDurationLabel?: boolean;
   formatEventDuration?: (duration: number) => string;
+  /** 主刻度时间间隔（秒），>0。设置后启用自定义刻度模式 */
+  scale?: number;
+  /** 每个主刻度之间的细分数，>0 整数 */
+  scaleSplitCount?: number;
+  /** 自定义刻度标签渲染回调，参数为该刻度对应的时间（秒） */
+  getScaleRender?: (time: number) => string;
   eventTextStyle?: Partial<EventTextStyle>;
   eventBlockStyle?: Partial<EventBlockStyle>;
   colors?: Partial<TimelineColors>;
