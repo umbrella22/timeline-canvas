@@ -42,7 +42,9 @@ export class TimeIndicatorDragState extends BaseState {
         state.zoomLevel,
         config.snapInterval,
         config.snapToSeconds,
-        config.secondPrecisionZoomThreshold
+        config.secondPrecisionZoomThreshold,
+        config.scale,
+        config.scaleSplitCount
       );
       newTime = snapToInterval(newTime, snapIntervalSeconds);
     }

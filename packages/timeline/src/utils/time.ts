@@ -15,7 +15,25 @@ export function getCurrentTime(): number {
   return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 }
 
-export function getSnapInterval(zoomLevel: number, snapInterval: number, snapToSeconds: boolean, secondPrecisionThreshold: number): number {
+export function getSnapInterval(
+  zoomLevel: number,
+  snapInterval: number,
+  snapToSeconds: boolean,
+  secondPrecisionThreshold: number,
+  scale?: number | null,
+  scaleSplitCount?: number
+): number {
+  // 如果设置了自定义刻度，优先使用刻度细分间隔
+  if (scale != null && scale > 0) {
+    const splitCount = Math.max(1, Math.floor(scaleSplitCount ?? 10));
+    const subInterval = scale / splitCount;
+    // 根据缩放级别决定吸附到主刻度还是细分刻度
+    if (zoomLevel >= secondPrecisionThreshold) {
+      return subInterval; // 高缩放：吸附到细分刻度
+    }
+    return scale; // 低缩放：吸附到主刻度
+  }
+
   if (!snapToSeconds || zoomLevel < secondPrecisionThreshold) {
     return snapInterval * 60;
   }
@@ -25,10 +43,11 @@ export function getSnapInterval(zoomLevel: number, snapInterval: number, snapToS
     { threshold: 5, seconds: 2 },
     { threshold: 3, seconds: 5 },
     { threshold: 2, seconds: 10 },
-    { threshold: 0, seconds: 15 },
+    { threshold: 1.5, seconds: 15 },
+    { threshold: 0, seconds: 30 },
   ];
   const config = snapConfigs.find((c) => zoomLevel >= c.threshold);
-  return (config?.seconds ?? 15);
+  return (config?.seconds ?? 30);
 }
 
 export function snapToInterval(seconds: number, snapInterval: number): number {

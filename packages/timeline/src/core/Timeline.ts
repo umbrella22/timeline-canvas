@@ -715,7 +715,9 @@ export class Timeline {
         this.state.zoomLevel,
         this.config.snapInterval,
         this.config.snapToSeconds,
-        this.config.secondPrecisionZoomThreshold
+        this.config.secondPrecisionZoomThreshold,
+        this.config.scale,
+        this.config.scaleSplitCount
       );
       seconds = snapToInterval(seconds, snapIntervalSeconds);
     }
@@ -1287,11 +1289,11 @@ export class Timeline {
     }> = [];
     const threshold = this.config.guideLineSnapThreshold;
     const newEndTime = newStartTime + duration;
+    // 搜索所有轨道，而不仅仅是相邻轨道，以找到更多对齐参考点
     const tracksToCheck = new Set<number>();
-    tracksToCheck.add(toTrackIndex);
-    if (toTrackIndex > 0) tracksToCheck.add(toTrackIndex - 1);
-    if (toTrackIndex < this.state.tracks.length - 1)
-      tracksToCheck.add(toTrackIndex + 1);
+    for (let i = 0; i < this.state.tracks.length; i++) {
+      tracksToCheck.add(i);
+    }
     const addGuideLine = (
       time: number,
       type: "start" | "end",
@@ -1345,16 +1347,49 @@ export class Timeline {
     if (this.state.guideLines.length === 0) return null;
     const threshold = this.config.guideLineSnapThreshold;
     const newEndTime = newStartTime + duration;
+
+    // 找最近的吸附点，而不是第一个匹配的（参考 react-timeline 的最小距离算法）
+    let bestSnap: number | null = null;
+    let minDistance = Number.MAX_SAFE_INTEGER;
+
     for (const guideLine of this.state.guideLines) {
       if (guideLine.type === "start") {
-        if (Math.abs(guideLine.time - newStartTime) < threshold)
-          return guideLine.time;
+        const distance = Math.abs(guideLine.time - newStartTime);
+        if (distance < threshold && distance < minDistance) {
+          minDistance = distance;
+          bestSnap = guideLine.time;
+        }
       } else if (guideLine.type === "end") {
-        if (Math.abs(guideLine.time - newEndTime) < threshold)
-          return guideLine.time - duration;
+        const distance = Math.abs(guideLine.time - newEndTime);
+        if (distance < threshold && distance < minDistance) {
+          minDistance = distance;
+          bestSnap = guideLine.time - duration;
+        }
       }
     }
-    return null;
+    return bestSnap;
+  }
+
+  /**
+   * Resize 边缘辅助线吸附 - 仅检查单侧边缘
+   * @param edgeTime 正在调整的边缘时间（左边缘的 startTime 或右边缘的 endTime）
+   * @returns 吸附后的边缘时间，或 null
+   */
+  public snapEdgeToGuideLines(edgeTime: number): number | null {
+    if (this.state.guideLines.length === 0) return null;
+    const threshold = this.config.guideLineSnapThreshold;
+
+    let bestSnap: number | null = null;
+    let minDistance = Number.MAX_SAFE_INTEGER;
+
+    for (const guideLine of this.state.guideLines) {
+      const distance = Math.abs(guideLine.time - edgeTime);
+      if (distance < threshold && distance < minDistance) {
+        minDistance = distance;
+        bestSnap = guideLine.time;
+      }
+    }
+    return bestSnap;
   }
 
   public canMoveEvent(

@@ -24,6 +24,10 @@ const logger = getLogger("DraggingState");
 export class DraggingState extends BaseState {
   readonly name = "Dragging";
   private readonly MOVE_THRESHOLD = 5;
+  /** 是否当前吸附在辅助线上（粘滞吸附） */
+  private isSnappedToGuideLine = false;
+  /** 当前吸附位置的时间 */
+  private snappedTime: number | null = null;
 
   constructor(timeline: Timeline) {
     super(timeline);
@@ -121,51 +125,77 @@ export class DraggingState extends BaseState {
       event.duration
     );
 
-    // 吸附到辅助线
+    // 吸附到辅助线（最高优先级）
     const guideLineSnap = this.timeline.snapToGuideLines(
       newStartTime,
       event.duration
     );
     if (guideLineSnap !== null) {
-      newStartTime = guideLineSnap;
-    } else if (state.snapEnabled) {
-      // 吸附到时间指示器
-      if (config.enableTimeIndicator && state.timeIndicatorSnapEnabled) {
-        const timeIndicatorX = getTimeX(
-          state.timeIndicatorPosition,
-          config.startTime,
-          config.startPaddingTime,
-          config.secondWidth,
-          state.zoomLevel,
-          state.scrollX
-        );
-        const eventX =
-          config.startPaddingTime +
-          (newStartTime - config.startTime) *
-            config.secondWidth *
-            state.zoomLevel -
-          state.scrollX;
-        const distance = Math.abs(eventX - timeIndicatorX);
+      // 粘滞吸附机制：如果已经吸附在辅助线上，需要更大的拖拽量才能脱离
+      if (this.isSnappedToGuideLine && this.snappedTime !== null) {
+        const breakFreeThreshold = this.timeline.config.guideLineSnapThreshold * 1.5;
+        if (Math.abs(newStartTime - this.snappedTime) < breakFreeThreshold) {
+          newStartTime = this.snappedTime;
+        } else {
+          // 脱离吸附
+          this.isSnappedToGuideLine = false;
+          this.snappedTime = null;
+          newStartTime = guideLineSnap;
+          this.isSnappedToGuideLine = true;
+          this.snappedTime = guideLineSnap;
+        }
+      } else {
+        newStartTime = guideLineSnap;
+        this.isSnappedToGuideLine = true;
+        this.snappedTime = guideLineSnap;
+      }
+    } else {
+      this.isSnappedToGuideLine = false;
+      this.snappedTime = null;
 
-        if (distance < config.timeIndicatorSnapThreshold) {
-          newStartTime = state.timeIndicatorPosition;
+      if (state.snapEnabled) {
+        // 吸附到时间指示器
+        if (config.enableTimeIndicator && state.timeIndicatorSnapEnabled) {
+          const timeIndicatorX = getTimeX(
+            state.timeIndicatorPosition,
+            config.startTime,
+            config.startPaddingTime,
+            config.secondWidth,
+            state.zoomLevel,
+            state.scrollX
+          );
+          const eventX =
+            config.startPaddingTime +
+            (newStartTime - config.startTime) *
+              config.secondWidth *
+              state.zoomLevel -
+            state.scrollX;
+          const distance = Math.abs(eventX - timeIndicatorX);
+
+          if (distance < config.timeIndicatorSnapThreshold) {
+            newStartTime = state.timeIndicatorPosition;
+          } else {
+            const snapIntervalSeconds = getSnapInterval(
+              state.zoomLevel,
+              config.snapInterval,
+              config.snapToSeconds,
+              config.secondPrecisionZoomThreshold,
+              config.scale,
+              config.scaleSplitCount
+            );
+            newStartTime = snapToInterval(newStartTime, snapIntervalSeconds);
+          }
         } else {
           const snapIntervalSeconds = getSnapInterval(
             state.zoomLevel,
             config.snapInterval,
             config.snapToSeconds,
-            config.secondPrecisionZoomThreshold
+            config.secondPrecisionZoomThreshold,
+            config.scale,
+            config.scaleSplitCount
           );
           newStartTime = snapToInterval(newStartTime, snapIntervalSeconds);
         }
-      } else {
-        const snapIntervalSeconds = getSnapInterval(
-          state.zoomLevel,
-          config.snapInterval,
-          config.snapToSeconds,
-          config.secondPrecisionZoomThreshold
-        );
-        newStartTime = snapToInterval(newStartTime, snapIntervalSeconds);
       }
     }
 

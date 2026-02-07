@@ -453,7 +453,9 @@ export class IdleState extends BaseState {
               state.zoomLevel,
               config.snapInterval,
               config.snapToSeconds,
-              config.secondPrecisionZoomThreshold
+              config.secondPrecisionZoomThreshold,
+              config.scale,
+              config.scaleSplitCount
             );
             splitTime = snapToInterval(splitTime, snapIntervalSeconds);
           }

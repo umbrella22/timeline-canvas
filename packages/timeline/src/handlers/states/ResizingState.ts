@@ -28,6 +28,8 @@ export class ResizingState extends BaseState {
   }
 
   onExit(): void {
+    const state = this.timeline.state;
+    state.guideLines = [];
     this.timeline.endIndexBatch();
   }
 
@@ -70,13 +72,29 @@ export class ResizingState extends BaseState {
         originalStartTime + originalDuration
       );
 
-      // 应用吸附
-      if (state.snapEnabled) {
+      // 计算辅助线（以当前新 startTime 和不变的 endTime 计算）
+      const currentDuration = originalEndTime - newStartTime;
+      state.guideLines = this.timeline.calculateGuideLines(
+        trackIndex,
+        eventIndex,
+        trackIndex,
+        newStartTime,
+        currentDuration > 0 ? currentDuration : originalDuration
+      );
+
+      // 辅助线吸附（仅检查左边缘）
+      const guideSnap = this.timeline.snapEdgeToGuideLines(newStartTime);
+      if (guideSnap !== null) {
+        newStartTime = guideSnap;
+      } else if (state.snapEnabled) {
+        // 网格吸附
         const snapIntervalSeconds = getSnapInterval(
           state.zoomLevel,
           config.snapInterval,
           config.snapToSeconds,
-          config.secondPrecisionZoomThreshold
+          config.secondPrecisionZoomThreshold,
+          config.scale,
+          config.scaleSplitCount
         );
         newStartTime = snapToInterval(newStartTime, snapIntervalSeconds);
       }
@@ -125,30 +143,47 @@ export class ResizingState extends BaseState {
     } else {
       // 调整右边缘
       let newDuration = originalDuration + deltaTime;
+      let newEndTime = originalStartTime + newDuration;
 
-      // 应用吸附
-      if (state.snapEnabled) {
+      // 计算辅助线
+      state.guideLines = this.timeline.calculateGuideLines(
+        trackIndex,
+        eventIndex,
+        trackIndex,
+        originalStartTime,
+        newDuration > 0 ? newDuration : originalDuration
+      );
+
+      // 辅助线吸附（仅检查右边缘）
+      const guideSnap = this.timeline.snapEdgeToGuideLines(newEndTime);
+      if (guideSnap !== null) {
+        newDuration = fixFloatPrecision(guideSnap - originalStartTime);
+      } else if (state.snapEnabled) {
+        // 网格吸附
         const snapIntervalSeconds = getSnapInterval(
           state.zoomLevel,
           config.snapInterval,
           config.snapToSeconds,
-          config.secondPrecisionZoomThreshold
+          config.secondPrecisionZoomThreshold,
+          config.scale,
+          config.scaleSplitCount
         );
-        const newEndTime = originalStartTime + newDuration;
         const snappedEndTime = snapToInterval(newEndTime, snapIntervalSeconds);
         newDuration = fixFloatPrecision(snappedEndTime - originalStartTime);
       } else {
         newDuration = fixFloatPrecision(newDuration);
       }
 
+      newEndTime = originalStartTime + newDuration;
+
+      // 限制范围
       newDuration = fixFloatPrecision(
         Math.max(config.minEventDuration, newDuration)
       );
       newDuration = fixFloatPrecision(
         Math.min(newDuration, config.endTime - originalStartTime)
       );
-
-      const newEndTime = originalStartTime + newDuration;
+      newEndTime = originalStartTime + newDuration;
 
       // 检查是否与其他事件重叠
       let canResize = true;
