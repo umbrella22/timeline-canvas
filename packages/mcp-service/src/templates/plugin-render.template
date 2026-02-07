@@ -11,11 +11,12 @@ export const {{EXPORT_NAME}}: TimelinePlugin = {
   activate(context) {
     context.api.registerRenderLayer({
       name: "{{METADATA_NAME}}-layer",
-      position: "overlay",
+      position: "overlay", // 'background' | 'overlay'
       render: (ctx, _canvas, _config, _state) => {
-        // TODO: implement custom rendering
+        // ctx 来自对应 buffer 的 OffscreenCanvasRenderingContext2D
+        // 不要缓存 ctx 引用，每次 render 调用的 ctx 可能不同
         ctx.save();
-        // ... drawing logic
+        // TODO: implement custom rendering
         ctx.restore();
       },
     });

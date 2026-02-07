@@ -50,7 +50,7 @@ async function main() {
           .describe("The plugin type category"),
         features: z
           .array(
-            z.enum(["renderLayer", "eventHandler", "config", "lifecycle", "init"])
+            z.enum(["renderLayer", "eventHandler", "config", "lifecycle", "init", "media"])
           )
           .optional()
           .default([])
@@ -224,6 +224,8 @@ async function main() {
               "state-fields",
               "change-types",
               "boundary-conditions",
+              "dirty-mapping",
+              "buffer-compose",
             ])
           )
           .optional()
@@ -251,7 +253,7 @@ async function main() {
         "missing visibility culling, and other performance anti-patterns.",
       inputSchema: {
         target: z
-          .enum(["render", "highlight", "interaction", "all"])
+          .enum(["render", "highlight", "interaction", "worker", "all"])
           .describe("Which subsystem to analyze"),
       },
     },

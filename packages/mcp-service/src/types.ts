@@ -30,7 +30,8 @@ export type PluginFeature =
   | "eventHandler"
   | "config"
   | "lifecycle"
-  | "init";
+  | "init"
+  | "media";
 
 export interface ScaffoldInput {
   exportName: string;
@@ -92,7 +93,9 @@ export type ConsistencyCheckName =
   | "render-layers"
   | "state-fields"
   | "change-types"
-  | "boundary-conditions";
+  | "boundary-conditions"
+  | "dirty-mapping"
+  | "buffer-compose";
 
 export interface ConsistencyCheckInput {
   checks?: ConsistencyCheckName[];
@@ -106,7 +109,7 @@ export interface CheckResult {
 
 // ─── Performance annotate types ───
 
-export type PerfTarget = "render" | "highlight" | "interaction" | "all";
+export type PerfTarget = "render" | "highlight" | "interaction" | "worker" | "all";
 
 export interface PerfAnnotateInput {
   target: PerfTarget;

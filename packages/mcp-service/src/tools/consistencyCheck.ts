@@ -25,6 +25,8 @@ const ALL_CHECKS: ConsistencyCheckName[] = [
   "state-fields",
   "change-types",
   "boundary-conditions",
+  "dirty-mapping",
+  "buffer-compose",
 ];
 
 // ─── Check: plugin-exports ───
@@ -73,9 +75,10 @@ async function checkRenderLayers(): Promise<CheckResult> {
   const problems: string[] = [];
 
   // Look for LayerType or renderOrder definitions
-  const typesFile = await readFile(`${TIMELINE_SRC}/types.ts`);
+  const typesFile = await readFile(`${TIMELINE_SRC}/types/index.ts`);
   const renderPipelineFiles = [
-    `${TIMELINE_SRC}/core/renderers/RenderPipeline.ts`,
+    `${TIMELINE_SRC}/renderers/core/RenderPipeline.ts`,
+    `${TIMELINE_SRC}/renderers/core/types.ts`,
     `${TIMELINE_SRC}/core/managers/RenderManager.ts`,
   ];
 
@@ -125,12 +128,12 @@ async function checkRenderLayers(): Promise<CheckResult> {
 async function checkStateFields(): Promise<CheckResult> {
   const problems: string[] = [];
 
-  const typesFile = await readFile(`${TIMELINE_SRC}/types.ts`);
+  const typesFile = await readFile(`${TIMELINE_SRC}/types/index.ts`);
   if (!typesFile) {
     return {
       name: "state-fields",
       passed: true,
-      details: ["types.ts not found — skipped"],
+      details: ["types/index.ts not found — skipped"],
     };
   }
 
@@ -198,45 +201,53 @@ async function checkChangeTypes(): Promise<CheckResult> {
     };
   }
 
-  // Find ChangeType enum/union values
-  const enumMatch = schedulerFile.match(
-    /(?:enum|type)\s+ChangeType\s*=?\s*\{?([\s\S]*?)(?:\}|;)/
-  );
-  if (!enumMatch) {
-    return {
-      name: "change-types",
-      passed: true,
-      details: ["ChangeType definition not found — skipped"],
-    };
-  }
-
-  // Extract values from the enum/type
-  const body = enumMatch[1];
-  const values: string[] = [];
-  // Handle enum style: VALUE = "value",
-  const enumRe = /(\w+)\s*=\s*["']([^"']+)["']/g;
-  let match;
-  while ((match = enumRe.exec(body)) !== null) {
-    values.push(match[1]);
-  }
-
-  // Check each ChangeType has a corresponding handler/case
-  const handlerPatterns = [
-    /case\s+ChangeType\.(\w+)/g,
-    /ChangeType\.(\w+)/g,
-  ];
-
-  const usedTypes = new Set<string>();
-  for (const pattern of handlerPatterns) {
-    let m;
-    while ((m = pattern.exec(schedulerFile)) !== null) {
-      usedTypes.add(m[1]);
+  // Match string literal union type: type ChangeType = "xxx" | "yyy" | ...
+  const unionMatch = schedulerFile.match(/type\s+ChangeType\s*=\s*([\s\S]*?);/);
+  if (!unionMatch) {
+    // Fallback: try enum style
+    const enumMatch = schedulerFile.match(
+      /(?:enum|type)\s+ChangeType\s*=?\s*\{?([\s\S]*?)(?:\}|;)/
+    );
+    if (!enumMatch) {
+      return {
+        name: "change-types",
+        passed: true,
+        details: ["ChangeType definition not found — skipped"],
+      };
     }
   }
 
+  // Extract string literal values from the union type
+  const unionBody = unionMatch ? unionMatch[1] : "";
+  const values: string[] = [];
+  const literalRe = /["']([^"']+)["']/g;
+  let match;
+  while ((match = literalRe.exec(unionBody)) !== null) {
+    values.push(match[1]);
+  }
+
+  if (values.length === 0) {
+    // Fallback: try enum style VALUE = "value"
+    const enumMatch = schedulerFile.match(
+      /(?:enum|type)\s+ChangeType\s*=?\s*\{?([\s\S]*?)(?:\}|;)/
+    );
+    if (enumMatch) {
+      const body = enumMatch[1];
+      const enumRe = /(\w+)\s*=\s*["']([^"']+)["']/g;
+      while ((match = enumRe.exec(body)) !== null) {
+        values.push(match[2]);
+      }
+    }
+  }
+
+  // Check each ChangeType value has a corresponding handler .set("xxx", {...})
   for (const v of values) {
-    if (!usedTypes.has(v)) {
-      problems.push(`ChangeType.${v} defined but no handler case found`);
+    const handlerPattern = new RegExp(
+      `\.set\\s*\\(\\s*["']${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`
+    );
+    const casePattern = new RegExp(`["']${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
+    if (!handlerPattern.test(schedulerFile) && !casePattern.test(schedulerFile)) {
+      problems.push(`ChangeType "${v}" defined but no handler found`);
     }
   }
 
@@ -257,10 +268,11 @@ async function checkBoundaryConditions(): Promise<CheckResult> {
 
   // Scan for event interval boundary patterns
   const filesToCheck = [
-    `${TIMELINE_SRC}/core/renderers/EventRenderer.ts`,
+    `${TIMELINE_SRC}/renderers/layers/EventsRenderer.ts`,
     `${TIMELINE_SRC}/core/managers/EventIndexManager.ts`,
-    `${TIMELINE_SRC}/core/managers/InteractionManager.ts`,
-    `${TIMELINE_SRC}/core/managers/VisibilityManager.ts`,
+    `${TIMELINE_SRC}/core/managers/ChangeScheduler.ts`,
+    `${TIMELINE_SRC}/handlers/states/IdleState.ts`,
+    `${TIMELINE_SRC}/handlers/states/DraggingState.ts`,
   ];
 
   for (const rel of filesToCheck) {
@@ -319,6 +331,106 @@ async function checkBoundaryConditions(): Promise<CheckResult> {
   };
 }
 
+// ─── Check: dirty-mapping ───
+
+async function checkDirtyMapping(): Promise<CheckResult> {
+  const problems: string[] = [];
+
+  const schedulerFile = await readFile(`${TIMELINE_SRC}/core/managers/ChangeScheduler.ts`);
+  const bufferMgrFile = await readFile(`${TIMELINE_SRC}/core/managers/LayerBufferManager.ts`);
+
+  if (!schedulerFile || !bufferMgrFile) {
+    return {
+      name: "dirty-mapping",
+      passed: true,
+      details: ["Required files not found — skipped"],
+    };
+  }
+
+  // 1. Extract LayerType values from ChangeScheduler handler layers arrays
+  const layerTypeSet = new Set<string>();
+  const layersRe = /layers:\s*\[([^\]]+)\]/g;
+  let m;
+  while ((m = layersRe.exec(schedulerFile)) !== null) {
+    const content = m[1];
+    const strRe = /["']([^"']+)["']/g;
+    let sm;
+    while ((sm = strRe.exec(content)) !== null) {
+      layerTypeSet.add(sm[1]);
+    }
+  }
+
+  // 2. Extract LAYER_TO_BUFFER mapping keys from LayerBufferManager
+  const mappingRe = /(\w+)\s*:\s*["'](\w+)["']/g;
+  const mappedLayerTypes = new Set<string>();
+  while ((m = mappingRe.exec(bufferMgrFile)) !== null) {
+    mappedLayerTypes.add(m[1]);
+  }
+
+  // 3. Find LayerTypes used in ChangeScheduler but not mapped in LAYER_TO_BUFFER
+  for (const lt of layerTypeSet) {
+    if (!mappedLayerTypes.has(lt)) {
+      problems.push(
+        `LayerType "${lt}" used in ChangeScheduler handlers but not mapped in LAYER_TO_BUFFER`
+      );
+    }
+  }
+
+  return {
+    name: "dirty-mapping",
+    passed: problems.length === 0,
+    details: problems.length > 0
+      ? problems
+      : [`All ${layerTypeSet.size} layer types correctly mapped to buffers`],
+  };
+}
+
+// ─── Check: buffer-compose ───
+
+async function checkBufferCompose(): Promise<CheckResult> {
+  const problems: string[] = [];
+
+  const renderMgrFile = await readFile(`${TIMELINE_SRC}/core/managers/RenderManager.ts`);
+  const bufferMgrFile = await readFile(`${TIMELINE_SRC}/core/managers/LayerBufferManager.ts`);
+
+  if (!renderMgrFile || !bufferMgrFile) {
+    return {
+      name: "buffer-compose",
+      passed: true,
+      details: ["Required files not found — skipped"],
+    };
+  }
+
+  // Check RenderManager.draw() compose step includes all BufferLayerIds
+  const bufferIdRe = /['"](\w+)['"]\s*(?:as\s+const|as\s+BufferLayerId)/g;
+  const composeIds = new Set<string>();
+  let m;
+  while ((m = bufferIdRe.exec(renderMgrFile)) !== null) {
+    composeIds.add(m[1]);
+  }
+
+  // Extract all BufferLayerIds from LayerBufferManager
+  const allBufferIds = new Set<string>();
+  const initRe = /['"](\w+)['"]\s*(?:as\s+BufferLayerId|\))/g;
+  while ((m = initRe.exec(bufferMgrFile)) !== null) {
+    allBufferIds.add(m[1]);
+  }
+
+  for (const id of allBufferIds) {
+    if (!composeIds.has(id)) {
+      problems.push(`BufferLayerId "${id}" defined but not included in RenderManager compose step`);
+    }
+  }
+
+  return {
+    name: "buffer-compose",
+    passed: problems.length === 0,
+    details: problems.length > 0
+      ? problems
+      : [`All buffer layers included in compose step`],
+  };
+}
+
 // ─── Main entry ───
 
 const CHECK_MAP: Record<ConsistencyCheckName, () => Promise<CheckResult>> = {
@@ -327,6 +439,8 @@ const CHECK_MAP: Record<ConsistencyCheckName, () => Promise<CheckResult>> = {
   "state-fields": checkStateFields,
   "change-types": checkChangeTypes,
   "boundary-conditions": checkBoundaryConditions,
+  "dirty-mapping": checkDirtyMapping,
+  "buffer-compose": checkBufferCompose,
 };
 
 export async function consistencyCheck(

@@ -1,0 +1,65 @@
+import type { TimelinePlugin } from "../../plugins/types";
+import { PluginType } from "../../plugins/types";
+
+/**
+ * {{DESCRIPTION}}
+ *
+ * 媒体插件模板：通过 Worker 异步生成位图，渲染时只做 drawImage 搬运。
+ * 遵循 OffscreenCanvas 分层缓存方案，输出到 mediaBuffer。
+ */
+export function {{EXPORT_NAME}}(): TimelinePlugin {
+  return {
+    metadata: {
+      name: "{{METADATA_NAME}}",
+      version: "{{VERSION}}",
+      description: "{{DESCRIPTION}}",
+      type: PluginType.RENDER,
+    },
+    async activate(context) {
+      // 1. 初始化位图缓存
+      const bitmapCache = new Map<string, ImageBitmap>();
+      context.api.setData("{{METADATA_NAME}}_cache", bitmapCache);
+
+      // 2. 注册渲染钩子（输出到 mediaBuffer）
+      const handler = (
+        ctx: CanvasRenderingContext2D,
+        config: any,
+        state: any,
+        trackIndex: number,
+        eventIndex: number,
+        eventX: number,
+        trackY: number,
+        eventWidth: number,
+        eventVerticalPadding: number,
+        eventHeight: number
+      ) => {
+        const cache = context.api.getData("{{METADATA_NAME}}_cache") as Map<string, ImageBitmap>;
+        const ev = state.tracks[trackIndex].events[eventIndex];
+        if (!ev) return;
+
+        const key = `${ev.id}_media`;
+        const bitmap = cache.get(key);
+        if (bitmap) {
+          ctx.drawImage(bitmap, eventX, trackY + eventVerticalPadding, eventWidth, eventHeight);
+        }
+        // TODO: 若 cache miss，通过 MediaWorkerBridge 异步请求生成
+      };
+
+      context.api.registerEventHandler("render:event:media", handler);
+      context.api.setData("{{METADATA_NAME}}_handler", handler);
+    },
+    deactivate(context) {
+      // 清理渲染钩子
+      const handler = context.api.getData("{{METADATA_NAME}}_handler");
+      if (handler) {
+        context.api.unregisterEventHandler("render:event:media", handler);
+      }
+      // 清理位图缓存
+      const cache = context.api.getData("{{METADATA_NAME}}_cache") as Map<string, ImageBitmap> | undefined;
+      if (cache) {
+        for (const bmp of cache.values()) bmp.close();
+        cache.clear();
+      }
+    },
+  };
+}

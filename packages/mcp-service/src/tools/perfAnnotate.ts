@@ -23,22 +23,33 @@ interface FileTarget {
 
 const SCAN_TARGETS: FileTarget[] = [
   // Render paths
-  { rel: `${TIMELINE_SRC}/core/renderers/EventRenderer.ts`, category: "render" },
-  { rel: `${TIMELINE_SRC}/core/renderers/TrackRenderer.ts`, category: "render" },
-  { rel: `${TIMELINE_SRC}/core/renderers/TimeIndicatorRenderer.ts`, category: "render" },
-  { rel: `${TIMELINE_SRC}/core/renderers/RenderPipeline.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/EventsRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/TracksRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/TimelineRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/IndicatorRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/GuideLinesRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/ScrollbarRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/layers/InteractionRenderer.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/renderers/core/RenderPipeline.ts`, category: "render" },
   { rel: `${TIMELINE_SRC}/core/managers/RenderManager.ts`, category: "render" },
-  // Highlight / interaction
-  { rel: `${TIMELINE_SRC}/core/managers/HighlightManager.ts`, category: "highlight" },
+  // Layer buffer management (OffscreenCanvas)
+  { rel: `${TIMELINE_SRC}/core/managers/LayerBufferManager.ts`, category: "render" },
+  // Worker (media)
+  { rel: `${TIMELINE_SRC}/workers/media.worker.ts`, category: "render" },
+  { rel: `${TIMELINE_SRC}/workers/MediaWorkerBridge.ts`, category: "render" },
+  // Media cache
+  { rel: `${TIMELINE_SRC}/utils/MediaLRUCache.ts`, category: "render" },
+  // Highlight / index
   { rel: `${TIMELINE_SRC}/core/managers/EventIndexManager.ts`, category: "highlight" },
-  // Interaction
-  { rel: `${TIMELINE_SRC}/core/managers/InteractionManager.ts`, category: "interaction" },
-  { rel: `${TIMELINE_SRC}/core/managers/DragDropManager.ts`, category: "interaction" },
-  { rel: `${TIMELINE_SRC}/core/managers/SelectionManager.ts`, category: "interaction" },
-  // Interaction states (common source of redundant calls)
-  { rel: `${TIMELINE_SRC}/core/interaction/IdleState.ts`, category: "interaction" },
-  { rel: `${TIMELINE_SRC}/core/interaction/DragState.ts`, category: "interaction" },
-  { rel: `${TIMELINE_SRC}/core/interaction/ResizeState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/core/managers/ChangeScheduler.ts`, category: "highlight" },
+  // Interaction (state machine)
+  { rel: `${TIMELINE_SRC}/handlers/MouseHandler.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/WheelHandler.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/IdleState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/DraggingState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/ResizingState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/ScrollingState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/TimeIndicatorDragState.ts`, category: "interaction" },
 ];
 
 interface PatternRule {
@@ -106,6 +117,38 @@ const RULES: PatternRule[] = [
     description: "Canvas save() detected — ensure matching restore()",
     suggestion: "Verify save/restore pairs are balanced; unbalanced pairs leak state",
   },
+  {
+    name: "offscreen-canvas-resize-without-clear",
+    severity: "medium",
+    pattern: /\.width\s*=|\.height\s*=/,
+    description: "OffscreenCanvas resize detected — ensure content is redrawn after resize",
+    suggestion: "Resize clears canvas content; mark buffer as dirty after resize",
+    requiresLoopContext: false,
+  },
+  {
+    name: "drawimage-in-loop",
+    severity: "medium",
+    pattern: /ctx\.drawImage\s*\(/,
+    description: "drawImage in loop — may cause compositing overhead",
+    suggestion: "Batch drawImage calls or use a single composite step",
+    requiresLoopContext: true,
+  },
+  {
+    name: "transferable-not-used",
+    severity: "medium",
+    pattern: /postMessage\s*\([^,)]+\)\s*;/,
+    description: "postMessage without Transferable list — data will be cloned instead of transferred",
+    suggestion: "Pass [buffer] as second argument for zero-copy transfer of ArrayBuffer/ImageBitmap",
+    requiresLoopContext: false,
+  },
+  {
+    name: "worker-sync-in-render",
+    severity: "high",
+    pattern: /await\s+.*worker.*\.postMessage|await\s+.*requestBitmap/,
+    description: "Awaiting Worker response in render path — blocks frame",
+    suggestion: "Use fire-and-forget pattern; render placeholder until Worker returns bitmap",
+    requiresLoopContext: false,
+  },
 ];
 
 function isInsideLoop(lines: string[], lineIndex: number): boolean {
@@ -168,6 +211,10 @@ const EXPENSIVE_METHODS = [
   "getInteractionTarget",
   "findEventAt",
   "getVisibleEvents",
+  // OffscreenCanvas related
+  "markDirtyFromLayers",
+  "transferToImageBitmap",
+  "createImageBitmap",
 ];
 
 /**

@@ -189,6 +189,57 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
         }
       }
     }
+
+    // 6d. Worker creation but not terminated in deactivate
+    const workerCreation = /new\s+Worker\s*\(/.test(text);
+    if (workerCreation && hasDeactivate) {
+      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
+      const hasTerminate = /\.terminate\s*\(\s*\)/.test(deactivateBlock2);
+      if (!hasTerminate) {
+        problems.push(
+          `⚠ Behavioral: Worker created but .terminate() not called in deactivate — ${implRel}`
+        );
+      }
+    }
+
+    // 6e. OffscreenCanvas / ImageBitmap resource management
+    const offscreenCreation = /new\s+OffscreenCanvas\s*\(/.test(text);
+    const transferToImageBitmap = /transferToImageBitmap\s*\(/.test(text);
+    if ((offscreenCreation || transferToImageBitmap) && hasDeactivate) {
+      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
+      const hasClose = /\.close\s*\(\s*\)/.test(deactivateBlock2);
+      if (!hasClose && transferToImageBitmap) {
+        problems.push(
+          `⚠ Behavioral: ImageBitmap created via transferToImageBitmap but .close() not called in deactivate — ${implRel}`
+        );
+      }
+    }
+
+    // 6f. MediaLRUCache cleanup
+    const cacheCreation = /new\s+MediaLRUCache\s*\(/.test(text) ||
+      /MediaLRUCache/.test(text);
+    if (cacheCreation && hasDeactivate) {
+      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
+      const hasCacheClear = /\.clear\s*\(\s*\)/.test(deactivateBlock2);
+      if (!hasCacheClear) {
+        problems.push(
+          `⚠ Behavioral: MediaLRUCache used but .clear() not called in deactivate — ${implRel}`
+        );
+      }
+    }
+
+    // 6g. RENDER plugin directly accessing main canvas ctx instead of buffer ctx
+    if (text.includes('PluginType.RENDER') && activateBlockMatch) {
+      const activateBlock2 = activateBlockMatch[0];
+      if (/getCanvas\s*\(\s*\).*getContext/.test(activateBlock2)) {
+        problems.push(
+          `⚠ Behavioral: RENDER plugin directly accesses main canvas ctx — should use buffer ctx after OffscreenCanvas migration — ${implRel}`
+        );
+      }
+    }
   }
 
   // 6. Re-export path consistency

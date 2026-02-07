@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { resolveInWorkspace, pathExists } from "../workspace.js";
 import { TemplateEngine } from "../services/templateEngine.js";
 import { getBuiltinPluginNames } from "../services/projectModel.js";
-import type { ScaffoldInput, PluginTypeKey } from "../types.js";
+import type { ScaffoldInput, PluginTypeKey, PluginFeature } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, "..", "templates");
@@ -36,7 +36,11 @@ function enumKeyFromPluginType(t: PluginTypeKey): string {
   return map[t] ?? "EXTENSION";
 }
 
-function selectTemplate(pluginType: PluginTypeKey): string {
+function selectTemplate(pluginType: PluginTypeKey, features?: PluginFeature[]): string {
+  // When pluginType is 'render' and features include 'media', use media template
+  if (pluginType === "render" && features?.includes("media" as PluginFeature)) {
+    return "plugin-media.template";
+  }
   switch (pluginType) {
     case "theme":
       return "plugin-theme.template";
@@ -87,7 +91,7 @@ export async function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
   const createdFiles: string[] = [];
 
   // 1. Generate plugin implementation from template
-  const templateFile = selectTemplate(pluginType);
+  const templateFile = selectTemplate(pluginType, features);
   let templateContent: string;
   try {
     templateContent = await fs.readFile(
