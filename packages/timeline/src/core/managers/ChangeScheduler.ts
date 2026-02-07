@@ -219,7 +219,6 @@ export class ChangeScheduler {
 
     this.handlers.set("scroll:y", {
       layers: [
-        "background",
         "tracks",
         "timeline",
         "guideLines",
@@ -279,15 +278,15 @@ export class ChangeScheduler {
       needsDraw: true,
     });
 
-    // 主题变更
+    // 主题变更：包含 indicator 和 scrollbar，主题色会影响它们的颜色
     this.handlers.set("theme:change", {
-      layers: ["background", "tracks", "timeline", "overlay"],
+      layers: ["background", "tracks", "timeline", "indicator", "scrollbar", "overlay"],
       needsDraw: true,
     });
 
-    // 交互相关变更
+    // 交互相关变更：hover 需要触发 overlay（tooltip 依赖）
     this.handlers.set("interaction:hover", {
-      layers: ["tracks", "interaction"],
+      layers: ["tracks", "interaction", "overlay"],
       needsDraw: true,
     });
 
@@ -329,12 +328,7 @@ export class ChangeScheduler {
 
     this.handlers.set("config:readOnly", {
       layers: [
-        "background",
         "tracks",
-        "timeline",
-        "guideLines",
-        "indicator",
-        "scrollbar",
         "interaction",
         "overlay",
       ],

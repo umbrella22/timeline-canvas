@@ -34,7 +34,7 @@ import { ChangeScheduler, type ChangeType } from "./managers/ChangeScheduler";
 // Built-in plugins are now optional external imports for tree-shaking.
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
 import { DarkThemePlugin } from "../plugins/builtin/DarkThemePlugin";
-import type { TimelinePlugin } from "../plugins/types";
+import { type TimelinePlugin, PluginType } from "../plugins/types";
 
 export class Timeline {
   private canvas: HTMLCanvasElement;
@@ -153,7 +153,11 @@ export class Timeline {
     if (options.theme) {
       const id = `${options.theme.metadata.name}@${options.theme.metadata.version}`;
       this.pluginManager.loadPlugin(options.theme).then((ok) => {
-        if (ok) this.currentThemePluginId = id;
+        if (ok) {
+          this.currentThemePluginId = id;
+          // 主题插件异步激活后需触发重绘，确保所有缓冲层使用正确的主题色
+          this.notifyChange("theme:change");
+        }
       });
     }
     // ContextMenuPlugin 需要通过 usePlugin() 显式加载
@@ -185,7 +189,15 @@ export class Timeline {
   }
 
   public usePlugin(plugin: any): Promise<boolean> {
-    return this.pluginManager.loadPlugin(plugin);
+    return this.pluginManager.loadPlugin(plugin).then((ok) => {
+      if (ok && plugin.metadata?.type === PluginType.THEME) {
+        const id = `${plugin.metadata.name}@${plugin.metadata.version}`;
+        this.currentThemePluginId = id;
+        // 主题插件加载后需触发重绘，确保背景层使用正确的主题色
+        this.notifyChange("theme:change");
+      }
+      return ok;
+    });
   }
 
   public getLoadedPlugins(): any[] {

@@ -8,11 +8,14 @@ export class TracksRenderer implements Renderer {
   readonly name = "Tracks";
   readonly layer: LayerType = "tracks";
 
+  /** 复用 EventsRenderer 实例，避免热路径上反复 new 造成 GC 压力 */
+  private readonly eventsRenderer = new EventsRenderer();
+
   render(context: RenderContext): void {
     const { ctx, canvas, config, state, pluginManager, width, height } =
       context;
     const trackStartX = config.startPaddingTime - state.scrollX;
-    const eventsRenderer = new EventsRenderer();
+    const eventsRenderer = this.eventsRenderer;
 
     for (let i = 0; i < state.tracks.length; i++) {
       const trackY =

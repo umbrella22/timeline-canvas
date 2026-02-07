@@ -33,7 +33,6 @@ export class RenderPipeline {
     "overlay",
   ];
 
-  private prevContext?: RenderContext;
   private stats: RenderStats = {
     layerTimes: {} as Record<LayerType, number>,
     totalTime: 0,
@@ -125,7 +124,6 @@ export class RenderPipeline {
     }
 
     this.stats.totalTime = performance.now() - startTime;
-    this.prevContext = context;
     if (shouldLog) {
       logger.debugStyled(
         LogColors.pipeline,
@@ -141,34 +139,24 @@ export class RenderPipeline {
 
   /**
    * 判断图层是否需要渲染
+   *
+   * 完全依赖 ChangeScheduler 的脏层标记，不再使用 prevContext 对比。
+   * 原因：TimelineState 是可变对象，prevContext.state 和 context.state
+   * 是同一个引用，shouldRender() 无法正确检测变化。
    */
   private shouldRenderLayer(
     layer: LayerType,
-    renderer: Renderer,
-    context: RenderContext,
+    _renderer: Renderer,
+    _context: RenderContext,
     forceFullRender: boolean,
     dirtyLayers?: Set<LayerType>
   ): boolean {
     // 强制全量渲染
     if (forceFullRender) return true;
 
-    // 如果没有提供 dirtyLayers，使用渲染器的 shouldRender 判断
-    if (!dirtyLayers) {
-      if (renderer.shouldRender && this.prevContext) {
-        return renderer.shouldRender(context, this.prevContext);
-      }
-      return true;
-    }
-
-    // 检查脏图层标记
-    if (!dirtyLayers.has(layer)) {
-      return false;
-    }
-
-    // 如果图层在 dirtyLayers 中，直接渲染
-    // 不再调用 shouldRender()，因为 prevContext.state 和 context.state 是同一个对象引用
-    // 导致 shouldRender() 无法正确检测变化
-    return true;
+    // 完全基于 dirtyLayers 判断
+    if (!dirtyLayers) return true;
+    return dirtyLayers.has(layer);
   }
 
   /**
@@ -179,10 +167,11 @@ export class RenderPipeline {
   }
 
   /**
-   * 清空上一次的渲染上下文(强制下次全量渲染)
+   * 清空上一次的渲染上下文(保持兼容性，目前为空操作)
+   * @deprecated 脏层判断已完全依赖 ChangeScheduler
    */
   clearPrevContext(): void {
-    this.prevContext = undefined;
+    // no-op：脏层判断已完全依赖 ChangeScheduler
   }
 
   /**
