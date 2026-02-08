@@ -1,5 +1,15 @@
 # timeline-canvas
 
+## 1.3.1
+
+### New Features
+
+- **新增**：支持插件拦截和修改核心渲染层渲染行为，引入 `registerCoreLayerHook` API 与洋葱模型钩子机制，增强插件对核心 UI 的定制能力
+
+### Internal
+
+- **重构**：在 `RenderPipeline` 中实现渲染钩子调度逻辑，并在 `PluginManager` 中增加钩子管理功能
+
 ## 1.3.0
 
 ### New Features
