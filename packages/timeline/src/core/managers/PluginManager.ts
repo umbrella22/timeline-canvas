@@ -2,6 +2,7 @@ import type {
   PluginContext,
   TimelinePlugin,
   RenderLayer,
+  CoreLayerHook,
   PerformanceProvider,
 } from "../../plugins/types";
 import { getLogger } from "./Logger";
@@ -13,6 +14,7 @@ export class PluginManager {
   > = new Map();
   private eventHandlers: Map<string, Function[]> = new Map();
   private renderLayers: Map<string, RenderLayer> = new Map();
+  private coreLayerHooks: Map<string, CoreLayerHook> = new Map();
   private pluginData: Map<string, Map<string, any>> = new Map();
   private performanceProvider: PerformanceProvider | undefined;
 
@@ -56,6 +58,10 @@ export class PluginManager {
         this.registerRenderLayer(pluginId, layer),
       unregisterRenderLayer: (name: string) =>
         this.unregisterRenderLayer(pluginId, name),
+      registerCoreLayerHook: (hook: CoreLayerHook) =>
+        this.registerCoreLayerHook(pluginId, hook),
+      unregisterCoreLayerHook: (name: string) =>
+        this.unregisterCoreLayerHook(pluginId, name),
       registerEventHandler: (event: string, handler: Function) =>
         this.registerEventHandler(pluginId, event, handler),
       unregisterEventHandler: (event: string, handler: Function) =>
@@ -125,12 +131,46 @@ export class PluginManager {
     this.renderLayers.delete(name);
   }
 
+  private registerCoreLayerHook(
+    _pluginId: string,
+    hook: CoreLayerHook
+  ): void {
+    this.coreLayerHooks.set(hook.name, hook);
+  }
+
+  private unregisterCoreLayerHook(_pluginId: string, name: string): void {
+    this.coreLayerHooks.delete(name);
+  }
+
+  /**
+   * 获取指定核心渲染层的所有钩子
+   */
+  getCoreLayerHooks(target: string): CoreLayerHook[] {
+    return Array.from(this.coreLayerHooks.values()).filter(
+      (h) => h.target === target
+    );
+  }
+
+  /**
+   * 检查指定核心渲染层是否有钩子注册
+   */
+  hasCoreLayerHooks(target: string): boolean {
+    for (const hook of this.coreLayerHooks.values()) {
+      if (hook.target === target) return true;
+    }
+    return false;
+  }
+
   private cleanupPluginResources(pluginId: string): void {
     // 清理插件私有数据
     this.pluginData.delete(pluginId);
     // 渲染层按名称由插件在 destroy 时自行清理；这里作为兜底删除其命名空间前缀的层
     for (const [name] of this.renderLayers) {
       if (name.startsWith(pluginId)) this.renderLayers.delete(name);
+    }
+    // 清理核心层钩子
+    for (const [name] of this.coreLayerHooks) {
+      if (name.startsWith(pluginId)) this.coreLayerHooks.delete(name);
     }
     // 事件处理器无需全局清理（弱引用策略），由插件管理
   }

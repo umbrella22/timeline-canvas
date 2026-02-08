@@ -5,6 +5,7 @@ import type {
   RenderStats,
   LayerType,
 } from "./types";
+import type { CoreLayerHook } from "../../plugins/types";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("RenderPipeline");
@@ -112,7 +113,13 @@ export class RenderPipeline {
       const layerStartTime = skipPerfMeasure ? 0 : performance.now();
 
       try {
-        renderer.render(context);
+        // 检查是否有插件钩子拦截此核心层
+        const hooks = context.pluginManager?.getCoreLayerHooks(layer);
+        if (hooks && hooks.length > 0) {
+          this.executeWithHooks(context, renderer, hooks);
+        } else {
+          renderer.render(context);
+        }
         this.stats.renderedLayers++;
       } catch (error) {
         logger.error(`Error rendering layer "${layer}":`, error);
@@ -135,6 +142,51 @@ export class RenderPipeline {
     }
 
     return { ...this.stats };
+  }
+
+  /**
+   * 使用插件钩子中间件链执行渲染
+   *
+   * 构建洋葱模型：最后注册的钩子最先包裹默认渲染，
+   * 第一个注册的钩子最外层执行，依次调用 next() 进入下一层。
+   */
+  private executeWithHooks(
+    context: RenderContext,
+    renderer: Renderer,
+    hooks: CoreLayerHook[]
+  ): void {
+    // 构建逻辑 canvas（与 RenderLayer API 保持一致，传递逻辑尺寸）
+    const logicalCanvas = {
+      width: context.width,
+      height: context.height,
+      getContext: context.canvas.getContext.bind(context.canvas),
+    } as unknown as HTMLCanvasElement;
+
+    // 从内到外构建中间件链：默认渲染 → 最后一个钩子 → ... → 第一个钩子
+    let chain = () => renderer.render(context);
+    for (let i = hooks.length - 1; i >= 0; i--) {
+      const hook = hooks[i];
+      const next = chain;
+      chain = () => {
+        try {
+          hook.handler(
+            context.ctx,
+            logicalCanvas,
+            context.config,
+            context.state,
+            next
+          );
+        } catch (error) {
+          logger.error(
+            `Error in core layer hook "${hook.name}":`,
+            error
+          );
+          // 钩子出错时降级执行默认渲染
+          next();
+        }
+      };
+    }
+    chain();
   }
 
   /**

@@ -37,9 +37,69 @@ export interface RenderLayer {
   ) => void;
 }
 
+/**
+ * 可被插件钩子拦截的核心渲染层
+ */
+export type CoreRenderTarget =
+  | "tracks"
+  | "timeline"
+  | "guideLines"
+  | "indicator"
+  | "scrollbar"
+  | "interaction";
+
+/**
+ * 核心层钩子 — 允许插件拦截、修改或替换核心渲染层的行为
+ *
+ * `handler` 中调用 `next()` 执行默认渲染，不调用则完全替换默认行为。
+ * 多个钩子按注册顺序形成中间件链。
+ *
+ * @example
+ * ```ts
+ * // 修改轨道渲染：添加自定义背景后执行默认渲染
+ * registerCoreLayerHook({
+ *   name: "custom-track-bg",
+ *   target: "tracks",
+ *   handler(ctx, canvas, config, state, next) {
+ *     ctx.save();
+ *     ctx.fillStyle = "rgba(0,0,255,0.05)";
+ *     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ *     ctx.restore();
+ *     next(); // 执行默认轨道渲染
+ *   }
+ * });
+ *
+ * // 完全替换时间轴刻度渲染
+ * registerCoreLayerHook({
+ *   name: "custom-timeline",
+ *   target: "timeline",
+ *   handler(ctx, canvas, config, state, _next) {
+ *     // 不调用 next()，完全自定义绘制
+ *     drawMyCustomTimeline(ctx, canvas, config, state);
+ *   }
+ * });
+ * ```
+ */
+export interface CoreLayerHook {
+  /** 钩子名称，唯一标识 */
+  name: string;
+  /** 目标核心渲染层 */
+  target: CoreRenderTarget;
+  /** 钩子处理函数 */
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: any,
+    state: any,
+    next: () => void
+  ) => void;
+}
+
 export interface PluginAPI {
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
+  registerCoreLayerHook: (hook: CoreLayerHook) => void;
+  unregisterCoreLayerHook: (name: string) => void;
   registerEventHandler: (event: string, handler: Function) => void;
   unregisterEventHandler: (event: string, handler: Function) => void;
   showNotification: (message: string, type?: "info" | "warning" | "error") => void;

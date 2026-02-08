@@ -7,6 +7,17 @@ export { EventMediaPlugin } from "./plugins/builtin/EventMediaPlugin";
 export { EventTooltipPlugin } from "./plugins/builtin/EventTooltipPlugin";
 export type { ChangeType } from "./core/managers/ChangeScheduler";
 export type {
+  TimelinePlugin,
+  PluginContext,
+  PluginAPI,
+  PluginMetadata,
+  RenderLayer,
+  RenderLayerPosition,
+  CoreRenderTarget,
+  CoreLayerHook,
+} from "./plugins/types";
+export { PluginType, PluginPriority } from "./plugins/types";
+export type {
   TimelineConfig,
   TimelineState,
   TimelineOptions,
