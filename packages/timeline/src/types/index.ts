@@ -101,6 +101,9 @@ export interface TimelineConfig {
   timeIndicatorSnapThreshold: number;
   timeIndicatorHeadSize: number;
   timeIndicatorTriangleHeight: number;
+  edgeScrollThrottle: number;
+  edgeScrollTriggerMargin: number;
+  edgeScrollViewportMargin: number;
   guideLineSnapThreshold: number;
   enableTimeIndicator: boolean;
   enableEventResize: boolean;
@@ -414,6 +417,9 @@ export interface TimelineOptions {
   snapToSeconds?: boolean;
   secondPrecisionZoomThreshold?: number;
   enableTimeIndicator?: boolean;
+  edgeScrollThrottle?: number;
+  edgeScrollTriggerMargin?: number;
+  edgeScrollViewportMargin?: number;
   enableEventResize?: boolean;
   enableEventSplit?: boolean;
   enableContextMenu?: boolean;

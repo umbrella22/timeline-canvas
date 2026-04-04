@@ -5,12 +5,16 @@ import type {
   RenderStats,
   LayerType,
 } from "./types";
-import type { CoreLayerHook } from "../../plugins/types";
+import type { CoreLayerHook, CoreRenderTarget } from "../../plugins/types";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("RenderPipeline");
 
 let lastPipelineLogTime = 0;
+
+function isCoreRenderTarget(layer: LayerType): layer is CoreRenderTarget {
+  return layer !== "background" && layer !== "overlay";
+}
 
 /**
  * 渲染管道 - 管理和执行多个渲染器
@@ -113,8 +117,9 @@ export class RenderPipeline {
       const layerStartTime = skipPerfMeasure ? 0 : performance.now();
 
       try {
-        // 检查是否有插件钩子拦截此核心层
-        const hooks = context.pluginManager?.getCoreLayerHooks(layer);
+        const hooks = isCoreRenderTarget(layer)
+          ? context.pluginManager?.getCoreLayerHooks(layer)
+          : undefined;
         if (hooks && hooks.length > 0) {
           this.executeWithHooks(context, renderer, hooks);
         } else {

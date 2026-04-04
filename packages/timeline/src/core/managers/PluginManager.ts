@@ -1,10 +1,15 @@
 import type {
+  CoreRenderTarget,
   PluginContext,
+  PluginAPI,
+  PluginEventHandler,
   TimelinePlugin,
   RenderLayer,
   CoreLayerHook,
   PerformanceProvider,
 } from "../../plugins/types";
+import type { TimelineConfig, TimelineState } from "../../types";
+import { ErrorHandler } from "./ErrorHandler";
 import { getLogger } from "./Logger";
 
 export class PluginManager {
@@ -12,13 +17,18 @@ export class PluginManager {
     string,
     { plugin: TimelinePlugin; context: PluginContext; active: boolean }
   > = new Map();
-  private eventHandlers: Map<string, Function[]> = new Map();
+  private eventHandlers: Map<string, PluginEventHandler[]> = new Map();
   private renderLayers: Map<string, RenderLayer> = new Map();
   private coreLayerHooks: Map<string, CoreLayerHook> = new Map();
-  private pluginData: Map<string, Map<string, any>> = new Map();
+  private pluginData: Map<string, Map<string, unknown>> = new Map();
   private performanceProvider: PerformanceProvider | undefined;
 
-  constructor(private baseContext: Omit<PluginContext, "api">) {}
+  constructor(
+    private baseContext: Omit<PluginContext, "api">,
+    private errorHandler: ErrorHandler = new ErrorHandler(
+      getLogger("PluginManager")
+    )
+  ) {}
 
   async loadPlugin(plugin: TimelinePlugin): Promise<boolean> {
     const { name, version } = plugin.metadata;
@@ -31,29 +41,41 @@ export class PluginManager {
       if (plugin.activate) await plugin.activate(ctx);
       this.plugins.set(pluginId, { plugin, context: ctx, active: true });
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      this.cleanupPluginResources(pluginId);
+      return this.errorHandler.fail(
+        this.baseContext.config.debug,
+        `Plugin load failed: ${pluginId}`,
+        error
+      );
     }
   }
 
   async unloadPlugin(pluginId: string): Promise<boolean> {
     const entry = this.plugins.get(pluginId);
     if (!entry) return false;
+    let success = true;
     try {
       if (entry.plugin.deactivate) await entry.plugin.deactivate(entry.context);
       if (entry.plugin.destroy) await entry.plugin.destroy(entry.context);
+    } catch (error) {
+      success = this.errorHandler.fail(
+        this.baseContext.config.debug,
+        `Plugin unload failed: ${pluginId}`,
+        error
+      );
     } finally {
       this.cleanupPluginResources(pluginId);
       this.plugins.delete(pluginId);
     }
-    return true;
+    return success;
   }
 
   private createPluginContext(pluginId: string): PluginContext {
-    const store = new Map<string, any>();
+    const store = new Map<string, unknown>();
     this.pluginData.set(pluginId, store);
 
-    const api = {
+    const api: PluginAPI = {
       registerRenderLayer: (layer: RenderLayer) =>
         this.registerRenderLayer(pluginId, layer),
       unregisterRenderLayer: (name: string) =>
@@ -62,15 +84,14 @@ export class PluginManager {
         this.registerCoreLayerHook(pluginId, hook),
       unregisterCoreLayerHook: (name: string) =>
         this.unregisterCoreLayerHook(pluginId, name),
-      registerEventHandler: (event: string, handler: Function) =>
+      registerEventHandler: (event: string, handler: PluginEventHandler) =>
         this.registerEventHandler(pluginId, event, handler),
-      unregisterEventHandler: (event: string, handler: Function) =>
+      unregisterEventHandler: (event: string, handler: PluginEventHandler) =>
         this.unregisterEventHandler(pluginId, event, handler),
       showNotification: (
         message: string,
         type: "info" | "warning" | "error" = "info"
       ) => {
-        // 使用日志管理器输出插件通知
         const pluginLogger = getLogger(`plugin:${pluginId}`);
         switch (type) {
           case "error":
@@ -98,13 +119,13 @@ export class PluginManager {
       },
     };
 
-    return { ...this.baseContext, api } as PluginContext;
+    return { ...this.baseContext, api };
   }
 
   private registerEventHandler(
     _pluginId: string,
     event: string,
-    handler: Function
+    handler: PluginEventHandler
   ): void {
     const list = this.eventHandlers.get(event) || [];
     list.push(handler);
@@ -114,7 +135,7 @@ export class PluginManager {
   private unregisterEventHandler(
     _pluginId: string,
     event: string,
-    handler: Function
+    handler: PluginEventHandler
   ): void {
     const list = this.eventHandlers.get(event);
     if (!list) return;
@@ -145,7 +166,7 @@ export class PluginManager {
   /**
    * 获取指定核心渲染层的所有钩子
    */
-  getCoreLayerHooks(target: string): CoreLayerHook[] {
+  getCoreLayerHooks(target: CoreRenderTarget): CoreLayerHook[] {
     return Array.from(this.coreLayerHooks.values()).filter(
       (h) => h.target === target
     );
@@ -154,7 +175,7 @@ export class PluginManager {
   /**
    * 检查指定核心渲染层是否有钩子注册
    */
-  hasCoreLayerHooks(target: string): boolean {
+  hasCoreLayerHooks(target: CoreRenderTarget): boolean {
     for (const hook of this.coreLayerHooks.values()) {
       if (hook.target === target) return true;
     }
@@ -175,24 +196,37 @@ export class PluginManager {
     // 事件处理器无需全局清理（弱引用策略），由插件管理
   }
 
-  emitEvent(event: string, ...args: any[]): void {
+  emitEvent(event: string, ...args: unknown[]): void {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return;
     for (const fn of list) {
       try {
-        (fn as any)(...args);
-      } catch {}
+        fn(...args);
+      } catch (error) {
+        this.errorHandler.debugIf(
+          this.baseContext.config.debug,
+          `Plugin event failed: ${event}`,
+          error
+        );
+      }
     }
   }
 
-  validateEvent(event: string, ...args: any[]): boolean {
+  validateEvent(event: string, ...args: unknown[]): boolean {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return true;
     for (const fn of list) {
       try {
-        const r = (fn as any)(...args);
+        const r = fn(...args);
         if (r === false) return false;
-      } catch {}
+      } catch (error) {
+        this.errorHandler.debugIf(
+          this.baseContext.config.debug,
+          `Plugin validation failed: ${event}`,
+          error
+        );
+        return false;
+      }
     }
     return true;
   }
@@ -200,8 +234,8 @@ export class PluginManager {
   renderBackground(
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any
+    config: TimelineConfig,
+    state: TimelineState
   ): void {
     for (const layer of this.layersByPosition("background")) {
       layer.render(ctx, canvas, config, state);
@@ -211,8 +245,8 @@ export class PluginManager {
   renderOverlay(
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any
+    config: TimelineConfig,
+    state: TimelineState
   ): void {
     for (const layer of this.layersByPosition("overlay")) {
       layer.render(ctx, canvas, config, state);

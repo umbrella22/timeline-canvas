@@ -12,6 +12,20 @@ export class ErrorHandler {
     throw new Error(message);
   }
 
+  debug(message: string, error: unknown): void {
+    this.logger.error(message, error);
+  }
+
+  debugIf(enabled: boolean, message: string, error: unknown): void {
+    if (!enabled) return;
+    this.debug(message, error);
+  }
+
+  fail(enabled: boolean, message: string, error: unknown): false {
+    this.debugIf(enabled, message, error);
+    return false;
+  }
+
   error(message: string): void {
     this.logger.error(message);
   }

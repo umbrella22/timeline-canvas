@@ -1,3 +1,7 @@
+import type { Timeline } from "../core/Timeline";
+import type { TimelineConfig, TimelineState } from "../types";
+import type { PerformanceStats } from "../utils/performanceMonitor";
+
 export enum PluginType {
   RENDER = "render",
   EVENT_HANDLER = "event_handler",
@@ -32,8 +36,8 @@ export interface RenderLayer {
   render: (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any
+    config: TimelineConfig,
+    state: TimelineState
   ) => void;
 }
 
@@ -89,19 +93,21 @@ export interface CoreLayerHook {
   handler: (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any,
+    config: TimelineConfig,
+    state: TimelineState,
     next: () => void
   ) => void;
 }
+
+export type PluginEventHandler = (...args: any[]) => unknown;
 
 export interface PluginAPI {
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
   registerCoreLayerHook: (hook: CoreLayerHook) => void;
   unregisterCoreLayerHook: (name: string) => void;
-  registerEventHandler: (event: string, handler: Function) => void;
-  unregisterEventHandler: (event: string, handler: Function) => void;
+  registerEventHandler: (event: string, handler: PluginEventHandler) => void;
+  unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
   showNotification: (message: string, type?: "info" | "warning" | "error") => void;
   getData: (key: string) => any;
   setData: (key: string, value: any) => void;
@@ -110,12 +116,10 @@ export interface PluginAPI {
   getFPS: () => number;
 }
 
-import type { Timeline } from "../core/Timeline";
-
 export interface PluginContext {
   timeline: Timeline;
-  config: any;
-  state: any;
+  config: TimelineConfig;
+  state: TimelineState;
   api: PluginAPI;
 }
 
@@ -126,8 +130,6 @@ export interface TimelinePlugin {
   deactivate?: (context: PluginContext) => Promise<void> | void;
   destroy?: (context: PluginContext) => Promise<void> | void;
 }
-
-import type { PerformanceStats } from "../utils/performanceMonitor";
 
 export interface PerformanceProvider {
   startMeasurement: (name: string) => void;

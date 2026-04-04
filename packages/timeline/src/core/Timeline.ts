@@ -31,6 +31,7 @@ import { ErrorHandler } from "./managers/ErrorHandler";
 import { StateManager } from "./managers/StateManager";
 import { EventIndexManager } from "./managers/EventIndexManager";
 import { ChangeScheduler, type ChangeType } from "./managers/ChangeScheduler";
+import { HitTestService } from "./managers/HitTestService";
 // Built-in plugins are now optional external imports for tree-shaking.
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
 import { DarkThemePlugin } from "../plugins/builtin/DarkThemePlugin";
@@ -66,6 +67,7 @@ export class Timeline {
   private errorHandler: ErrorHandler;
   private stateManager: StateManager;
   private eventIndexManager: EventIndexManager;
+  private hitTestService: HitTestService;
   private changeScheduler: ChangeScheduler;
   private currentThemePluginId: string | null = null;
 
@@ -142,6 +144,11 @@ export class Timeline {
     this.stateManager = new StateManager(this.config);
     this.state = this.stateManager.state;
     this.eventIndexManager = new EventIndexManager(this.state);
+    this.hitTestService = new HitTestService(
+      this.config,
+      this.state,
+      this.eventIndexManager
+    );
 
     this.mouseHandler = new MouseHandler(this);
     this.wheelHandler = new WheelHandler(this);
@@ -188,7 +195,7 @@ export class Timeline {
     return this.canvas;
   }
 
-  public usePlugin(plugin: any): Promise<boolean> {
+  public usePlugin(plugin: TimelinePlugin): Promise<boolean> {
     return this.pluginManager.loadPlugin(plugin).then((ok) => {
       if (ok && plugin.metadata?.type === PluginType.THEME) {
         const id = `${plugin.metadata.name}@${plugin.metadata.version}`;
@@ -200,7 +207,7 @@ export class Timeline {
     });
   }
 
-  public getLoadedPlugins(): any[] {
+  public getLoadedPlugins(): TimelinePlugin[] {
     return this.pluginManager.getLoadedPlugins();
   }
 
@@ -219,8 +226,11 @@ export class Timeline {
 
   private async switchTheme(plugin: TimelinePlugin): Promise<boolean> {
     if (this.currentThemePluginId) {
-      await this.pluginManager.unloadPlugin(this.currentThemePluginId);
+      const unloaded = await this.pluginManager.unloadPlugin(
+        this.currentThemePluginId
+      );
       this.currentThemePluginId = null;
+      if (!unloaded) return false;
     }
     const id = `${plugin.metadata.name}@${plugin.metadata.version}`;
     const ok = await this.pluginManager.loadPlugin(plugin);
@@ -760,21 +770,11 @@ export class Timeline {
     this.notifyChange("timeIndicator:drag");
   }
 
-  /** 上一次边界滚动的时间戳 */
   private _lastEdgeScrollTime = 0;
-  /** 边界滚动节流间隔（ms） */
-  private static readonly EDGE_SCROLL_THROTTLE = 80;
-  /** 距画布边缘多少 px 内触发滚动 */
-  private static readonly EDGE_SCROLL_MARGIN = 30;
 
-  /**
-   * 拖拽过程中的节流边界滚动
-   * 仅当指示器距离画布边缘 < EDGE_SCROLL_MARGIN 时才调整 scrollX，
-   * 且受 EDGE_SCROLL_THROTTLE 节流。
-   */
   private scrollToTimeIndicatorThrottled(seconds: number): void {
     const now = performance.now();
-    if (now - this._lastEdgeScrollTime < Timeline.EDGE_SCROLL_THROTTLE) return;
+    if (now - this._lastEdgeScrollTime < this.getEdgeScrollThrottle()) return;
 
     const timeIndicatorX = getTimeX(
       seconds,
@@ -785,15 +785,17 @@ export class Timeline {
       this.state.scrollX
     );
     const canvasWidth = this.renderManager.getCanvasLogicalWidth();
-    const margin = Timeline.EDGE_SCROLL_MARGIN;
+    const triggerMargin = this.getEdgeScrollTriggerMargin();
 
-    if (timeIndicatorX >= margin && timeIndicatorX <= canvasWidth - margin) {
-      // 在安全区域内，无需滚动
+    if (
+      timeIndicatorX >= triggerMargin &&
+      timeIndicatorX <= canvasWidth - triggerMargin
+    ) {
       return;
     }
 
     this._lastEdgeScrollTime = now;
-    const scrollMargin = 50; // 滚动后保留的边距
+    const viewportMargin = this.getEdgeScrollViewportMargin();
     const timeAtZeroScroll = getTimeX(
       seconds,
       this.config.startTime,
@@ -806,15 +808,15 @@ export class Timeline {
       this.state.zoomLevel
     );
 
-    if (timeIndicatorX < margin) {
+    if (timeIndicatorX < triggerMargin) {
       this.state.scrollX = Math.max(
         0,
-        Math.min(maxScrollX, timeAtZeroScroll - scrollMargin)
+        Math.min(maxScrollX, timeAtZeroScroll - viewportMargin)
       );
     } else {
       this.state.scrollX = Math.max(
         0,
-        Math.min(maxScrollX, timeAtZeroScroll - (canvasWidth - scrollMargin))
+        Math.min(maxScrollX, timeAtZeroScroll - (canvasWidth - viewportMargin))
       );
     }
 
@@ -840,7 +842,7 @@ export class Timeline {
       this.state.scrollX
     );
     const canvasWidth = this.renderManager.getCanvasLogicalWidth();
-    const margin = 50;
+    const margin = this.getEdgeScrollViewportMargin();
     let needsScroll = false;
     if (timeIndicatorX < margin) {
       const targetScrollX =
@@ -874,7 +876,6 @@ export class Timeline {
       this.state.scrollX = Math.max(0, Math.min(maxScrollX, targetScrollX));
       needsScroll = true;
     }
-    // 仅在实际发生滚动时才标记所有层脏
     if (needsScroll) {
       this.markDirty([
         "background",
@@ -1021,248 +1022,49 @@ export class Timeline {
    * @param canvasY 画布坐标 Y（不含 scroll 偏移）
    */
   public getInteractionTarget(canvasX: number, canvasY: number): InteractionTarget {
-    const result: InteractionTarget = {
-      trackIndex: null,
-      eventIndex: null,
-      resizeEdge: null,
-    };
-
-    const logicalY = canvasY + this.state.scrollY;
-    if (logicalY < this.config.timelineHeight) return result;
-
-    const trackIndex = Math.floor(
-      (logicalY -
-        this.config.timelineHeight -
-        this.config.firstTrackTopMargin) /
-        (this.config.trackHeight + this.config.trackMargin)
-    );
-    if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return result;
-
-    result.trackIndex = trackIndex;
-    const track = this.state.tracks[trackIndex];
-    const eventVerticalPadding = Math.max(5, this.config.trackHeight * 0.0625);
-    const trackY =
-      this.config.timelineHeight +
-      this.config.firstTrackTopMargin +
-      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
-      this.state.scrollY;
-
-    if (
-      canvasY < trackY + eventVerticalPadding ||
-      canvasY > trackY + this.config.trackHeight - eventVerticalPadding
-    ) {
-      return result;
-    }
-
-    const mouseTime =
-      (canvasX + this.state.scrollX - this.config.startPaddingTime) /
-        (this.config.secondWidth * this.state.zoomLevel) +
-      this.config.startTime;
-
-    const handleWidth = this.config.resizeHandleWidth;
-    const margin =
-      handleWidth / (this.config.secondWidth * this.state.zoomLevel);
-
-    // 用较大的 margin 获取候选，同时满足 resize handle 和事件体需求
-    const candidates = this.eventIndexManager.getCandidatesByTime(
-      trackIndex,
-      mouseTime,
-      margin
-    );
-
-    if (candidates.length === 0) return result;
-
-    // O(n) max-scan：追踪最高 z-order（eventIndex 最大）的命中
-    let bestResizeIndex: number | null = null;
-    let bestResizeEdge: "left" | "right" | null = null;
-    let bestEventIndex: number | null = null;
-
-    for (const eventIndex of candidates) {
-      const event = track.events[eventIndex];
-      const eventX =
-        this.config.startPaddingTime +
-        (event.startTime - this.config.startTime) *
-          this.config.secondWidth *
-          this.state.zoomLevel -
-        this.state.scrollX;
-      const eventWidth =
-        event.duration * this.config.secondWidth * this.state.zoomLevel;
-
-      // 检测 resize handle（优先级高于事件体）
-      if (
-        canvasX >= eventX - handleWidth / 2 &&
-        canvasX <= eventX + handleWidth / 2
-      ) {
-        if (bestResizeIndex === null || eventIndex > bestResizeIndex) {
-          bestResizeIndex = eventIndex;
-          bestResizeEdge = "left";
-        }
-      } else if (
-        canvasX >= eventX + eventWidth - handleWidth / 2 &&
-        canvasX <= eventX + eventWidth + handleWidth / 2
-      ) {
-        if (bestResizeIndex === null || eventIndex > bestResizeIndex) {
-          bestResizeIndex = eventIndex;
-          bestResizeEdge = "right";
-        }
-      }
-
-      // 检测事件体
-      if (canvasX >= eventX && canvasX <= eventX + eventWidth) {
-        if (bestEventIndex === null || eventIndex > bestEventIndex) {
-          bestEventIndex = eventIndex;
-        }
-      }
-    }
-
-    // resize handle 优先级高于事件体
-    if (bestResizeIndex !== null) {
-      result.eventIndex = bestResizeIndex;
-      result.resizeEdge = bestResizeEdge;
-    } else if (bestEventIndex !== null) {
-      result.eventIndex = bestEventIndex;
-    }
-
-    return result;
+    return this.hitTestService.getInteractionTarget(canvasX, canvasY);
   }
 
   public getEventAtPosition(
     x: number,
     y: number
   ): { trackIndex: number; eventIndex: number } | null {
-    // 将画布坐标转换为逻辑坐标（考虑滚动偏移）
-    const logicalY = y + this.state.scrollY;
-    if (logicalY < this.config.timelineHeight) return null;
-    const trackIndex = Math.floor(
-      (logicalY -
-        this.config.timelineHeight -
-        this.config.firstTrackTopMargin) /
-        (this.config.trackHeight + this.config.trackMargin)
-    );
-    if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return null;
-    const track = this.state.tracks[trackIndex];
-    const eventVerticalPadding = Math.max(5, this.config.trackHeight * 0.0625);
-    const trackY =
-      this.config.timelineHeight +
-      this.config.firstTrackTopMargin +
-      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
-      this.state.scrollY;
-    if (
-      y < trackY + eventVerticalPadding ||
-      y > trackY + this.config.trackHeight - eventVerticalPadding
-    ) {
-      return null;
-    }
-    const mouseTime =
-      (x + this.state.scrollX - this.config.startPaddingTime) /
-        (this.config.secondWidth * this.state.zoomLevel) +
-      this.config.startTime;
-    const candidates = this.eventIndexManager.getCandidatesByTime(
-      trackIndex,
-      mouseTime,
-      0
-    );
-
-    if (candidates.length > 0) {
-      // O(n) max-scan 替代 sort：找到 eventIndex 最大（z-order 最高）的命中
-      let bestHit: number | null = null;
-      for (const eventIndex of candidates) {
-        const event = track.events[eventIndex];
-        const eventX =
-          this.config.startPaddingTime +
-          (event.startTime - this.config.startTime) *
-            this.config.secondWidth *
-            this.state.zoomLevel -
-          this.state.scrollX;
-        const eventWidth =
-          event.duration * this.config.secondWidth * this.state.zoomLevel;
-
-        if (x >= eventX && x <= eventX + eventWidth) {
-          if (bestHit === null || eventIndex > bestHit) {
-            bestHit = eventIndex;
-          }
-        }
-      }
-      if (bestHit !== null) {
-        return { trackIndex, eventIndex: bestHit };
-      }
-    }
-    return null;
+    return this.hitTestService.getEventAtPosition(x, y);
   }
 
   public getResizeHandle(
     x: number,
     y: number
   ): { trackIndex: number; eventIndex: number; edge: "left" | "right" } | null {
-    // 将画布坐标转换为逻辑坐标（考虑滚动偏移）
-    const logicalY = y + this.state.scrollY;
-    if (logicalY < this.config.timelineHeight) return null;
-    const trackIndex = Math.floor(
-      (logicalY -
-        this.config.timelineHeight -
-        this.config.firstTrackTopMargin) /
-        (this.config.trackHeight + this.config.trackMargin)
+    return this.hitTestService.getResizeHandle(x, y);
+  }
+
+  private getEdgeScrollThrottle(): number {
+    return this.resolveEdgeScrollValue(
+      this.config.edgeScrollThrottle,
+      DEFAULT_CONFIG.edgeScrollThrottle
     );
-    if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return null;
-    const track = this.state.tracks[trackIndex];
-    const handleWidth = this.config.resizeHandleWidth;
-    const eventVerticalPadding = Math.max(5, this.config.trackHeight * 0.0625);
-    const trackY =
-      this.config.timelineHeight +
-      this.config.firstTrackTopMargin +
-      trackIndex * (this.config.trackHeight + this.config.trackMargin) -
-      this.state.scrollY;
-    if (
-      y < trackY + eventVerticalPadding ||
-      y > trackY + this.config.trackHeight - eventVerticalPadding
-    ) {
-      return null;
-    }
-    const mouseTime =
-      (x + this.state.scrollX - this.config.startPaddingTime) /
-        (this.config.secondWidth * this.state.zoomLevel) +
-      this.config.startTime;
-    const margin =
-      handleWidth / (this.config.secondWidth * this.state.zoomLevel);
-    const candidates = this.eventIndexManager.getCandidatesByTime(
-      trackIndex,
-      mouseTime,
-      margin
+  }
+
+  private getEdgeScrollTriggerMargin(): number {
+    return this.resolveEdgeScrollValue(
+      this.config.edgeScrollTriggerMargin,
+      DEFAULT_CONFIG.edgeScrollTriggerMargin
     );
-    if (candidates.length > 0) {
-      // O(n) max-scan 替代 sort：找到 eventIndex 最大（z-order 最高）的 resize handle 命中
-      let bestIndex: number | null = null;
-      let bestEdge: "left" | "right" | null = null;
-      for (const eventIndex of candidates) {
-        const event = track.events[eventIndex];
-        const eventX =
-          this.config.startPaddingTime +
-          (event.startTime - this.config.startTime) *
-            this.config.secondWidth *
-            this.state.zoomLevel -
-          this.state.scrollX;
-        const eventWidth =
-          event.duration * this.config.secondWidth * this.state.zoomLevel;
-        if (x >= eventX - handleWidth / 2 && x <= eventX + handleWidth / 2) {
-          if (bestIndex === null || eventIndex > bestIndex) {
-            bestIndex = eventIndex;
-            bestEdge = "left";
-          }
-        } else if (
-          x >= eventX + eventWidth - handleWidth / 2 &&
-          x <= eventX + eventWidth + handleWidth / 2
-        ) {
-          if (bestIndex === null || eventIndex > bestIndex) {
-            bestIndex = eventIndex;
-            bestEdge = "right";
-          }
-        }
-      }
-      if (bestIndex !== null) {
-        return { trackIndex, eventIndex: bestIndex, edge: bestEdge! };
-      }
+  }
+
+  private getEdgeScrollViewportMargin(): number {
+    return this.resolveEdgeScrollValue(
+      this.config.edgeScrollViewportMargin,
+      DEFAULT_CONFIG.edgeScrollViewportMargin
+    );
+  }
+
+  private resolveEdgeScrollValue(value: number, fallback: number): number {
+    if (!Number.isFinite(value) || value < 0) {
+      return fallback;
     }
-    return null;
+    return value;
   }
 
   public calculateGuideLines(
