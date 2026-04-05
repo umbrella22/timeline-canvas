@@ -69,8 +69,8 @@ function createLayerCanvas(
       const canvas = new OffscreenCanvas(width, height);
       const ctx = canvas.getContext("2d");
       if (ctx) return { canvas, ctx };
-    } catch {
-      // 降级
+    } catch (error) {
+      logger.debug("Failed to create OffscreenCanvas buffer, fallback to DOM canvas", error);
     }
   }
   // 降级：不可见的 <canvas> 元素
@@ -174,14 +174,18 @@ export class LayerBufferManager {
   /**
    * 将所有缓冲层按合成顺序 drawImage 到主 canvas
    */
-  compositeToMain(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number): void {
+  compositeToMain(
+    ctx: CanvasRenderingContext2D,
+    canvasWidth: number,
+    canvasHeight: number
+  ): void {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     for (const id of COMPOSITE_ORDER) {
       const buf = this.buffers.get(id);
       if (buf) {
-        ctx.drawImage(buf.canvas as any, 0, 0);
+        ctx.drawImage(buf.canvas, 0, 0);
       }
     }
     ctx.restore();

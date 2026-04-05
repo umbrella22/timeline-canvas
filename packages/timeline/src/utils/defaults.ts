@@ -63,9 +63,9 @@ export const DEFAULT_EVENT_BLOCK_STYLE: EventBlockStyle = {
 };
 
 export const DEFAULT_CONTEXT_MENU_ITEMS: ContextMenuItem[] = [
-  { type: "edit", name: "编辑" },
-  { type: "delete", name: "删除" },
-  { type: "export", name: "导出" },
+  { type: "edit", name: "Edit" },
+  { type: "delete", name: "Delete" },
+  { type: "export", name: "Export" },
 ];
 
 export const DEFAULT_CONTEXT_MENU_STYLE: ContextMenuStyle = {
@@ -124,6 +124,7 @@ export const DEFAULT_CONFIG: Omit<
   autoRemoveEmptyLastTrack: true,
   readOnly: false,
   showEventDurationLabel: true,
+  eventDurationPrefix: "Duration",
   formatEventDuration: null,
   scale: null,
   scaleSplitCount: 10,

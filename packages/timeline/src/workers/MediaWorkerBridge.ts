@@ -10,6 +10,8 @@
  */
 
 import type {
+  ImageDecodePayload,
+  ImageTilePayload,
   MediaTaskType,
   MediaTaskRequest,
   MediaTaskResult,
@@ -87,7 +89,7 @@ export class MediaWorkerBridge {
    */
   requestBitmap(
     type: MediaTaskType,
-    payload: any,
+    payload: WaveformPayload | ImageDecodePayload | ImageTilePayload,
     priority: TaskPriority = "normal"
   ): Promise<ImageBitmap> {
     return new Promise((resolve, reject) => {
@@ -141,7 +143,7 @@ export class MediaWorkerBridge {
    */
   cancelTasksForEvent(eventId: number): void {
     this.taskQueue = this.taskQueue.filter((t) => {
-      if ((t.payload as any).eventId === eventId) {
+      if (t.payload.eventId === eventId) {
         const pending = this.pendingTasks.get(t.taskId);
         if (pending) {
           pending.reject(new Error("Task cancelled"));
@@ -209,7 +211,10 @@ export class MediaWorkerBridge {
    * 检查 Worker 是否可用
    */
   static isSupported(): boolean {
-    return typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
+    return (
+      typeof Worker !== "undefined" &&
+      typeof OffscreenCanvas !== "undefined"
+    );
   }
 
   /**

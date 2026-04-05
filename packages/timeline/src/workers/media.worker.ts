@@ -10,12 +10,18 @@
  */
 
 import type {
+  ImageTilePayload,
   MediaTaskRequest,
   MediaTaskResult,
   MediaTaskError,
   WaveformPayload,
   ImageDecodePayload,
 } from "./types";
+
+const postMessageToWorker = globalThis.postMessage as (
+  message: MediaTaskResult | MediaTaskError,
+  transfer?: Transferable[]
+) => void;
 
 /**
  * 从波形数据生成位图
@@ -83,7 +89,7 @@ async function decodeAndResizeImage(
  */
 function buildCacheKey(
   type: string,
-  payload: WaveformPayload | ImageDecodePayload | any
+  payload: WaveformPayload | ImageDecodePayload | ImageTilePayload
 ): string {
   if (type === "waveform") {
     const p = payload as WaveformPayload;
@@ -93,7 +99,8 @@ function buildCacheKey(
     const p = payload as ImageDecodePayload;
     return `img_${p.eventId}_${p.src}_${p.targetWidth}_${p.targetHeight}_z${p.zoomBucket}`;
   }
-  return `tile_${payload.eventId}_${payload.tileIndex}_z${payload.zoomBucket}`;
+  const p = payload as ImageTilePayload;
+  return `tile_${p.eventId}_${p.tileIndex}_z${p.zoomBucket}`;
 }
 
 // Worker 消息处理
@@ -122,13 +129,16 @@ self.onmessage = async (e: MessageEvent<MediaTaskRequest>) => {
     const result: MediaTaskResult = { taskId, type, bitmap, cacheKey };
 
     // ImageBitmap 通过 Transferable 零拷贝传回
-    (self as any).postMessage(result, [bitmap]);
-  } catch (err: any) {
+    postMessageToWorker(result, [bitmap]);
+  } catch (caughtError) {
     const error: MediaTaskError = {
       taskId,
       type,
-      error: err?.message || String(err),
+      error:
+        caughtError instanceof Error
+          ? caughtError.message
+          : String(caughtError),
     };
-    (self as any).postMessage(error);
+    postMessageToWorker(error);
   }
 };

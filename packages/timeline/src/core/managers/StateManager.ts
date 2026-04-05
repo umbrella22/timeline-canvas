@@ -38,7 +38,7 @@ export class StateManager {
       lastClickTime: 0,
       lastClickEvent: null,
       hoveredSplitLine: null,
-      statusText: "就绪",
+      statusText: "Ready",
       contextMenuBounds: null,
       lastDrawTime: 0,
     };

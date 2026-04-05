@@ -34,6 +34,8 @@ describe("public type regressions", () => {
       .parameters.toEqualTypeOf<[RenderLayer]>();
     expectTypeOf<PluginContext["api"]["registerCoreLayerHook"]>()
       .parameters.toEqualTypeOf<[CoreLayerHook]>();
+    expectTypeOf<PluginContext["api"]["getData"]>()
+      .returns.toEqualTypeOf<unknown>();
   });
 
   it("保留配置、回调与变更类型导出", () => {
@@ -45,6 +47,8 @@ describe("public type regressions", () => {
     >().parameters.toEqualTypeOf<[TimeIndicatorHighlightData]>();
     expectTypeOf<TimelineOptions["theme"]>()
       .toEqualTypeOf<TimelinePlugin | undefined>();
+    expectTypeOf<TimelineOptions["eventDurationPrefix"]>()
+      .toEqualTypeOf<string | undefined>();
     expectTypeOf<TimelineConfig["formatEventDuration"]>()
       .toEqualTypeOf<((duration: number) => string) | null>();
   });

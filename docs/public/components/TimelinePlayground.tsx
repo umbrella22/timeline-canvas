@@ -153,7 +153,7 @@ const getText = (lang: TimelinePlaygroundLang) => {
       shiftMorningDesc: 'Morning work block',
       shiftNight: 'Night Shift',
       shiftNightDesc: 'Night work block',
-      readonlyEvent: 'Read-only Event',
+      readonlyEvent: 'Read-only Event - Media Event',
       mutexExample: 'Mutex Example',
       menuEdit: '✏️ Edit',
       menuDuplicate: '📋 Duplicate',
@@ -199,7 +199,7 @@ const getText = (lang: TimelinePlaygroundLang) => {
     shiftMorningDesc: '上午工作时段',
     shiftNight: '夜班',
     shiftNightDesc: '夜间工作时段',
-    readonlyEvent: '只读事件',
+    readonlyEvent: '只读事件-媒体事件',
     mutexExample: '互斥示例',
     menuEdit: '✏️ 编辑',
     menuDuplicate: '📋 复制',
@@ -326,15 +326,12 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                             endTime: 900,
                             title: t.shiftMorning,
                             description: t.shiftMorningDesc,
-                            customData: { priority: "high" },
-                            media: { images: [{ src: "https://picsum.photos/200/300", fit: "contain", opacity: 0.35 }] }
                         },
                         {
                             startTime: 1800,
                             endTime: 3600,
                             title: t.shiftNight,
                             description: t.shiftNightDesc,
-                            customData: { priority: "normal" }
                         }
                     ]
                 },
@@ -345,7 +342,7 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                             endTime: 900,
                             title: t.readonlyEvent,
                             readonly: true,
-                            media: { waveform: { data: waveformData, color: "#FF7F00", backgroundColor: "rgba(255,255,255,0.03)", opacity: 0.5 } }
+                            media: { waveform: { data: waveformData, color: "#FF7F00", opacity: 0.5 } }
                         },
                         {
                             startTime: 1200,

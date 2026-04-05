@@ -149,7 +149,7 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
         ctx.fillStyle = "#00FF00";
         ctx.font = "bold 16px monospace";
         ctx.textAlign = "left";
-        ctx.fillText("性能监控报告", pos.x + 10, pos.y + 20);
+        ctx.fillText("Performance Monitor", pos.x + 10, pos.y + 20);
         let yOffset = pos.y + 20 + headerHeight;
         ctx.fillStyle =
           fps >= 55 ? "#00FF00" : fps >= 30 ? "#FFFF00" : "#FF0000";

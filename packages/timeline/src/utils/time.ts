@@ -63,7 +63,13 @@ export function formatTimeRange(startTime: number, endTime: number): string {
   return `${formatTime(startTime)} - ${formatTime(endTime)}`;
 }
 
-export function formatDuration(duration: number): string {
+export function formatDuration(duration: number, label?: string): string {
   const accurateDuration = fixFloatPrecision(duration);
-  return `持续 ${formatTime(accurateDuration)}`;
+  const formattedDuration = formatTime(accurateDuration);
+
+  if (!label) {
+    return formattedDuration;
+  }
+
+  return `${label} ${formattedDuration}`;
 }

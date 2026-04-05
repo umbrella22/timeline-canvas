@@ -15,7 +15,7 @@ const lightColors = {
   eventText: "#FFFFFF",
   eventBorder: "#FFFFFF",
   eventBorderSelected: "#3F76FC",
-  eventOverlay: "rgba(255, 255, 255, 0.2)",
+  eventOverlay: "rgba(63, 118, 252, 0.12)",
   dragPreviewValid: "rgba(100, 255, 100, 0.5)",
   dragPreviewInvalid: "rgba(255, 100, 100, 0.5)",
   dragPreviewBorderValid: "#00FF00",

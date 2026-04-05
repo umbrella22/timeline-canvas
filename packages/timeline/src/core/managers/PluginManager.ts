@@ -13,15 +13,23 @@ import { ErrorHandler } from "./ErrorHandler";
 import { getLogger } from "./Logger";
 
 export class PluginManager {
+  private pluginResources: Map<string, PluginResources> = new Map();
+  private pluginMetadata: Map<string, TimelinePlugin["metadata"]> = new Map();
   private plugins: Map<
     string,
     { plugin: TimelinePlugin; context: PluginContext; active: boolean }
   > = new Map();
-  private eventHandlers: Map<string, PluginEventHandler[]> = new Map();
+  private eventHandlers: Map<string, RegisteredEventHandler[]> = new Map();
   private renderLayers: Map<string, RenderLayer> = new Map();
+  private renderLayerOwners: Map<string, string> = new Map();
+  private renderLayerOrder: Map<string, number> = new Map();
   private coreLayerHooks: Map<string, CoreLayerHook> = new Map();
+  private coreLayerHookOwners: Map<string, string> = new Map();
+  private coreLayerHookOrder: Map<string, number> = new Map();
   private pluginData: Map<string, Map<string, unknown>> = new Map();
   private performanceProvider: PerformanceProvider | undefined;
+  private performanceProviderOwner: string | undefined;
+  private registrationOrder = 0;
 
   constructor(
     private baseContext: Omit<PluginContext, "api">,
@@ -34,14 +42,40 @@ export class PluginManager {
     const { name, version } = plugin.metadata;
     const pluginId = `${name}@${version}`;
     if (this.plugins.has(pluginId)) return false;
+    if (!this.areDependenciesLoaded(plugin.metadata.dependencies)) {
+      return this.errorHandler.fail(
+        this.baseContext.config.debug,
+        `Plugin dependencies missing: ${pluginId}`,
+        new Error(
+          `Missing dependencies: ${plugin.metadata.dependencies?.join(", ")}`
+        )
+      );
+    }
 
+    this.pluginMetadata.set(pluginId, plugin.metadata);
     const ctx = this.createPluginContext(pluginId);
+    let initStarted = false;
+    let activateStarted = false;
+
     try {
-      if (plugin.init) await plugin.init(ctx);
-      if (plugin.activate) await plugin.activate(ctx);
+      if (plugin.init) {
+        initStarted = true;
+        await plugin.init(ctx);
+      }
+      if (plugin.activate) {
+        activateStarted = true;
+        await plugin.activate(ctx);
+      }
       this.plugins.set(pluginId, { plugin, context: ctx, active: true });
       return true;
     } catch (error) {
+      await this.rollbackFailedLoad(
+        pluginId,
+        plugin,
+        ctx,
+        initStarted,
+        activateStarted
+      );
       this.cleanupPluginResources(pluginId);
       return this.errorHandler.fail(
         this.baseContext.config.debug,
@@ -54,26 +88,86 @@ export class PluginManager {
   async unloadPlugin(pluginId: string): Promise<boolean> {
     const entry = this.plugins.get(pluginId);
     if (!entry) return false;
-    let success = true;
+    let success = await this.runLifecycleStep(
+      pluginId,
+      "deactivate",
+      entry.plugin.deactivate,
+      entry.context
+    );
+
+    const destroySucceeded = await this.runLifecycleStep(
+      pluginId,
+      "destroy",
+      entry.plugin.destroy,
+      entry.context
+    );
+
+    if (!destroySucceeded) {
+      success = false;
+    }
+
     try {
-      if (entry.plugin.deactivate) await entry.plugin.deactivate(entry.context);
-      if (entry.plugin.destroy) await entry.plugin.destroy(entry.context);
-    } catch (error) {
-      success = this.errorHandler.fail(
-        this.baseContext.config.debug,
-        `Plugin unload failed: ${pluginId}`,
-        error
-      );
+      return success;
     } finally {
       this.cleanupPluginResources(pluginId);
       this.plugins.delete(pluginId);
     }
-    return success;
+  }
+
+  private async rollbackFailedLoad(
+    pluginId: string,
+    plugin: TimelinePlugin,
+    context: PluginContext,
+    initStarted: boolean,
+    activateStarted: boolean
+  ): Promise<void> {
+    if (activateStarted) {
+      await this.runLifecycleStep(
+        pluginId,
+        "rollback deactivate",
+        plugin.deactivate,
+        context
+      );
+    }
+
+    if (initStarted || activateStarted) {
+      await this.runLifecycleStep(
+        pluginId,
+        "rollback destroy",
+        plugin.destroy,
+        context
+      );
+    }
+  }
+
+  private async runLifecycleStep(
+    pluginId: string,
+    step: string,
+    lifecycle:
+      | ((context: PluginContext) => Promise<void> | void)
+      | undefined,
+    context: PluginContext
+  ): Promise<boolean> {
+    if (!lifecycle) {
+      return true;
+    }
+
+    try {
+      await lifecycle(context);
+      return true;
+    } catch (error) {
+      return this.errorHandler.fail(
+        this.baseContext.config.debug,
+        `Plugin ${step} failed: ${pluginId}`,
+        error
+      );
+    }
   }
 
   private createPluginContext(pluginId: string): PluginContext {
     const store = new Map<string, unknown>();
     this.pluginData.set(pluginId, store);
+    this.pluginResources.set(pluginId, this.createPluginResources());
 
     const api: PluginAPI = {
       registerRenderLayer: (layer: RenderLayer) =>
@@ -105,9 +199,10 @@ export class PluginManager {
         }
       },
       getData: (key: string) => store.get(key),
-      setData: (key: string, value: any) => store.set(key, value),
+      setData: (key: string, value: unknown) => store.set(key, value),
       setPerformanceProvider: (provider: PerformanceProvider) => {
         this.performanceProvider = provider;
+        this.performanceProviderOwner = pluginId;
       },
       getPerformanceStats: () => {
         return this.performanceProvider
@@ -123,53 +218,105 @@ export class PluginManager {
   }
 
   private registerEventHandler(
-    _pluginId: string,
+    pluginId: string,
     event: string,
     handler: PluginEventHandler
   ): void {
     const list = this.eventHandlers.get(event) || [];
-    list.push(handler);
+    list.push({
+      pluginId,
+      handler,
+      priority: this.getPluginPriority(pluginId),
+      order: this.nextRegistrationOrder(),
+    });
+    list.sort((a, b) => {
+      if (b.priority !== a.priority) {
+        return b.priority - a.priority;
+      }
+      return a.order - b.order;
+    });
     this.eventHandlers.set(event, list);
+
+    const resources = this.getPluginResources(pluginId);
+    const handlers = resources.eventHandlers.get(event) ?? new Set();
+    handlers.add(handler);
+    resources.eventHandlers.set(event, handlers);
   }
 
   private unregisterEventHandler(
-    _pluginId: string,
+    pluginId: string,
     event: string,
     handler: PluginEventHandler
   ): void {
     const list = this.eventHandlers.get(event);
     if (!list) return;
-    const idx = list.indexOf(handler);
-    if (idx >= 0) list.splice(idx, 1);
-    this.eventHandlers.set(event, list);
+
+    const nextList = list.filter((entry) => {
+      return !(entry.pluginId === pluginId && entry.handler === handler);
+    });
+
+    if (nextList.length === 0) {
+      this.eventHandlers.delete(event);
+    } else {
+      this.eventHandlers.set(event, nextList);
+    }
+
+    const resources = this.pluginResources.get(pluginId);
+    const handlers = resources?.eventHandlers.get(event);
+    if (!handlers) return;
+    handlers.delete(handler);
+    if (handlers.size === 0) {
+      resources?.eventHandlers.delete(event);
+    }
   }
 
-  private registerRenderLayer(_pluginId: string, layer: RenderLayer): void {
+  private registerRenderLayer(pluginId: string, layer: RenderLayer): void {
+    this.reassignRenderLayerOwner(layer.name, pluginId);
     this.renderLayers.set(layer.name, layer);
+    this.renderLayerOwners.set(layer.name, pluginId);
+    this.renderLayerOrder.set(layer.name, this.nextRegistrationOrder());
+    this.getPluginResources(pluginId).renderLayers.add(layer.name);
   }
 
-  private unregisterRenderLayer(_pluginId: string, name: string): void {
+  private unregisterRenderLayer(pluginId: string, name: string): void {
+    if (this.renderLayerOwners.get(name) !== pluginId) {
+      return;
+    }
     this.renderLayers.delete(name);
+    this.renderLayerOwners.delete(name);
+    this.renderLayerOrder.delete(name);
+    this.pluginResources.get(pluginId)?.renderLayers.delete(name);
   }
 
   private registerCoreLayerHook(
-    _pluginId: string,
+    pluginId: string,
     hook: CoreLayerHook
   ): void {
+    this.reassignCoreLayerHookOwner(hook.name, pluginId);
     this.coreLayerHooks.set(hook.name, hook);
+    this.coreLayerHookOwners.set(hook.name, pluginId);
+    this.coreLayerHookOrder.set(hook.name, this.nextRegistrationOrder());
+    this.getPluginResources(pluginId).coreLayerHooks.add(hook.name);
   }
 
-  private unregisterCoreLayerHook(_pluginId: string, name: string): void {
+  private unregisterCoreLayerHook(pluginId: string, name: string): void {
+    if (this.coreLayerHookOwners.get(name) !== pluginId) {
+      return;
+    }
     this.coreLayerHooks.delete(name);
+    this.coreLayerHookOwners.delete(name);
+    this.coreLayerHookOrder.delete(name);
+    this.pluginResources.get(pluginId)?.coreLayerHooks.delete(name);
   }
 
   /**
    * 获取指定核心渲染层的所有钩子
    */
   getCoreLayerHooks(target: CoreRenderTarget): CoreLayerHook[] {
-    return Array.from(this.coreLayerHooks.values()).filter(
-      (h) => h.target === target
-    );
+    return Array.from(this.coreLayerHooks.entries())
+      .filter(([, hook]) => hook.target === target)
+      .sort(([nameA], [nameB]) => this.compareOwnedResources(nameA, nameB))
+      .map(([, hook]) => hook);
   }
 
   /**
@@ -183,25 +330,55 @@ export class PluginManager {
   }
 
   private cleanupPluginResources(pluginId: string): void {
-    // 清理插件私有数据
+    const resources = this.pluginResources.get(pluginId);
+
+    if (resources) {
+      for (const [event, handlers] of resources.eventHandlers) {
+        const list = this.eventHandlers.get(event);
+        if (!list) continue;
+
+        const nextList = list.filter((entry) => {
+          return !(entry.pluginId === pluginId && handlers.has(entry.handler));
+        });
+
+        if (nextList.length === 0) {
+          this.eventHandlers.delete(event);
+        } else {
+          this.eventHandlers.set(event, nextList);
+        }
+      }
+
+      for (const name of resources.renderLayers) {
+        if (this.renderLayerOwners.get(name) !== pluginId) continue;
+        this.renderLayers.delete(name);
+        this.renderLayerOwners.delete(name);
+        this.renderLayerOrder.delete(name);
+      }
+
+      for (const name of resources.coreLayerHooks) {
+        if (this.coreLayerHookOwners.get(name) !== pluginId) continue;
+        this.coreLayerHooks.delete(name);
+        this.coreLayerHookOwners.delete(name);
+        this.coreLayerHookOrder.delete(name);
+      }
+    }
+
+    if (this.performanceProviderOwner === pluginId) {
+      this.performanceProvider = undefined;
+      this.performanceProviderOwner = undefined;
+    }
+
     this.pluginData.delete(pluginId);
-    // 渲染层按名称由插件在 destroy 时自行清理；这里作为兜底删除其命名空间前缀的层
-    for (const [name] of this.renderLayers) {
-      if (name.startsWith(pluginId)) this.renderLayers.delete(name);
-    }
-    // 清理核心层钩子
-    for (const [name] of this.coreLayerHooks) {
-      if (name.startsWith(pluginId)) this.coreLayerHooks.delete(name);
-    }
-    // 事件处理器无需全局清理（弱引用策略），由插件管理
+    this.pluginMetadata.delete(pluginId);
+    this.pluginResources.delete(pluginId);
   }
 
   emitEvent(event: string, ...args: unknown[]): void {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return;
-    for (const fn of list) {
+    for (const entry of list) {
       try {
-        fn(...args);
+        entry.handler(...args);
       } catch (error) {
         this.errorHandler.debugIf(
           this.baseContext.config.debug,
@@ -215,9 +392,9 @@ export class PluginManager {
   validateEvent(event: string, ...args: unknown[]): boolean {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return true;
-    for (const fn of list) {
+    for (const entry of list) {
       try {
-        const r = fn(...args);
+        const r = entry.handler(...args);
         if (r === false) return false;
       } catch (error) {
         this.errorHandler.debugIf(
@@ -254,9 +431,10 @@ export class PluginManager {
   }
 
   private layersByPosition(pos: "background" | "overlay"): RenderLayer[] {
-    return Array.from(this.renderLayers.values()).filter(
-      (l) => l.position === pos
-    );
+    return Array.from(this.renderLayers.entries())
+      .filter(([, layer]) => layer.position === pos)
+      .sort(([nameA], [nameB]) => this.compareOwnedResources(nameA, nameB))
+      .map(([, layer]) => layer);
   }
 
   getLoadedPlugins(): TimelinePlugin[] {
@@ -280,4 +458,95 @@ export class PluginManager {
   measureEnd(name: string): void {
     if (this.performanceProvider) this.performanceProvider.endMeasurement(name);
   }
+
+  private createPluginResources(): PluginResources {
+    return {
+      eventHandlers: new Map(),
+      renderLayers: new Set(),
+      coreLayerHooks: new Set(),
+    };
+  }
+
+  private getPluginResources(pluginId: string): PluginResources {
+    let resources = this.pluginResources.get(pluginId);
+    if (resources) {
+      return resources;
+    }
+
+    resources = this.createPluginResources();
+    this.pluginResources.set(pluginId, resources);
+    return resources;
+  }
+
+  private reassignRenderLayerOwner(name: string, pluginId: string): void {
+    const previousOwner = this.renderLayerOwners.get(name);
+    if (!previousOwner || previousOwner === pluginId) {
+      return;
+    }
+
+    this.pluginResources.get(previousOwner)?.renderLayers.delete(name);
+  }
+
+  private reassignCoreLayerHookOwner(name: string, pluginId: string): void {
+    const previousOwner = this.coreLayerHookOwners.get(name);
+    if (!previousOwner || previousOwner === pluginId) {
+      return;
+    }
+
+    this.pluginResources.get(previousOwner)?.coreLayerHooks.delete(name);
+  }
+
+  private areDependenciesLoaded(dependencies?: string[]): boolean {
+    if (!dependencies || dependencies.length === 0) {
+      return true;
+    }
+
+    return dependencies.every((dependency) => {
+      if (this.plugins.has(dependency)) {
+        return true;
+      }
+      return this.isPluginLoaded(dependency);
+    });
+  }
+
+  private getPluginPriority(pluginId: string): number {
+    return this.pluginMetadata.get(pluginId)?.priority ?? 0;
+  }
+
+  private nextRegistrationOrder(): number {
+    const current = this.registrationOrder;
+    this.registrationOrder += 1;
+    return current;
+  }
+
+  private compareOwnedResources(nameA: string, nameB: string): number {
+    const ownerA =
+      this.renderLayerOwners.get(nameA) ?? this.coreLayerHookOwners.get(nameA);
+    const ownerB =
+      this.renderLayerOwners.get(nameB) ?? this.coreLayerHookOwners.get(nameB);
+    const priorityA = ownerA ? this.getPluginPriority(ownerA) : 0;
+    const priorityB = ownerB ? this.getPluginPriority(ownerB) : 0;
+    if (priorityB !== priorityA) {
+      return priorityB - priorityA;
+    }
+
+    const orderA =
+      this.renderLayerOrder.get(nameA) ?? this.coreLayerHookOrder.get(nameA) ?? 0;
+    const orderB =
+      this.renderLayerOrder.get(nameB) ?? this.coreLayerHookOrder.get(nameB) ?? 0;
+    return orderA - orderB;
+  }
+}
+
+interface RegisteredEventHandler {
+  pluginId: string;
+  handler: PluginEventHandler;
+  priority: number;
+  order: number;
+}
+
+interface PluginResources {
+  eventHandlers: Map<string, Set<PluginEventHandler>>;
+  renderLayers: Set<string>;
+  coreLayerHooks: Set<string>;
 }

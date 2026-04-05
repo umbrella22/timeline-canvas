@@ -20,7 +20,8 @@ describe("time utils", () => {
     expect(formatTime(3661.4, false)).toBe("01:01");
     expect(formatTimeRange(1, 61)).toBe("00:00:01 - 00:01:01");
     expect(fixFloatPrecision(0.1 + 0.2, 2)).toBe(0.3);
-    expect(formatDuration(65.4321)).toBe("持续 00:01:05");
+    expect(formatDuration(65.4321)).toBe("00:01:05");
+    expect(formatDuration(65.4321, "持续")).toBe("持续 00:01:05");
   });
 
   it("根据缩放级别选择秒级与自定义刻度吸附间隔", () => {

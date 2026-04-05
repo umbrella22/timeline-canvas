@@ -1,5 +1,6 @@
 import type { RenderContext } from "../core/types";
 import type { PluginManager } from "../../core/managers/PluginManager";
+import type { EventTextStyle, TimelineEvent } from "../../types";
 import {
   formatTime,
   formatTimeRange,
@@ -108,54 +109,6 @@ export class EventsRenderer {
           eventHeight
         );
       }
-      if (shouldHighlight) {
-        ctx.strokeStyle = config.colors.eventBorderSelected;
-        ctx.lineWidth = 2;
-        if (config.eventBlockStyle.enableSelectionGlow) {
-          ctx.shadowColor = config.colors.eventBorderSelected;
-          ctx.shadowBlur = config.eventBlockStyle.selectionGlowBlur;
-        }
-        if (borderRadius > 0) {
-          drawRoundedRect(
-            ctx,
-            eventX,
-            trackY + eventVerticalPadding,
-            eventWidth,
-            eventHeight,
-            borderRadius
-          );
-          ctx.stroke();
-        } else {
-          ctx.strokeRect(
-            eventX,
-            trackY + eventVerticalPadding,
-            eventWidth,
-            eventHeight
-          );
-        }
-        ctx.shadowBlur = 0;
-      }
-      if (shouldHighlight) {
-        ctx.fillStyle = config.colors.eventOverlay;
-        if (borderRadius > 0) {
-          drawRoundedRect(
-            ctx,
-            eventX,
-            trackY + eventVerticalPadding,
-            eventWidth,
-            eventHeight,
-            borderRadius
-          );
-          ctx.fill();
-        } else {
-          ctx.fillRect(
-            eventX,
-            trackY + eventVerticalPadding,
-            eventWidth,
-            eventHeight
-          );
-        }
-      }
       ctx.restore();
       if (pluginManager) {
         pluginManager.emitEvent(
@@ -172,6 +125,35 @@ export class EventsRenderer {
           eventVerticalPadding,
           eventHeight
         );
+      }
+      if (shouldHighlight) {
+        ctx.save();
+        ctx.strokeStyle = config.colors.eventBorderSelected;
+        ctx.lineWidth = 2;
+        if (config.eventBlockStyle.enableSelectionGlow) {
+          ctx.shadowColor = config.colors.eventBorderSelected;
+          ctx.shadowBlur = config.eventBlockStyle.selectionGlowBlur;
+        }
+        if (borderRadius > 0) {
+          drawRoundedRect(
+            ctx,
+            eventX,
+            trackY + eventVerticalPadding,
+            eventWidth,
+            eventHeight,
+            borderRadius,
+            true
+          );
+        } else {
+          ctx.strokeRect(
+            eventX,
+            trackY + eventVerticalPadding,
+            eventWidth,
+            eventHeight
+          );
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
       }
       this.drawEventText(
         ctx,
@@ -262,14 +244,14 @@ export class EventsRenderer {
   private drawEventText(
     ctx: CanvasRenderingContext2D,
     config: RenderContext["config"],
-    event: any,
+    event: TimelineEvent,
     eventX: number,
     trackY: number,
     eventWidth: number,
     eventVerticalPadding: number,
     titleFontSize: number,
     timeFontSize: number,
-    textStyle: any
+    textStyle: EventTextStyle
   ): void {
     const titleColor = textStyle.titleColor || config.colors.eventText;
     const timeColor = textStyle.timeColor || config.colors.eventText;
@@ -417,7 +399,7 @@ export class EventsRenderer {
       ctx.fillStyle = "rgba(255, 255, 0, 1)";
       ctx.textAlign = "center";
       ctx.fillText(
-        `切割: ${splitTimeText}`,
+        `Split: ${splitTimeText}`,
         splitX,
         trackY + eventVerticalPadding - 5
       );
@@ -428,7 +410,7 @@ export class EventsRenderer {
   private drawEventDurationLabel(
     ctx: CanvasRenderingContext2D,
     config: RenderContext["config"],
-    event: any,
+    event: TimelineEvent,
     eventX: number,
     trackY: number,
     eventWidth: number,
@@ -440,7 +422,10 @@ export class EventsRenderer {
     if (config.formatEventDuration) {
       durationText = config.formatEventDuration(accurateDuration);
     } else {
-      durationText = formatDuration(accurateDuration);
+      durationText = formatDuration(
+        accurateDuration,
+        config.eventDurationPrefix
+      );
     }
     ctx.font = "bold 11px Arial";
     ctx.fillStyle = config.colors.eventDurationLabel;

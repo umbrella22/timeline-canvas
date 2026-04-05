@@ -4,17 +4,12 @@ import {
   type MouseEventContext,
 } from "./InteractionState";
 import type { Timeline } from "../../core/Timeline";
-import {
-  cloneEvent,
-  formatTimeRange,
-  getTimeX,
-  getSnapInterval,
-  snapToInterval,
-} from "../../utils";
 import { DraggingState } from "./DraggingState";
 import { ResizingState } from "./ResizingState";
 import { ScrollingState } from "./ScrollingState";
 import { TimeIndicatorDragState } from "./TimeIndicatorDragState";
+import { IdleHoverController } from "./idle/IdleHoverController";
+import { IdleMouseDownRouter } from "./idle/IdleMouseDownRouter";
 
 /**
  * 空闲状态 - 没有进行任何交互操作
@@ -25,510 +20,25 @@ import { TimeIndicatorDragState } from "./TimeIndicatorDragState";
  */
 export class IdleState extends BaseState {
   readonly name = "Idle";
+  private readonly hoverController: IdleHoverController;
+  private readonly mouseDownRouter: IdleMouseDownRouter;
 
   constructor(timeline: Timeline) {
     super(timeline);
+    this.hoverController = new IdleHoverController(this);
+    this.mouseDownRouter = new IdleMouseDownRouter(this);
   }
 
-  handleMouseDown(ctx: MouseEventContext): InteractionState | null {
-    const {
-      canvasX,
-      canvasY,
-      logicalX,
-      logicalY,
-      canvasWidth,
-      canvasHeight,
-      originalEvent,
-    } = ctx;
-    const config = this.timeline.config;
-    const state = this.timeline.state;
-    const canvas = this.timeline.getCanvas();
-    const isReadOnly = config.readOnly;
-
-    // 如果是右键点击,不处理任何交互,等待 contextmenu 事件
-    if (originalEvent.button === 2) {
-      return null;
-    }
-
-    // 处理上下文菜单点击
-    if (state.contextMenuVisible) {
-      const menuBounds = state.contextMenuBounds;
-      if (menuBounds) {
-        const menuX = menuBounds.x;
-        const menuY = menuBounds.y;
-        const menuWidth = menuBounds.width;
-        const menuHeight = menuBounds.height;
-
-        if (
-          canvasX >= menuX &&
-          canvasX <= menuX + menuWidth &&
-          canvasY >= menuY &&
-          canvasY <= menuY + menuHeight
-        ) {
-          const itemIndex = Math.floor(
-            (canvasY - menuY - menuBounds.padding) / menuBounds.itemHeight
-          );
-          if (
-            itemIndex >= 0 &&
-            itemIndex < config.contextMenuItems.length &&
-            state.contextMenuEvent
-          ) {
-            const menuItem = config.contextMenuItems[itemIndex];
-            const { trackIndex, eventIndex } = state.contextMenuEvent;
-            const event = state.tracks[trackIndex].events[eventIndex];
-
-            if (
-              event.readonly &&
-              (menuItem.type === "delete" || menuItem.type === "edit")
-            ) {
-              this.timeline.setStatus("只读事件不可编辑或删除");
-              state.contextMenuVisible = false;
-              state.contextMenuEvent = null;
-              this.timeline.notifyChange("interaction:contextMenu");
-              return null;
-            }
-
-            if (this.timeline.callbacks.onContextMenu) {
-              this.timeline.callbacks.onContextMenu({
-                menuType: menuItem.type,
-                trackIndex,
-                eventIndex,
-                event: cloneEvent(event),
-              });
-            }
-
-            state.contextMenuVisible = false;
-            state.contextMenuEvent = null;
-            this.timeline.notifyChange("interaction:contextMenu");
-          }
-          return null;
-        } else {
-          // 点击菜单外部,关闭菜单
-          state.contextMenuVisible = false;
-          state.contextMenuEvent = null;
-          this.timeline.notifyChange("interaction:contextMenu");
-        }
-      }
-    }
-
-    // 检查垂直滚动条
-    const contentHeight =
-      config.timelineHeight +
-      config.firstTrackTopMargin +
-      state.tracks.length * (config.trackHeight + config.trackMargin);
-    const availableHeight = this.timeline.getAvailableHeight();
-
-    if (contentHeight > availableHeight) {
-      const scrollbarWidth = 8;
-      const scrollbarX = canvasWidth - scrollbarWidth - 5;
-      const scrollbarY = config.timelineHeight;
-      const scrollbarTrackHeight = availableHeight - config.timelineHeight - 5;
-
-      if (
-        canvasX >= scrollbarX &&
-        canvasX <= scrollbarX + scrollbarWidth &&
-        canvasY >= scrollbarY &&
-        canvasY <= scrollbarY + scrollbarTrackHeight
-      ) {
-        state.draggingScrollbar = true;
-        const viewportRatio = availableHeight / contentHeight;
-        const handleHeight = Math.max(30, scrollbarTrackHeight * viewportRatio);
-        const maxScrollY = contentHeight - availableHeight;
-        const scrollRatio = state.scrollY / maxScrollY;
-        const handleY =
-          scrollbarY + (scrollbarTrackHeight - handleHeight) * scrollRatio;
-        state.scrollbarDragOffset = canvasY - handleY;
-
-        // 导入并切换到滚动状态
-        return this.createScrollingState();
-      }
-    }
-
-    // 检查水平滚动条
-    const contentWidth = this.timeline.getContentWidthForZoom(state.zoomLevel);
-    if (contentWidth > canvasWidth) {
-      const scrollbarHeight = 8;
-      const scrollbarY = canvasHeight - scrollbarHeight - 5;
-      const scrollbarX = 0;
-      const scrollbarTrackWidth = canvasWidth;
-
-      if (
-        canvasY >= scrollbarY &&
-        canvasY <= scrollbarY + scrollbarHeight &&
-        canvasX >= scrollbarX &&
-        canvasX <= scrollbarX + scrollbarTrackWidth
-      ) {
-        state.draggingHorizontalScrollbar = true;
-        const viewportRatio = canvasWidth / contentWidth;
-        const handleWidth = Math.max(30, scrollbarTrackWidth * viewportRatio);
-        const maxScrollX = contentWidth - canvasWidth;
-        const scrollRatio = state.scrollX / maxScrollX;
-        const handleX =
-          scrollbarX + (scrollbarTrackWidth - handleWidth) * scrollRatio;
-        state.horizontalScrollbarDragOffset = canvasX - handleX;
-
-        return this.createScrollingState();
-      }
-    }
-
-    // 检查时间指示器
-    if (config.enableTimeIndicator && !isReadOnly) {
-      const timeIndicatorX = getTimeX(
-        state.timeIndicatorPosition,
-        config.startTime,
-        config.startPaddingTime,
-        config.secondWidth,
-        state.zoomLevel,
-        state.scrollX
-      );
-      const headSize = config.timeIndicatorHeadSize;
-      const triangleHeight = config.timeIndicatorTriangleHeight;
-      const headY = config.timelineHeight - headSize - triangleHeight;
-
-      if (
-        canvasX >= timeIndicatorX - headSize / 2 &&
-        canvasX <= timeIndicatorX + headSize / 2 &&
-        canvasY >= headY &&
-        canvasY <= config.timelineHeight
-      ) {
-        state.draggingTimeIndicator = true;
-        state.timeIndicatorDragOffsetX = canvasX - timeIndicatorX;
-
-        return this.createTimeIndicatorDragState();
-      }
-    }
-
-    // 如果点击在时间轴区域,不处理
-    if (logicalY < config.timelineHeight) return null;
-
-    // 统一命中：一次查询同时检测 resize handle 和事件体
-    const hitResult = this.timeline.getInteractionTarget(canvasX, canvasY);
-
-    // 检查是否点击了事件的调整手柄
-    if (config.enableEventResize && !isReadOnly && hitResult.resizeEdge) {
-      const event =
-        state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
-      if (event.readonly) {
-        canvas.style.cursor = "not-allowed";
-        return null;
-      }
-
-      state.resizingEvent = {
-        trackIndex: hitResult.trackIndex!,
-        eventIndex: hitResult.eventIndex!,
-        edge: hitResult.resizeEdge,
-        startX: logicalX,
-        originalStartTime: event.startTime,
-        originalDuration: event.duration,
-      };
-
-      return this.createResizingState();
-    }
-
-    // 8. 检查是否点击了事件
-    if (hitResult.eventIndex !== null && hitResult.trackIndex !== null) {
-      const trackIndex = hitResult.trackIndex;
-      const eventIndex = hitResult.eventIndex;
-      const event = state.tracks[trackIndex].events[eventIndex];
-
-      // 双击检测
-      const now = Date.now();
-      const isDoubleClick =
-        state.lastClickEvent &&
-        state.lastClickEvent.trackIndex === trackIndex &&
-        state.lastClickEvent.eventIndex === eventIndex &&
-        now - state.lastClickTime < 300;
-
-      if (isDoubleClick && config.enableEventSplit) {
-        if (event.readonly) {
-          this.timeline.setStatus("只读事件不可切割");
-          state.lastClickTime = 0;
-          state.lastClickEvent = null;
-          return null;
-        }
-
-        const clickTime =
-          (logicalX - config.startPaddingTime) /
-            (config.secondWidth * state.zoomLevel) +
-          config.startTime;
-        this.timeline.splitEvent(trackIndex, eventIndex, clickTime);
-        state.lastClickTime = 0;
-        state.lastClickEvent = null;
-        this.timeline.hideSplitLine();
-        // splitEvent 已经通过调度器触发绘制
-        return null;
-      }
-
-      state.lastClickEvent = { trackIndex, eventIndex };
-      state.lastClickTime = now;
-      state.selectedEvent = { trackIndex, eventIndex };
-      state.isManualSelection = true;
-      state.highlightedEvent = null;
-      state.selectedTrack = null;
-
-      // 只读事件或全局只读模式:仅选中,不拖拽
-      if (event.readonly || isReadOnly) {
-        canvas.style.cursor = "not-allowed";
-        this.timeline.setStatus(`已选中: ${event.title}`);
-        if (this.timeline.callbacks.onEventHighlight) {
-          this.timeline.callbacks.onEventHighlight({
-            trackIndex,
-            eventIndex,
-            event: cloneEvent(event),
-          });
-        }
-        if (this.timeline.callbacks.onEventClick) {
-          this.timeline.callbacks.onEventClick({
-            trackIndex,
-            eventIndex,
-            event: cloneEvent(event),
-            trackName: `轨道 ${trackIndex + 1}`,
-            formattedTimeRange: formatTimeRange(event.startTime, event.endTime),
-          });
-        }
-        this.timeline.notifyChange("selection:change");
-        return null;
-      }
-
-      // 准备拖拽事件
-      const eventX =
-        config.startPaddingTime +
-        (event.startTime - config.startTime) *
-          config.secondWidth *
-          state.zoomLevel -
-        state.scrollX;
-      const eventY =
-        config.timelineHeight +
-        config.firstTrackTopMargin +
-        trackIndex * (config.trackHeight + config.trackMargin);
-
-      state.draggingEvent = {
-        trackIndex,
-        eventIndex,
-        eventX,
-        eventY,
-        originalTrackIndex: trackIndex,
-        originalEventIndex: eventIndex,
-        originalStartTime: event.startTime,
-        startX: logicalX,
-        startY: logicalY,
-        isDragging: false,
-      };
-
-      state.dragOffsetX = logicalX - eventX;
-      state.dragOffsetY = logicalY - eventY;
-
-      if (this.timeline.callbacks.onEventHighlight) {
-        this.timeline.callbacks.onEventHighlight({
-          trackIndex,
-          eventIndex,
-          event: cloneEvent(event),
-        });
-      }
-
-      this.timeline.notifyChange("selection:change");
-      return this.createDraggingState();
-    }
-
-    // 9. 点击空白区域:清除选择
-    state.selectedEvent = null;
-    state.highlightedEvent = null;
-    state.selectedTrack = null;
-    state.isManualSelection = false;
-
-    if (this.timeline.callbacks.onEventHighlight) {
-      this.timeline.callbacks.onEventHighlight({
-        trackIndex: null,
-        eventIndex: null,
-        event: null,
-      });
-    }
-
-    this.timeline.notifyChange("selection:change");
-    return null;
+  public getTimeline(): Timeline {
+    return this.timeline;
   }
 
-  handleMouseMove(ctx: MouseEventContext): InteractionState | null {
-    const { canvasX, canvasY, logicalX, logicalY } = ctx;
-    const config = this.timeline.config;
-    const state = this.timeline.state;
-    const canvas = this.timeline.getCanvas();
+  public handleMouseDown(ctx: MouseEventContext): InteractionState | null {
+    return this.mouseDownRouter.handleMouseDown(ctx);
+  }
 
-    // 1. 上下文菜单悬停
-    if (state.contextMenuVisible) {
-      const menuBounds = state.contextMenuBounds;
-      if (menuBounds) {
-        const menuX = menuBounds.x;
-        const menuY = menuBounds.y;
-        const menuWidth = menuBounds.width;
-        const menuHeight = menuBounds.height;
-
-        if (
-          canvasX >= menuX &&
-          canvasX <= menuX + menuWidth &&
-          canvasY >= menuY &&
-          canvasY <= menuY + menuHeight
-        ) {
-          const itemIndex = Math.floor(
-            (canvasY - menuY - menuBounds.padding) / menuBounds.itemHeight
-          );
-          if (itemIndex >= 0 && itemIndex < config.contextMenuItems.length) {
-            if (state.hoveredContextMenuItem !== itemIndex) {
-              state.hoveredContextMenuItem = itemIndex;
-              this.timeline.notifyChange("interaction:contextMenu");
-            }
-            canvas.style.cursor = "pointer";
-          } else {
-            if (state.hoveredContextMenuItem !== -1) {
-              state.hoveredContextMenuItem = -1;
-              this.timeline.notifyChange("interaction:contextMenu");
-            }
-          }
-          return null;
-        } else {
-          if (state.hoveredContextMenuItem !== -1) {
-            state.hoveredContextMenuItem = -1;
-            this.timeline.notifyChange("interaction:contextMenu");
-          }
-        }
-      }
-    }
-
-    // 统一命中测试：一次查询同时检测 resize handle 和事件体
-    const hitResult = this.timeline.getInteractionTarget(canvasX, canvasY);
-
-    // 2. 内容区域的交互
-    if (logicalY >= config.timelineHeight && !config.readOnly) {
-      // 2.1 检查调整大小手柄
-      if (config.enableEventResize) {
-        if (hitResult.resizeEdge) {
-          const evt =
-            state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
-          if (evt.readonly) {
-            state.hoveredResizeHandle = null;
-            canvas.style.cursor = "not-allowed";
-            this.timeline.hideSplitLine();
-            this.timeline.notifyChange("interaction:hover");
-            return null;
-          }
-
-          state.hoveredResizeHandle = {
-            trackIndex: hitResult.trackIndex!,
-            eventIndex: hitResult.eventIndex!,
-            edge: hitResult.resizeEdge,
-          };
-          canvas.style.cursor = "ew-resize";
-          this.timeline.hideSplitLine();
-          this.timeline.notifyChange("interaction:hover");
-          return null;
-        }
-        state.hoveredResizeHandle = null;
-      }
-
-      // 2.2 检查事件切割线
-      if (config.enableEventSplit) {
-        if (
-          hitResult.eventIndex !== null &&
-          hitResult.trackIndex !== null &&
-          !hitResult.resizeEdge
-        ) {
-          const trackIndex = hitResult.trackIndex;
-          const eventIndex = hitResult.eventIndex;
-          const event = state.tracks[trackIndex].events[eventIndex];
-
-          if (event.readonly) {
-            this.timeline.hideSplitLine();
-            canvas.style.cursor = "not-allowed";
-            this.timeline.notifyChange("interaction:hover");
-            return null;
-          }
-
-          let splitTime =
-            (logicalX - config.startPaddingTime) /
-              (config.secondWidth * state.zoomLevel) +
-            config.startTime;
-
-          if (state.snapEnabled) {
-            const snapIntervalSeconds = getSnapInterval(
-              state.zoomLevel,
-              config.snapInterval,
-              config.snapToSeconds,
-              config.secondPrecisionZoomThreshold,
-              config.scale,
-              config.scaleSplitCount
-            );
-            splitTime = snapToInterval(splitTime, snapIntervalSeconds);
-          }
-
-          const firstDuration = splitTime - event.startTime;
-          const secondDuration = event.duration - firstDuration;
-
-          if (
-            splitTime > event.startTime &&
-            splitTime < event.startTime + event.duration &&
-            firstDuration >= config.minEventDuration &&
-            secondDuration >= config.minEventDuration
-          ) {
-            this.timeline.showSplitLine(trackIndex, eventIndex, splitTime);
-            canvas.style.cursor = "pointer";
-            this.timeline.notifyChange("interaction:splitLine");
-            return null;
-          }
-        }
-        this.timeline.hideSplitLine();
-      } else {
-        this.timeline.hideSplitLine();
-      }
-    }
-
-    // 3. 时间指示器悬停
-    if (config.enableTimeIndicator && canvasY <= config.timelineHeight) {
-      const timeIndicatorX = getTimeX(
-        state.timeIndicatorPosition,
-        config.startTime,
-        config.startPaddingTime,
-        config.secondWidth,
-        state.zoomLevel,
-        state.scrollX
-      );
-      const headSize = config.timeIndicatorHeadSize;
-
-      if (
-        canvasX >= timeIndicatorX - headSize / 2 &&
-        canvasX <= timeIndicatorX + headSize / 2 &&
-        canvasY >= 0 &&
-        canvasY <= config.timeIndicatorHeadSize
-      ) {
-        canvas.style.cursor = config.readOnly ? "not-allowed" : "ew-resize";
-        // 只是光标变化，不需要重绘
-        return null;
-      }
-    }
-
-    // 4. 事件悬停（复用 hitResult，无需额外 hit-test）
-    if (
-      hitResult.eventIndex !== null &&
-      hitResult.trackIndex !== null &&
-      !hitResult.resizeEdge
-    ) {
-      const { trackIndex, eventIndex } = {
-        trackIndex: hitResult.trackIndex,
-        eventIndex: hitResult.eventIndex,
-      };
-      const event = state.tracks[trackIndex].events[eventIndex];
-      // 只读模式下仍然可以点击选中，所以显示 pointer
-      canvas.style.cursor = "pointer";
-      this.timeline.setStatus(
-        `${event.title} (${this.timeline.formatTime(
-          event.startTime
-        )} - ${this.timeline.formatTime(event.endTime)})`
-      );
-    } else {
-      canvas.style.cursor = "default";
-    }
-
-    // 纯悬停状态不需要重绘，只有状态变化时才需要
-    return null;
+  public handleMouseMove(ctx: MouseEventContext): InteractionState | null {
+    return this.hoverController.handleMouseMove(ctx);
   }
 
   handleContextMenu(ctx: MouseEventContext): InteractionState | null {
@@ -567,28 +77,28 @@ export class IdleState extends BaseState {
   /**
    * 创建拖拽状态
    */
-  private createDraggingState(): InteractionState {
+  public createDraggingState(): InteractionState {
     return new DraggingState(this.timeline);
   }
 
   /**
    * 创建调整大小状态
    */
-  private createResizingState(): InteractionState {
+  public createResizingState(): InteractionState {
     return new ResizingState(this.timeline);
   }
 
   /**
    * 创建滚动状态
    */
-  private createScrollingState(): InteractionState {
+  public createScrollingState(): InteractionState {
     return new ScrollingState(this.timeline);
   }
 
   /**
    * 创建时间指示器拖拽状态
    */
-  private createTimeIndicatorDragState(): InteractionState {
+  public createTimeIndicatorDragState(): InteractionState {
     return new TimeIndicatorDragState(this.timeline);
   }
 }

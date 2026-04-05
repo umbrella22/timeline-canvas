@@ -99,7 +99,7 @@ export interface CoreLayerHook {
   ) => void;
 }
 
-export type PluginEventHandler = (...args: any[]) => unknown;
+export type PluginEventHandler = (...args: unknown[]) => unknown;
 
 export interface PluginAPI {
   registerRenderLayer: (layer: RenderLayer) => void;
@@ -109,8 +109,8 @@ export interface PluginAPI {
   registerEventHandler: (event: string, handler: PluginEventHandler) => void;
   unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
   showNotification: (message: string, type?: "info" | "warning" | "error") => void;
-  getData: (key: string) => any;
-  setData: (key: string, value: any) => void;
+  getData: (key: string) => unknown;
+  setData: (key: string, value: unknown) => void;
   setPerformanceProvider: (provider: PerformanceProvider) => void;
   getPerformanceStats: () => Map<string, PerformanceStats>;
   getFPS: () => number;

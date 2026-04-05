@@ -79,14 +79,14 @@ export class DraggingState extends BaseState {
       eventIndex < 0 ||
       eventIndex >= state.tracks[trackIndex].events.length
     ) {
-      logger.warn("当前错误的状态:", { value: state.draggingEvent });
+      logger.warn("Invalid dragging state:", { value: state.draggingEvent });
       state.draggingEvent = null;
       return this.createIdleState();
     }
 
     const event = state.tracks[trackIndex].events[eventIndex];
 
-    this.timeline.setStatus(`正在拖动: ${event.title}`);
+    this.timeline.setStatus(`Dragging: ${event.title}`);
 
     // 计算新的时间位置
     const currentMouseX = logicalX;

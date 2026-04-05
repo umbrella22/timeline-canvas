@@ -101,6 +101,7 @@ export class ChangeScheduler {
 
   /** 是否正在批量操作中 */
   private isBatching = false;
+  private highlightChanged = false;
 
   constructor(
     state: TimelineState,
@@ -482,7 +483,7 @@ export class ChangeScheduler {
     this.state.timeIndicatorHighlightedEvents = newHighlightedEvents;
 
     // 存储变化状态供回调使用
-    (this as any)._highlightChanged = hasChanged;
+    this.highlightChanged = hasChanged;
   }
 
   /**
@@ -574,7 +575,7 @@ export class ChangeScheduler {
    */
   private emitTimeIndicatorHighlight(): void {
     // 只在有变化时触发回调
-    if (!(this as any)._highlightChanged) return;
+    if (!this.highlightChanged) return;
 
     if (this.callbacks.onTimeIndicatorHighlight) {
       const position = this.state.timeIndicatorPosition;
@@ -594,7 +595,7 @@ export class ChangeScheduler {
     }
 
     // 重置变化状态
-    (this as any)._highlightChanged = false;
+    this.highlightChanged = false;
   }
 
   /**

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Timeline } from "../src";
+import { LightThemePlugin, Timeline } from "../src";
 import { PluginType, type TimelinePlugin } from "../src/plugins/types";
+import { MutexGuardPlugin } from "../src/plugins/builtin/MutexGuardPlugin";
 import { createMockCanvas } from "./helpers";
 
 function createTimeline(
@@ -101,5 +102,174 @@ describe("Timeline integration", () => {
 
     await expect(timeline.usePlugin(plugin)).resolves.toBe(false);
     expect(timeline.getLoadedPlugins()).toHaveLength(0);
+  });
+
+  it("usePlugin 和 removePlugin 在普通插件变更后触发重绘", async () => {
+    const timeline = createTimeline();
+    const drawSpy = vi.spyOn(timeline, "draw");
+    const plugin: TimelinePlugin = {
+      metadata: {
+        name: "redraw-plugin",
+        version: "1.0.0",
+        description: "redraw plugin",
+        type: PluginType.EXTENSION,
+      },
+    };
+
+    await expect(timeline.usePlugin(plugin)).resolves.toBe(true);
+    await expect(timeline.removePlugin("redraw-plugin@1.0.0")).resolves.toBe(true);
+
+    expect(drawSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("移除当前主题后 setTheme 仍可正常切换主题", async () => {
+    const timeline = createTimeline();
+
+    await expect(timeline.usePlugin(LightThemePlugin)).resolves.toBe(true);
+    await expect(timeline.removePlugin("theme-light@1.0.0")).resolves.toBe(true);
+    await expect(timeline.setTheme("dark")).resolves.toBe(true);
+
+    expect(timeline.isPluginLoaded("theme-light")).toBe(false);
+    expect(timeline.isPluginLoaded("theme-dark")).toBe(true);
+    expect(timeline.config.colors.canvasBackground).toBe("#1E1E2E");
+  });
+
+  it("usePlugin 加载主题插件时替换旧主题并同步主题状态", async () => {
+    const timeline = createTimeline();
+
+    await expect(timeline.usePlugin(LightThemePlugin)).resolves.toBe(true);
+    await expect(timeline.setTheme("dark")).resolves.toBe(true);
+    await expect(timeline.usePlugin(LightThemePlugin)).resolves.toBe(true);
+
+    expect(timeline.isPluginLoaded("theme-dark")).toBe(false);
+    expect(timeline.isPluginLoaded("theme-light")).toBe(true);
+    expect(timeline.config.colors.canvasBackground).toBe("#FFFFFF");
+    expect(timeline.config.colors.eventColors[0]).toBe("rgba(63, 118, 252, 0.16)");
+    expect(timeline.config.colors.eventText).toBe("#FFFFFF");
+    expect(timeline.config.colors.eventOverlay).toBe("rgba(63, 118, 252, 0.12)");
+  });
+
+  it("MutexGuardPlugin 卸载后注销校验处理器", async () => {
+    const timeline = createTimeline();
+    const plugin = MutexGuardPlugin();
+
+    timeline.loadData({
+      tracks: [
+        {
+          events: [
+            {
+              startTime: 0,
+              endTime: 10,
+              title: "事件 A",
+              customData: { mutex: ["group-1"] },
+            },
+          ],
+        },
+        {
+          events: [
+            {
+              startTime: 20,
+              endTime: 30,
+              title: "事件 B",
+              customData: { mutex: ["group-1"] },
+            },
+          ],
+        },
+      ],
+    });
+
+    await expect(timeline.usePlugin(plugin)).resolves.toBe(true);
+
+    expect(timeline.canMoveEvent(0, 0, 0, 22, 10)).toBe(false);
+
+    await expect(
+      timeline.removePlugin(`${plugin.metadata.name}@${plugin.metadata.version}`)
+    ).resolves.toBe(true);
+
+    expect(timeline.canMoveEvent(0, 0, 0, 22, 10)).toBe(true);
+  });
+
+  it("事件 CRUD 保持回调语义并深拷贝 customData", () => {
+    const onEventAdd = vi.fn();
+    const onEventUpdate = vi.fn();
+    const onEventDelete = vi.fn();
+    const timeline = createTimeline({
+      onEventAdd,
+      onEventUpdate,
+      onEventDelete,
+    });
+
+    timeline.loadData({
+      tracks: [{ events: [] }],
+    });
+    timeline.addEvent(0, 10, 20, "新事件", "说明", {
+      nested: { enabled: true },
+    });
+
+    const addedEvent = onEventAdd.mock.calls[0][0].event as {
+      customData: { nested: { enabled: boolean } };
+    };
+    addedEvent.customData.nested.enabled = false;
+
+    expect(
+      timeline.state.tracks[0].events[0].customData as {
+        nested: { enabled: boolean };
+      }
+    ).toEqual({
+      nested: { enabled: true },
+    });
+
+    expect(
+      timeline.updateEventData(0, 0, {
+        title: "已更新事件",
+        duration: 15,
+      })
+    ).toBe(true);
+    expect(timeline.deleteEvent(0, 0)).toBe(true);
+    expect(onEventUpdate).toHaveBeenCalledTimes(1);
+    expect(onEventDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("辅助线计算在服务拆分后保持结果兼容", () => {
+    const timeline = createTimeline();
+
+    timeline.loadData({
+      tracks: [
+        {
+          events: [{ startTime: 10, endTime: 20, title: "事件 A" }],
+        },
+        {
+          events: [{ startTime: 30, endTime: 40, title: "事件 B" }],
+        },
+      ],
+    });
+
+    expect(timeline.calculateGuideLines(0, 0, 1, 30, 10)).toEqual([
+      {
+        time: 30,
+        type: "start",
+        trackIndices: [1],
+      },
+      {
+        time: 40,
+        type: "end",
+        trackIndices: [1],
+      },
+    ]);
+
+    timeline.updateEventData(1, 0, { startTime: 35 });
+
+    expect(timeline.calculateGuideLines(0, 0, 1, 35, 10)).toEqual([
+      {
+        time: 35,
+        type: "start",
+        trackIndices: [1],
+      },
+      {
+        time: 45,
+        type: "end",
+        trackIndices: [1],
+      },
+    ]);
   });
 });

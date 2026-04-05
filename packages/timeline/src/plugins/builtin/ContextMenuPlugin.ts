@@ -8,6 +8,13 @@ interface ContextMenuPluginOptions {
   htmlTemplate?: string;
 }
 
+function getPluginData<T>(
+  getData: (key: string) => unknown,
+  key: string
+): T | undefined {
+  return getData(key) as T | undefined;
+}
+
 export function ContextMenuPlugin(
   options: ContextMenuPluginOptions = {}
 ): TimelinePlugin {
@@ -39,8 +46,11 @@ export function ContextMenuPlugin(
             !state.contextMenuVisible ||
             !state.contextMenuEvent
           ) {
-            const container: HTMLElement | null =
-              context.api.getData("contextMenuContainer") || null;
+            const container =
+              getPluginData<HTMLElement>(
+                context.api.getData,
+                "contextMenuContainer"
+              ) || null;
             if (container) container.style.display = "none";
             state.contextMenuBounds = null;
             return;
@@ -62,7 +72,11 @@ export function ContextMenuPlugin(
           const widthCache: Record<
             string,
             Record<string, number>
-          > = context.api.getData("contextMenuTextWidthCache") || {};
+          > =
+            getPluginData<Record<string, Record<string, number>>>(
+              context.api.getData,
+              "contextMenuTextWidthCache"
+            ) || {};
           const cacheBucket = widthCache[cacheKey] || {};
           for (const item of config.contextMenuItems) {
             const cached = cacheBucket[item.name];
@@ -96,8 +110,11 @@ export function ContextMenuPlugin(
           };
 
           if (useHtml) {
-            let container: HTMLElement | null =
-              context.api.getData("contextMenuContainer") || null;
+            let container =
+              getPluginData<HTMLElement>(
+                context.api.getData,
+                "contextMenuContainer"
+              ) || null;
             if (!container) {
               container = document.createElement("div");
               container.style.position = "absolute";
@@ -255,14 +272,16 @@ export function ContextMenuPlugin(
     },
     deactivate(context) {
       context.api.unregisterRenderLayer("context-menu-overlay");
-      const container: HTMLElement | null =
-        context.api.getData("contextMenuContainer") || null;
+      const container =
+        getPluginData<HTMLElement>(context.api.getData, "contextMenuContainer") ||
+        null;
       if (container && container.parentElement)
         container.parentElement.removeChild(container);
     },
     destroy(context) {
-      const container: HTMLElement | null =
-        context.api.getData("contextMenuContainer") || null;
+      const container =
+        getPluginData<HTMLElement>(context.api.getData, "contextMenuContainer") ||
+        null;
       if (container && container.parentElement)
         container.parentElement.removeChild(container);
     },

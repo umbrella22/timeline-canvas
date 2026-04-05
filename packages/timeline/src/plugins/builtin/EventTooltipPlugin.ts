@@ -35,6 +35,13 @@ interface TooltipState {
   eventIndex: number;
 }
 
+function getPluginData<T>(
+  getData: (key: string) => unknown,
+  key: string
+): T | undefined {
+  return getData(key) as T | undefined;
+}
+
 export function EventTooltipPlugin(
   options: EventTooltipPluginOptions = {}
 ): TimelinePlugin {
@@ -221,8 +228,11 @@ export function EventTooltipPlugin(
         render(ctx, _canvas, _config, _state) {
           if (!tooltipState.visible || !tooltipState.title) {
             // 隐藏 HTML 容器（如果存在）
-            const container: HTMLElement | null =
-              context.api.getData("tooltipContainer") || null;
+            const container =
+              getPluginData<HTMLElement>(
+                context.api.getData,
+                "tooltipContainer"
+              ) || null;
             if (container) {
               container.style.display = "none";
             }
@@ -299,8 +309,11 @@ export function EventTooltipPlugin(
                 "htmlTemplate returned empty content, falling back to Canvas rendering"
               );
             } else {
-              let container: HTMLElement | null =
-                context.api.getData("tooltipContainer") || null;
+              let container =
+                getPluginData<HTMLElement>(
+                  context.api.getData,
+                  "tooltipContainer"
+                ) || null;
 
               if (!container) {
                 container = document.createElement("div");
@@ -407,8 +420,13 @@ export function EventTooltipPlugin(
     deactivate(context) {
       // 清理事件监听
       const canvas = context.timeline.getCanvas();
-      const handleMouseMove = context.api.getData("tooltipMouseMoveHandler");
-      const handleMouseLeave = context.api.getData("tooltipMouseLeaveHandler");
+      const handleMouseMove = getPluginData<
+        (event: MouseEvent) => void
+      >(context.api.getData, "tooltipMouseMoveHandler");
+      const handleMouseLeave = getPluginData<() => void>(
+        context.api.getData,
+        "tooltipMouseLeaveHandler"
+      );
 
       if (handleMouseMove) {
         canvas.removeEventListener("mousemove", handleMouseMove);
@@ -427,8 +445,9 @@ export function EventTooltipPlugin(
       context.api.unregisterRenderLayer("event-tooltip-overlay");
 
       // 清理 HTML 容器
-      const container: HTMLElement | null =
-        context.api.getData("tooltipContainer") || null;
+      const container =
+        getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") ||
+        null;
       if (container && container.parentElement) {
         container.parentElement.removeChild(container);
       }
@@ -436,8 +455,9 @@ export function EventTooltipPlugin(
 
     destroy(context) {
       // 清理 HTML 容器
-      const container: HTMLElement | null =
-        context.api.getData("tooltipContainer") || null;
+      const container =
+        getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") ||
+        null;
       if (container && container.parentElement) {
         container.parentElement.removeChild(container);
       }

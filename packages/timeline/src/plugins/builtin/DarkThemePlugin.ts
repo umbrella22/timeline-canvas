@@ -13,7 +13,7 @@ const darkColors = {
   eventText: "#FFFFFF",
   eventBorder: "#FFFFFF",
   eventBorderSelected: "#FFD700",
-  eventOverlay: "rgba(255, 255, 255, 0.2)",
+  eventOverlay: "rgba(255, 255, 255, 0.1)",
   dragPreviewValid: "rgba(100, 255, 100, 0.5)",
   dragPreviewInvalid: "rgba(255, 100, 100, 0.5)",
   dragPreviewBorderValid: "#00FF00",

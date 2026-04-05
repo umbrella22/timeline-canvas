@@ -117,6 +117,7 @@ export interface TimelineConfig {
   autoRemoveEmptyLastTrack: boolean;
   readOnly: boolean;
   showEventDurationLabel: boolean;
+  eventDurationPrefix: string;
   formatEventDuration: ((duration: number) => string) | null;
   /** 主刻度时间间隔（秒），>0。设置后启用自定义刻度模式 */
   scale: number | null;
@@ -160,7 +161,7 @@ export interface TimelineEvent {
   description: string;
   color: string;
   readonly?: boolean;
-  customData?: Record<string, any>;
+  customData?: Record<string, unknown>;
   media?: {
     images?: Array<{
       src: string;
@@ -379,7 +380,7 @@ export interface LoadDataFormat {
       description?: string;
       color?: string;
       readonly?: boolean;
-      customData?: Record<string, any>;
+      customData?: Record<string, unknown>;
       media?: {
         images?: Array<{
           src: string;
@@ -431,6 +432,7 @@ export interface TimelineOptions {
   autoRemoveEmptyLastTrack?: boolean;
   readOnly?: boolean;
   showEventDurationLabel?: boolean;
+  eventDurationPrefix?: string;
   formatEventDuration?: (duration: number) => string;
   /** 主刻度时间间隔（秒），>0。设置后启用自定义刻度模式 */
   scale?: number;

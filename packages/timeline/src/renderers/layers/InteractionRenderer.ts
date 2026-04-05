@@ -1,4 +1,5 @@
 import type { Renderer, RenderContext, LayerType } from "../core/types";
+import type { TimelineConfig, TimelineEvent, TimelineState } from "../../types";
 import { drawRoundedRect, formatTime } from "../../utils";
 
 /**
@@ -24,8 +25,8 @@ export class InteractionRenderer implements Renderer {
 
   private renderDragPreview(
     ctx: CanvasRenderingContext2D,
-    config: Readonly<any>,
-    state: Readonly<any>
+    config: Readonly<TimelineConfig>,
+    state: Readonly<TimelineState>
   ): void {
     if (!state.draggingEvent) return;
     if (!state.tracks[state.draggingEvent.trackIndex]) return;
@@ -105,8 +106,8 @@ export class InteractionRenderer implements Renderer {
 
   private renderDraggingEvent(
     ctx: CanvasRenderingContext2D,
-    config: Readonly<any>,
-    state: Readonly<any>
+    config: Readonly<TimelineConfig>,
+    state: Readonly<TimelineState>
   ): void {
     if (!state.draggingEvent) return;
     if (!state.tracks[state.draggingEvent.trackIndex].events) return;
@@ -178,27 +179,6 @@ export class InteractionRenderer implements Renderer {
 
     ctx.shadowBlur = 0;
 
-    // 绘制半透明遮罩
-    ctx.fillStyle = config.colors.eventOverlay;
-    if (borderRadius > 0) {
-      drawRoundedRect(
-        ctx,
-        eventX,
-        eventY + eventVerticalPadding,
-        eventWidth,
-        eventHeight,
-        borderRadius
-      );
-      ctx.fill();
-    } else {
-      ctx.fillRect(
-        eventX,
-        eventY + eventVerticalPadding,
-        eventWidth,
-        eventHeight
-      );
-    }
-
     ctx.restore();
 
     // 绘制文本
@@ -215,8 +195,8 @@ export class InteractionRenderer implements Renderer {
 
   private renderEventText(
     ctx: CanvasRenderingContext2D,
-    config: Readonly<any>,
-    event: any,
+    config: Readonly<TimelineConfig>,
+    event: TimelineEvent,
     eventX: number,
     eventY: number,
     eventWidth: number,
