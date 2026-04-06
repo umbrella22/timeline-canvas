@@ -5,7 +5,7 @@ import type {
 } from "../../types";
 import type { RenderManager } from "./RenderManager";
 import type { EventIndexManager } from "./EventIndexManager";
-import { cloneEvent } from "../../utils";
+import { cloneEvent, translateTimelineConfig } from "../../utils";
 import { getLogger } from "./Logger";
 
 const logger = getLogger("ChangeScheduler");
@@ -343,7 +343,11 @@ export class ChangeScheduler {
   public notify(change: ChangeType): void {
     const handler = this.handlers.get(change);
     if (!handler) {
-      logger.warn(`Unknown change type: ${change}`);
+      logger.warn(
+        translateTimelineConfig(this.config, "warningUnknownChangeType", {
+          change,
+        })
+      );
       return;
     }
 
@@ -381,7 +385,9 @@ export class ChangeScheduler {
    */
   public beginBatch(): void {
     if (this.isBatching) {
-      logger.warn("Already in batch mode");
+      logger.warn(
+        translateTimelineConfig(this.config, "warningAlreadyInBatchMode")
+      );
       return;
     }
     this.isBatching = true;
@@ -398,7 +404,7 @@ export class ChangeScheduler {
    */
   public endBatch(): void {
     if (!this.isBatching || !this.batchContext) {
-      logger.warn("Not in batch mode");
+      logger.warn(translateTimelineConfig(this.config, "warningNotInBatchMode"));
       return;
     }
 

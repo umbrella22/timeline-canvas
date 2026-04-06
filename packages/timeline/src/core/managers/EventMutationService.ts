@@ -5,7 +5,7 @@ import type {
   TimelineState,
   Track,
 } from "../../types";
-import { cloneEvent, fixFloatPrecision } from "../../utils";
+import { cloneEvent, fixFloatPrecision, translateTimelineConfig } from "../../utils";
 import type { Logger } from "./Logger";
 import type { EventIndexManager } from "./EventIndexManager";
 
@@ -75,14 +75,20 @@ export class EventMutationService {
       duration = endTime;
     } else {
       this.logger.error(
-        `无效的时间范围: startTime=${startTime}, endTime=${endTime}`
+        translateTimelineConfig(this.config, "errorInvalidTimeRange", {
+          startTime,
+          endTime,
+        })
       );
       return null;
     }
 
     if (startSec < this.config.startTime) {
       this.logger.error(
-        `开始时间不能进入左侧留白区域: startTime=${startSec}, minAllowed=${this.config.startTime}`
+        translateTimelineConfig(this.config, "errorStartTimeBeforeMin", {
+          startTime: startSec,
+          minAllowed: this.config.startTime,
+        })
       );
       return null;
     }
@@ -206,7 +212,7 @@ export class EventMutationService {
 
   public loadData(data: LoadDataFormat): boolean {
     if (!data || typeof data !== "object") {
-      this.logger.error("Invalid data format");
+      this.logger.error(translateTimelineConfig(this.config, "errorInvalidDataFormat"));
       return false;
     }
 
@@ -264,13 +270,13 @@ export class EventMutationService {
     eventIndex: number
   ): TimelineEvent | null {
     if (!this.isValidTrackIndex(trackIndex)) {
-      this.logger.error("Invalid track index");
+      this.logger.error(translateTimelineConfig(this.config, "errorInvalidTrackIndex"));
       return null;
     }
 
     const track = this.state.tracks[trackIndex];
     if (!this.isValidEventIndex(track, eventIndex)) {
-      this.logger.error("Invalid event index");
+      this.logger.error(translateTimelineConfig(this.config, "errorInvalidEventIndex"));
       return null;
     }
 

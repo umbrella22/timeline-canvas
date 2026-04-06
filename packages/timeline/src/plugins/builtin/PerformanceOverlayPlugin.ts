@@ -1,14 +1,29 @@
 import { RenderLayer, TimelinePlugin, PluginType } from "../types";
 import { PerformanceMonitor } from "../../utils/performanceMonitor";
+import type { TimelineMessageKey } from "../../utils";
 
 export const PerformanceOverlayPlugin: TimelinePlugin = {
   metadata: {
     name: "performance-overlay",
     version: "1.0.0",
     description: "Draw performance metrics overlay",
+    descriptionI18n: {
+      "zh-CN": "绘制性能指标叠加层",
+    },
     type: PluginType.TOOL,
   },
   activate(context) {
+    const layerLabelKeys: Record<string, TimelineMessageKey> = {
+      background: "overlayLayerBackground",
+      tracks: "overlayLayerTracks",
+      timeline: "overlayLayerTimeline",
+      interaction: "overlayLayerInteraction",
+      guideLines: "overlayLayerGuideLines",
+      scrollbar: "overlayLayerScrollbar",
+      overlay: "overlayLayerOverlay",
+      dragPreview: "overlayLayerDragPreview",
+    };
+
     const monitor = new PerformanceMonitor(
       context.config.enablePerformanceMonitor || context.config.debug
     );
@@ -149,26 +164,40 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
         ctx.fillStyle = "#00FF00";
         ctx.font = "bold 16px monospace";
         ctx.textAlign = "left";
-        ctx.fillText("Performance Monitor", pos.x + 10, pos.y + 20);
+        ctx.fillText(
+          context.timeline.t("overlayPerformanceMonitor"),
+          pos.x + 10,
+          pos.y + 20
+        );
         let yOffset = pos.y + 20 + headerHeight;
         ctx.fillStyle =
           fps >= 55 ? "#00FF00" : fps >= 30 ? "#FFFF00" : "#FF0000";
         ctx.font = "bold 14px monospace";
-        ctx.fillText(`FPS: ${fps.toFixed(1)}`, pos.x + 10, yOffset);
+        ctx.fillText(
+          context.timeline.t("overlayFps", { value: fps.toFixed(1) }),
+          pos.x + 10,
+          yOffset
+        );
         ctx.font = "12px monospace";
         yOffset += lineHeight;
 
         if (layerTimes) {
           ctx.fillStyle = "#00FFFF";
           ctx.font = "bold 12px monospace";
-          ctx.fillText("Layer Times (ms):", pos.x + 10, yOffset);
+          ctx.fillText(
+            context.timeline.t("overlayLayerTimesMs"),
+            pos.x + 10,
+            yOffset
+          );
           yOffset += lineHeight;
           ctx.font = "12px monospace";
           ctx.fillStyle = "#FFFFFF";
           for (const key of ordered) {
             if (layerTimes[key] !== undefined) {
               ctx.fillText(
-                `${key}: ${layerTimes[key].toFixed(2)}`,
+                `${context.timeline.t(layerLabelKeys[key] || "overlayLayerOverlay")}: ${layerTimes[
+                  key
+                ].toFixed(2)}`,
                 pos.x + 10,
                 yOffset
               );
@@ -179,7 +208,7 @@ export const PerformanceOverlayPlugin: TimelinePlugin = {
 
         if (allStats.size === 0) {
           ctx.fillStyle = "#FFFFFF";
-          ctx.fillText("Collecting...", pos.x + 10, yOffset);
+          ctx.fillText(context.timeline.t("overlayCollecting"), pos.x + 10, yOffset);
           yOffset += lineHeight;
         } else {
           lines.forEach(([name, stats]) => {

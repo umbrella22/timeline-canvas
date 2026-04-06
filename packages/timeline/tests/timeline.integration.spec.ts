@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { LightThemePlugin, Timeline } from "../src";
+import {
+  LightThemePlugin,
+  Timeline,
+  DarkThemePlugin,
+  getPluginMetadataDescription,
+} from "../src";
 import { PluginType, type TimelinePlugin } from "../src/plugins/types";
 import { MutexGuardPlugin } from "../src/plugins/builtin/MutexGuardPlugin";
 import { createMockCanvas } from "./helpers";
@@ -20,6 +25,41 @@ function createTimeline(
 }
 
 describe("Timeline integration", () => {
+  it("内置插件 metadata 描述支持按 locale 解析", () => {
+    expect(getPluginMetadataDescription(DarkThemePlugin.metadata, "zh-CN")).toBe(
+      "时间轴暗色主题"
+    );
+    expect(getPluginMetadataDescription(LightThemePlugin.metadata, "en")).toBe(
+      "Light theme for timeline"
+    );
+  });
+
+  it("支持通过 locale 切换默认运行时文案", () => {
+    const timeline = createTimeline({ locale: "zh-CN" });
+
+    expect(timeline.getStatus()).toBe("就绪");
+    expect(timeline.config.eventDurationPrefix).toBe("时长");
+    expect(timeline.config.contextMenuItems.map((item) => item.name)).toEqual([
+      "编辑",
+      "删除",
+      "导出",
+    ]);
+    expect(timeline.t("labelTrackName", { index: 2 })).toBe("轨道 2");
+  });
+
+  it("支持通过 messages 覆盖默认翻译", () => {
+    const timeline = createTimeline({
+      locale: "zh-CN",
+      messages: {
+        statusReady: "已准备",
+        contextMenuEdit: "修改",
+      },
+    });
+
+    expect(timeline.getStatus()).toBe("已准备");
+    expect(timeline.config.contextMenuItems[0].name).toBe("修改");
+  });
+
   it("通过公开 API 保持命中检测优先级", () => {
     const timeline = createTimeline({
       timelineHeight: 20,

@@ -42,6 +42,9 @@ export const DarkThemePlugin: TimelinePlugin = {
     name: "theme-dark",
     version: "1.0.0",
     description: "Dark theme for timeline",
+    descriptionI18n: {
+      "zh-CN": "时间轴暗色主题",
+    },
     type: PluginType.THEME,
   },
   activate(context) {

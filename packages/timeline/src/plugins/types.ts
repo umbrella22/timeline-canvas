@@ -1,6 +1,8 @@
 import type { Timeline } from "../core/Timeline";
-import type { TimelineConfig, TimelineState } from "../types";
+import type { TimelineConfig, TimelineLocale, TimelineState } from "../types";
 import type { PerformanceStats } from "../utils/performanceMonitor";
+
+export type PluginLocalizedText = Partial<Record<TimelineLocale, string>>;
 
 export enum PluginType {
   RENDER = "render",
@@ -22,6 +24,7 @@ export interface PluginMetadata {
   name: string;
   version: string;
   description: string;
+  descriptionI18n?: PluginLocalizedText;
   author?: string;
   type: PluginType;
   priority?: PluginPriority;

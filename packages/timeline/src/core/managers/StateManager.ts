@@ -1,4 +1,5 @@
 import type { TimelineState, TimelineConfig } from "../../types";
+import { translateTimelineConfig } from "../../utils";
 
 export class StateManager {
   public state: TimelineState;
@@ -38,7 +39,7 @@ export class StateManager {
       lastClickTime: 0,
       lastClickEvent: null,
       hoveredSplitLine: null,
-      statusText: "Ready",
+      statusText: translateTimelineConfig(config, "statusReady"),
       contextMenuBounds: null,
       lastDrawTime: 0,
     };

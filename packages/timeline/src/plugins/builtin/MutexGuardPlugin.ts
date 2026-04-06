@@ -88,6 +88,9 @@ export function MutexGuardPlugin(): TimelinePlugin {
       name: "MutexGuardPlugin",
       version: "1.0.0",
       description: "Disallow parallel existence of mutex-tagged events across tracks",
+      descriptionI18n: {
+        "zh-CN": "禁止带互斥标签的事件在不同轨道上并行存在",
+      },
       type: PluginType.EXTENSION,
     },
     activate(ctx) {

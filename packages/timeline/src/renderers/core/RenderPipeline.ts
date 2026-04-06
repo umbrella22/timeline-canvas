@@ -6,6 +6,7 @@ import type {
   LayerType,
 } from "./types";
 import type { CoreLayerHook, CoreRenderTarget } from "../../plugins/types";
+import { translateTimelineConfig } from "../../utils";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("RenderPipeline");
@@ -127,7 +128,12 @@ export class RenderPipeline {
         }
         this.stats.renderedLayers++;
       } catch (error) {
-        logger.error(`Error rendering layer "${layer}":`, error);
+        logger.error(
+          `${translateTimelineConfig(context.config, "errorRenderLayer", {
+            layer,
+          })}:`,
+          error
+        );
       }
 
       if (!skipPerfMeasure) {
@@ -183,7 +189,9 @@ export class RenderPipeline {
           );
         } catch (error) {
           logger.error(
-            `Error in core layer hook "${hook.name}":`,
+            `${translateTimelineConfig(context.config, "errorCoreLayerHook", {
+              hook: hook.name,
+            })}:`,
             error
           );
           // 钩子出错时降级执行默认渲染

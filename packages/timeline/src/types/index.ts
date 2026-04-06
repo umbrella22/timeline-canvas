@@ -78,6 +78,90 @@ export interface ContextMenuStyle {
   minWidth: number;
 }
 
+export type TimelineLocale = "en" | "zh" | "zh-CN";
+
+export type TimelineMessageParams = Record<string, string | number>;
+
+export interface TimelineI18nMessages {
+  statusReady: string;
+  statusTrackAdded: string;
+  statusAtLeastOneTrackRequired: string;
+  statusTrackRemoved: string;
+  statusEmptyTrackRemoved: string;
+  statusEventUpdated: string;
+  statusEventDeleted: string;
+  statusDataLoaded: string;
+  statusTimeIndicatorMoved: string;
+  statusZoomChanged: string;
+  statusAutoFit: string;
+  statusAutoFitCappedWithPadding: string;
+  statusAutoFitCappedContentShort: string;
+  statusEndTimeUpdated: string;
+  statusInvalidSplitPosition: string;
+  statusEventSplit: string;
+  statusReadOnlyModeEnabled: string;
+  statusReadOnlyModeDisabled: string;
+  statusEventHighlighted: string;
+  statusHighlightCleared: string;
+  statusTimelineDestroyed: string;
+  statusDragging: string;
+  statusAutoTrackAdded: string;
+  statusEventPlaced: string;
+  statusEventSelected: string;
+  statusEventResizing: string;
+  statusEventResized: string;
+  statusReadOnlyEditDeleteBlocked: string;
+  statusReadOnlySplitBlocked: string;
+  statusHoverEventTimeRange: string;
+  labelTrackName: string;
+  labelDurationPrefix: string;
+  contextMenuEdit: string;
+  contextMenuDelete: string;
+  contextMenuExport: string;
+  overlayPerformanceMonitor: string;
+  overlayFps: string;
+  overlayLayerTimesMs: string;
+  overlayCollecting: string;
+  overlayLayerBackground: string;
+  overlayLayerTracks: string;
+  overlayLayerTimeline: string;
+  overlayLayerGuideLines: string;
+  overlayLayerIndicator: string;
+  overlayLayerScrollbar: string;
+  overlayLayerInteraction: string;
+  overlayLayerOverlay: string;
+  overlayLayerDragPreview: string;
+  errorCanvasNotFound: string;
+  errorCanvasContextUnavailable: string;
+  errorTimeIndicatorInvalid: string;
+  errorZoomLevelInvalid: string;
+  errorZoomLevelOutOfRange: string;
+  errorEndTimeInvalid: string;
+  errorEndTimeNotAfterStart: string;
+  warningEventsExceedEndTime: string;
+  errorInvalidTrackIndex: string;
+  errorInvalidTrackIndexWithValue: string;
+  errorInvalidEventIndex: string;
+  errorInvalidEventIndexWithValue: string;
+  errorInvalidDataFormat: string;
+  errorInvalidTimeRange: string;
+  errorStartTimeBeforeMin: string;
+  errorRenderLayer: string;
+  errorCoreLayerHook: string;
+  errorPluginDependenciesMissing: string;
+  errorPluginLoadFailed: string;
+  errorPluginLifecycleFailed: string;
+  errorPluginEventFailed: string;
+  errorPluginValidationFailed: string;
+  warningInvalidDraggingState: string;
+  warningDraggingEventMissing: string;
+  warningUnknownChangeType: string;
+  warningAlreadyInBatchMode: string;
+  warningNotInBatchMode: string;
+  warningEmptyHtmlTemplateFallback: string;
+  warningEmptyTooltipTemplateFallback: string;
+}
+
 export interface TimelineConfig {
   canvasHeight?: number;
   timelineHeight: number;
@@ -131,6 +215,8 @@ export interface TimelineConfig {
   contextMenuItems: ContextMenuItem[];
   contextMenuStyle: ContextMenuStyle;
   contextMenuHtml?: string | HTMLElement;
+  locale: TimelineLocale;
+  messages: TimelineI18nMessages;
 }
 
 export interface TimelineCallbacks {
@@ -402,6 +488,8 @@ import type { TimelinePlugin } from "../plugins/types";
 
 export interface TimelineOptions {
   canvasHeight?: number;
+  locale?: TimelineLocale;
+  messages?: Partial<TimelineI18nMessages>;
   startTime?: number;
   endTime?: number;
   startPaddingTime?: number;

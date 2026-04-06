@@ -3,6 +3,7 @@ import type {
   TimelineState,
   TimelineOptions,
   TimelineCallbacks,
+  TimelineMessageParams,
   Track,
   TimelineEvent,
   LoadDataFormat,
@@ -13,7 +14,6 @@ import {
   DEFAULT_COLORS,
   DEFAULT_EVENT_TEXT_STYLE,
   DEFAULT_EVENT_BLOCK_STYLE,
-  DEFAULT_CONTEXT_MENU_ITEMS,
   DEFAULT_CONTEXT_MENU_STYLE,
   formatTime,
   fixFloatPrecision,
@@ -21,6 +21,11 @@ import {
   snapToInterval,
   cloneEvent,
   getTimeX,
+  createDefaultContextMenuItems,
+  createTimelineMessages,
+  normalizeTimelineLocale,
+  translateTimelineMessage,
+  type TimelineMessageKey,
 } from "../utils";
 import { RenderManager } from "./managers/RenderManager";
 import { MouseHandler } from "../handlers/MouseHandler";
@@ -70,6 +75,9 @@ export class Timeline {
   private currentThemePluginId: string | null = null;
 
   constructor(canvasId: string, options: TimelineOptions = {}) {
+    const locale = normalizeTimelineLocale(options.locale);
+    const messages = createTimelineMessages(locale, options.messages);
+
     this.logger = new Logger({
       enabled: true,
       level: options.debug ? "debug" : "info",
@@ -84,13 +92,19 @@ export class Timeline {
     this.errorHandler = new ErrorHandler(this.logger);
     const canvas = document.getElementById(canvasId);
     if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
-      this.errorHandler.throw(`Canvas element with id "${canvasId}" not found`);
+      this.errorHandler.throw(
+        translateTimelineMessage(messages, "errorCanvasNotFound", {
+          canvasId,
+        })
+      );
     }
 
     this.canvas = canvas as HTMLCanvasElement;
     const ctx = this.canvas.getContext("2d");
     if (!ctx) {
-      this.errorHandler.throw("Failed to get 2D context from canvas");
+      this.errorHandler.throw(
+        translateTimelineMessage(messages, "errorCanvasContextUnavailable")
+      );
     }
     this.ctx = ctx as CanvasRenderingContext2D;
 
@@ -101,6 +115,8 @@ export class Timeline {
     this.config = {
       ...DEFAULT_CONFIG,
       ...options,
+      locale,
+      messages,
       colors: {
         ...DEFAULT_COLORS,
         ...options.colors,
@@ -113,7 +129,10 @@ export class Timeline {
         ...DEFAULT_EVENT_BLOCK_STYLE,
         ...options.eventBlockStyle,
       },
-      contextMenuItems: options.contextMenuItems || DEFAULT_CONTEXT_MENU_ITEMS,
+      eventDurationPrefix:
+        options.eventDurationPrefix ?? messages.labelDurationPrefix,
+      contextMenuItems:
+        options.contextMenuItems || createDefaultContextMenuItems(messages),
       contextMenuStyle: {
         ...DEFAULT_CONTEXT_MENU_STYLE,
         ...options.contextMenuStyle,
@@ -384,7 +403,9 @@ export class Timeline {
     ) {
       this.state.zoomLevel = parseFloat(zoom.toFixed(3));
       this.setStatus(
-        `Auto fit: ${Math.round(this.state.zoomLevel * 100)}%`
+        this.t("statusAutoFit", {
+          percentage: Math.round(this.state.zoomLevel * 100),
+        })
       );
       return;
     }
@@ -398,18 +419,19 @@ export class Timeline {
         this.config.endPaddingTime = Math.ceil(extraSeconds);
         this.state.zoomLevel = maxZoom;
         this.setStatus(
-          `Auto fit capped at ${Math.round(maxZoom * 100)}%, added ${
-            this.config.endPaddingTime
-          }s padding`
+          this.t("statusAutoFitCappedWithPadding", {
+            percentage: Math.round(maxZoom * 100),
+            seconds: this.config.endPaddingTime,
+          })
         );
         return;
       }
     }
     this.state.zoomLevel = maxZoom;
     this.setStatus(
-      `Auto fit capped at ${Math.round(
-        maxZoom * 100
-      )}%, content does not fill canvas`
+      this.t("statusAutoFitCappedContentShort", {
+        percentage: Math.round(maxZoom * 100),
+      })
     );
     this.markDirty([
       "background",
@@ -485,13 +507,15 @@ export class Timeline {
     this.state.tracks.push(track);
     this.clearGuideLineCache();
     this.adjustCanvasSize();
-    this.setStatus(`Track added (${this.state.tracks.length} total)`);
+    this.setStatus(
+      this.t("statusTrackAdded", { count: this.state.tracks.length })
+    );
     if (this.callbacks.onTrackAdd) this.callbacks.onTrackAdd(track);
   }
 
   public removeTrack(): void {
     if (this.state.tracks.length <= 1) {
-      this.setStatus("At least one track is required");
+      this.setStatus(this.t("statusAtLeastOneTrackRequired"));
       return;
     }
     const removedTrack = this.state.tracks.pop()!;
@@ -504,7 +528,9 @@ export class Timeline {
     }
     this.clearGuideLineCache();
     this.adjustCanvasSize();
-    this.setStatus(`Track removed (${this.state.tracks.length} remaining)`);
+    this.setStatus(
+      this.t("statusTrackRemoved", { count: this.state.tracks.length })
+    );
     if (this.callbacks.onTrackRemove)
       this.callbacks.onTrackRemove(removedTrack);
   }
@@ -523,7 +549,11 @@ export class Timeline {
           this.state.tracks.length > 0 ? this.state.tracks.length - 1 : null;
       }
       this.clearGuideLineCache();
-      this.setStatus(`Empty track removed (${this.state.tracks.length} remaining)`);
+      this.setStatus(
+        this.t("statusEmptyTrackRemoved", {
+          count: this.state.tracks.length,
+        })
+      );
       if (this.callbacks.onTrackRemove)
         this.callbacks.onTrackRemove(removedTrack);
       this.adjustCanvasSize();
@@ -571,7 +601,9 @@ export class Timeline {
     }
 
     this.notifyChange("events:update");
-    this.setStatus(`Event updated: ${result.event.title}`);
+    this.setStatus(
+      this.t("statusEventUpdated", { title: result.event.title })
+    );
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
         trackIndex,
@@ -603,7 +635,9 @@ export class Timeline {
     }
 
     this.notifyChange("events:update");
-    this.setStatus(`Event updated: ${result.event.title}`);
+    this.setStatus(
+      this.t("statusEventUpdated", { title: result.event.title })
+    );
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
         trackIndex,
@@ -621,7 +655,7 @@ export class Timeline {
 
     this.autoRemoveEmptyLastTrack();
     this.notifyChange("events:delete");
-    this.setStatus(`Event deleted: ${event.title}`);
+    this.setStatus(this.t("statusEventDeleted", { title: event.title }));
     if (this.callbacks.onEventDelete)
       this.callbacks.onEventDelete({ trackIndex, eventIndex, event });
     return true;
@@ -635,13 +669,15 @@ export class Timeline {
     if (data.timeIndicatorPosition !== undefined)
       this.setTimeIndicator(data.timeIndicatorPosition);
     this.notifyChange("data:load");
-    this.setStatus(`Loaded ${this.state.tracks.length} track(s)`);
+    this.setStatus(
+      this.t("statusDataLoaded", { count: this.state.tracks.length })
+    );
     return true;
   }
 
   public setTimeIndicator(seconds: number, applySnap = false): boolean {
     if (typeof seconds !== "number" || isNaN(seconds)) {
-      this.logger.error("Time indicator position must be a number (seconds)");
+      this.logger.error(this.t("errorTimeIndicatorInvalid"));
       return false;
     }
     if (applySnap && this.state.snapEnabled) {
@@ -665,7 +701,11 @@ export class Timeline {
     this.scrollToTimeIndicator(seconds);
     // 使用调度器处理高亮计算和回调触发
     this.notifyChange("timeIndicator:move");
-    this.setStatus(`Time indicator moved to: ${formatTime(seconds)}`);
+    this.setStatus(
+      this.t("statusTimeIndicatorMoved", {
+        time: formatTime(seconds),
+      })
+    );
     if (this.callbacks.onTimeIndicatorMove)
       this.callbacks.onTimeIndicatorMove({
         position: seconds,
@@ -837,7 +877,11 @@ export class Timeline {
       );
     }
     this.notifyChange("zoom:change");
-    this.setStatus(`Zoom: ${Math.round(this.state.zoomLevel * 100)}%`);
+    this.setStatus(
+      this.t("statusZoomChanged", {
+        percentage: Math.round(this.state.zoomLevel * 100),
+      })
+    );
     if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
       this.callbacks.onZoom({
         zoomLevel: this.state.zoomLevel,
@@ -848,11 +892,11 @@ export class Timeline {
 
   public setZoomLevel(zoomLevel: number): boolean {
     if (typeof zoomLevel !== "number" || isNaN(zoomLevel)) {
-      this.logger.error("Zoom level must be a valid number");
+      this.logger.error(this.t("errorZoomLevelInvalid"));
       return false;
     }
     if (zoomLevel < 1.0 || zoomLevel > 1000.0) {
-      this.logger.error("Zoom level out of valid range (1-1000)");
+      this.logger.error(this.t("errorZoomLevelOutOfRange"));
       return false;
     }
     const oldZoomLevel = this.state.zoomLevel;
@@ -869,7 +913,11 @@ export class Timeline {
     );
     this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
     this.notifyChange("zoom:change");
-    this.setStatus(`Zoom: ${Math.round(this.state.zoomLevel * 100)}%`);
+    this.setStatus(
+      this.t("statusZoomChanged", {
+        percentage: Math.round(this.state.zoomLevel * 100),
+      })
+    );
     if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
       this.callbacks.onZoom({
         zoomLevel: this.state.zoomLevel,
@@ -885,18 +933,18 @@ export class Timeline {
 
   public setEndTime(endTime: number): boolean {
     if (typeof endTime !== "number" || isNaN(endTime)) {
-      this.logger.error("End time must be a valid number (seconds)");
+      this.logger.error(this.t("errorEndTimeInvalid"));
       return false;
     }
     if (endTime <= this.config.startTime) {
-      this.logger.error("End time must be greater than start time");
+      this.logger.error(this.t("errorEndTimeNotAfterStart"));
       return false;
     }
     const hasOverflowEvents = this.state.tracks.some((track) =>
       track.events.some((event) => event.endTime > endTime)
     );
     if (hasOverflowEvents) {
-      this.logger.warn("Warning: some events exceed the new end time");
+      this.logger.warn(this.t("warningEventsExceedEndTime"));
     }
     const oldEndTime = this.config.endTime;
     this.config.endTime = endTime;
@@ -915,7 +963,10 @@ export class Timeline {
     this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
     this.notifyChange("config:endTime");
     this.setStatus(
-      `End time updated: ${formatTime(oldEndTime)} → ${formatTime(endTime)}`
+      this.t("statusEndTimeUpdated", {
+        from: formatTime(oldEndTime),
+        to: formatTime(endTime),
+      })
     );
     return true;
   }
@@ -926,6 +977,13 @@ export class Timeline {
 
   public formatTime(seconds: number): string {
     return formatTime(seconds);
+  }
+
+  public t(
+    key: TimelineMessageKey,
+    params: TimelineMessageParams = {}
+  ): string {
+    return translateTimelineMessage(this.config.messages, key, params);
   }
 
   public setStatus(text: string): void {
@@ -1126,7 +1184,7 @@ export class Timeline {
       splitTime <= event.startTime + this.config.minEventDuration ||
       splitTime >= event.endTime - this.config.minEventDuration
     ) {
-      this.setStatus("Invalid split position: resulting events too short");
+      this.setStatus(this.t("statusInvalidSplitPosition"));
       return false;
     }
     const firstEvent: TimelineEvent = {
@@ -1149,7 +1207,7 @@ export class Timeline {
     this.clearGuideLineCache();
     this.eventIndexManager.invalidateTrack(trackIndex);
     this.notifyChange("events:split");
-    this.setStatus(`Event split: ${event.title}`);
+    this.setStatus(this.t("statusEventSplit", { title: event.title }));
     if (this.callbacks.onEventUpdate) {
       this.callbacks.onEventUpdate({
         type: "split",
@@ -1181,16 +1239,24 @@ export class Timeline {
       this.state.guideLines = [];
     }
     this.notifyChange("config:readOnly");
-    this.setStatus(readOnly ? "Read-only mode enabled" : "Read-only mode disabled");
+    this.setStatus(
+      this.t(
+        readOnly ? "statusReadOnlyModeEnabled" : "statusReadOnlyModeDisabled"
+      )
+    );
   }
   public highlightEvent(trackIndex: number, eventIndex: number): boolean {
     if (trackIndex < 0 || trackIndex >= this.state.tracks.length) {
-      this.logger.error(`Invalid track index: ${trackIndex}`);
+      this.logger.error(
+        this.t("errorInvalidTrackIndexWithValue", { trackIndex })
+      );
       return false;
     }
     const track = this.state.tracks[trackIndex];
     if (eventIndex < 0 || eventIndex >= track.events.length) {
-      this.logger.error(`Invalid event index: ${eventIndex}`);
+      this.logger.error(
+        this.t("errorInvalidEventIndexWithValue", { eventIndex })
+      );
       return false;
     }
     this.state.selectedEvent = null;
@@ -1198,7 +1264,9 @@ export class Timeline {
     this.state.highlightedEvent = { trackIndex, eventIndex };
     const event = track.events[eventIndex];
     this.notifyChange("highlight:change");
-    this.setStatus(`Event highlighted: ${event.title}`);
+    this.setStatus(
+      this.t("statusEventHighlighted", { title: event.title })
+    );
     return true;
   }
 
@@ -1208,7 +1276,7 @@ export class Timeline {
       this.state.selectedEvent = null;
       this.state.selectedTrack = null;
       this.notifyChange("highlight:change");
-      this.setStatus("Highlight cleared");
+      this.setStatus(this.t("statusHighlightCleared"));
     }
   }
 
@@ -1246,7 +1314,7 @@ export class Timeline {
       this.canvas.removeEventListener("wheel", this.eventListeners.wheel);
       this.eventListeners = null;
     }
-    this.setStatus("Timeline destroyed");
+    this.setStatus(this.t("statusTimelineDestroyed"));
   }
 
   private clearGuideLineCache(): void {

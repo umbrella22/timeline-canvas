@@ -9,6 +9,7 @@ import type {
   PerformanceProvider,
 } from "../../plugins/types";
 import type { TimelineConfig, TimelineState } from "../../types";
+import { translateTimelineConfig } from "../../utils";
 import { ErrorHandler } from "./ErrorHandler";
 import { getLogger } from "./Logger";
 
@@ -45,7 +46,11 @@ export class PluginManager {
     if (!this.areDependenciesLoaded(plugin.metadata.dependencies)) {
       return this.errorHandler.fail(
         this.baseContext.config.debug,
-        `Plugin dependencies missing: ${pluginId}`,
+        translateTimelineConfig(
+          this.baseContext.config,
+          "errorPluginDependenciesMissing",
+          { pluginId }
+        ),
         new Error(
           `Missing dependencies: ${plugin.metadata.dependencies?.join(", ")}`
         )
@@ -79,7 +84,9 @@ export class PluginManager {
       this.cleanupPluginResources(pluginId);
       return this.errorHandler.fail(
         this.baseContext.config.debug,
-        `Plugin load failed: ${pluginId}`,
+        translateTimelineConfig(this.baseContext.config, "errorPluginLoadFailed", {
+          pluginId,
+        }),
         error
       );
     }
@@ -158,7 +165,11 @@ export class PluginManager {
     } catch (error) {
       return this.errorHandler.fail(
         this.baseContext.config.debug,
-        `Plugin ${step} failed: ${pluginId}`,
+        translateTimelineConfig(
+          this.baseContext.config,
+          "errorPluginLifecycleFailed",
+          { step, pluginId }
+        ),
         error
       );
     }
@@ -382,7 +393,9 @@ export class PluginManager {
       } catch (error) {
         this.errorHandler.debugIf(
           this.baseContext.config.debug,
-          `Plugin event failed: ${event}`,
+          translateTimelineConfig(this.baseContext.config, "errorPluginEventFailed", {
+            event,
+          }),
           error
         );
       }
@@ -399,7 +412,11 @@ export class PluginManager {
       } catch (error) {
         this.errorHandler.debugIf(
           this.baseContext.config.debug,
-          `Plugin validation failed: ${event}`,
+          translateTimelineConfig(
+            this.baseContext.config,
+            "errorPluginValidationFailed",
+            { event }
+          ),
           error
         );
         return false;

@@ -44,6 +44,9 @@ export const LightThemePlugin: TimelinePlugin = {
     name: "theme-light",
     version: "1.0.0",
     description: "Light theme for timeline",
+    descriptionI18n: {
+      "zh-CN": "时间轴亮色主题",
+    },
     type: PluginType.THEME,
   },
   activate(context) {

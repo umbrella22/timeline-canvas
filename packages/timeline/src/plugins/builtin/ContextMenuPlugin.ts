@@ -23,6 +23,9 @@ export function ContextMenuPlugin(
       name: "context-menu",
       version: "1.0.0",
       description: "Context menu as plugin, supports HTML takeover",
+      descriptionI18n: {
+        "zh-CN": "插件化右键菜单，支持 HTML 接管渲染",
+      },
       type: PluginType.EXTENSION,
     },
     activate(context) {
@@ -34,7 +37,7 @@ export function ContextMenuPlugin(
       // 传入 htmlTemplate 自动启用 HTML 模式，但需要验证内容有效性
       let useHtml = !!htmlTemplate;
       if (useHtml && (!htmlTemplate || htmlTemplate.trim() === "")) {
-        logger.warn("htmlTemplate is empty, falling back to Canvas rendering");
+        logger.warn(context.timeline.t("warningEmptyHtmlTemplateFallback"));
         useHtml = false;
       }
       const layer: RenderLayer = {

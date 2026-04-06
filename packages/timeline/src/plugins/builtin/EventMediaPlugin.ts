@@ -166,6 +166,9 @@ export function EventMediaPlugin(): TimelinePlugin {
       name: "event-media",
       version: "1.0.0",
       description: "Render images and waveforms inside event blocks",
+      descriptionI18n: {
+        "zh-CN": "在事件块内渲染图片和波形",
+      },
       type: PluginType.RENDER,
     },
     async activate(context) {

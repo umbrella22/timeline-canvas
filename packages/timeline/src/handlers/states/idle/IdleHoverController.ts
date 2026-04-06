@@ -43,9 +43,11 @@ export class IdleHoverController {
       const event = state.tracks[hitResult.trackIndex].events[hitResult.eventIndex];
       canvas.style.cursor = "pointer";
       timeline.setStatus(
-        `${event.title} (${timeline.formatTime(event.startTime)} - ${timeline.formatTime(
-          event.endTime
-        )})`
+        timeline.t("statusHoverEventTimeRange", {
+          title: event.title,
+          start: timeline.formatTime(event.startTime),
+          end: timeline.formatTime(event.endTime),
+        })
       );
       return null;
     }

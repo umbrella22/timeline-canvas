@@ -84,12 +84,12 @@ export class ScrollingState extends BaseState {
 
     if (state.draggingScrollbar) {
       state.draggingScrollbar = false;
-      this.timeline.setStatus("Ready");
+      this.timeline.setStatus(this.timeline.t("statusReady"));
     }
 
     if (state.draggingHorizontalScrollbar) {
       state.draggingHorizontalScrollbar = false;
-      this.timeline.setStatus("Ready");
+      this.timeline.setStatus(this.timeline.t("statusReady"));
     }
 
     return this.createIdleState();

@@ -87,6 +87,9 @@ export function EventTooltipPlugin(
       version: "1.0.0",
       description:
         "Tooltip plugin for displaying full event title when text is truncated",
+      descriptionI18n: {
+        "zh-CN": "当事件标题被截断时显示完整标题的提示插件",
+      },
       type: PluginType.EXTENSION,
     },
 
@@ -306,7 +309,7 @@ export function EventTooltipPlugin(
             const testContent = htmlTemplate(tooltipState.title);
             if (!testContent || testContent.trim() === "") {
               logger.warn(
-                "htmlTemplate returned empty content, falling back to Canvas rendering"
+                context.timeline.t("warningEmptyTooltipTemplateFallback")
               );
             } else {
               let container =

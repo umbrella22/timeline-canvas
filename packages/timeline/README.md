@@ -65,6 +65,10 @@ The `Timeline` constructor accepts an options object:
 
 ```typescript
 interface TimelineOptions {
+  // Localization
+  locale?: "en" | "zh" | "zh-CN";
+  messages?: Partial<TimelineI18nMessages>;
+
   // Dimensions
   canvasHeight?: number;
   trackHeight?: number;
@@ -98,6 +102,23 @@ interface TimelineOptions {
   // ... and more
 }
 ```
+
+### Localization
+
+Built-in status text, default context menu labels, and performance overlay labels can be localized with `locale` or overridden with `messages`:
+
+```typescript
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timeline-canvas", {
+  locale: "zh-CN",
+  messages: {
+    statusReady: "已准备",
+  },
+});
+```
+
+Built-in plugin metadata also supports localized descriptions via `descriptionI18n`. If you need to render the right description for the current language, use `getPluginMetadataDescription(metadata, locale)`.
 
 ## API Reference
 

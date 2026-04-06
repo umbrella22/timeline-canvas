@@ -131,7 +131,7 @@ export class IdleMouseDownRouter {
         event.readonly &&
         (menuItem.type === "delete" || menuItem.type === "edit")
       ) {
-        timeline.setStatus("Read-only events cannot be edited or deleted");
+        timeline.setStatus(timeline.t("statusReadOnlyEditDeleteBlocked"));
         state.contextMenuVisible = false;
         state.contextMenuEvent = null;
         timeline.notifyChange("interaction:contextMenu");
@@ -281,7 +281,7 @@ export class IdleMouseDownRouter {
 
     if (isDoubleClick && config.enableEventSplit) {
       if (event.readonly) {
-        timeline.setStatus("Read-only events cannot be split");
+        timeline.setStatus(timeline.t("statusReadOnlySplitBlocked"));
         state.lastClickTime = 0;
         state.lastClickEvent = null;
         return null;
@@ -307,7 +307,9 @@ export class IdleMouseDownRouter {
 
     if (event.readonly || config.readOnly) {
       canvas.style.cursor = "not-allowed";
-      timeline.setStatus(`已选中: ${event.title}`);
+      timeline.setStatus(
+        timeline.t("statusEventSelected", { title: event.title })
+      );
 
       if (timeline.callbacks.onEventHighlight) {
         timeline.callbacks.onEventHighlight({
@@ -322,7 +324,9 @@ export class IdleMouseDownRouter {
           trackIndex,
           eventIndex,
           event: cloneEvent(event),
-          trackName: `轨道 ${trackIndex + 1}`,
+          trackName: timeline.t("labelTrackName", {
+            index: trackIndex + 1,
+          }),
           formattedTimeRange: formatTimeRange(event.startTime, event.endTime),
         });
       }

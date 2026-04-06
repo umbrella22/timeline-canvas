@@ -220,9 +220,10 @@ export class ResizingState extends BaseState {
 
     this.timeline.notifyChange("events:update");
     this.timeline.setStatus(
-      `调整大小: ${this.timeline.formatTime(
-        event.startTime
-      )} - ${this.timeline.formatTime(event.endTime)}`
+      this.timeline.t("statusEventResizing", {
+        start: this.timeline.formatTime(event.startTime),
+        end: this.timeline.formatTime(event.endTime),
+      })
     );
 
     return null;
@@ -251,7 +252,9 @@ export class ResizingState extends BaseState {
     const event = state.tracks[trackIndex].events[eventIndex];
     state.resizingEvent = null;
     this.timeline.getCanvas().style.cursor = "default";
-    this.timeline.setStatus(`已调整事件大小: ${event.title}`);
+    this.timeline.setStatus(
+      this.timeline.t("statusEventResized", { title: event.title })
+    );
 
     if (this.timeline.callbacks.onEventUpdate) {
       this.timeline.callbacks.onEventUpdate({

@@ -65,6 +65,10 @@ timeline.addEvent(0, 10, 30, "我的事件", "描述信息");
 
 ```typescript
 interface TimelineOptions {
+  // 国际化
+  locale?: "en" | "zh" | "zh-CN";
+  messages?: Partial<TimelineI18nMessages>;
+
   // 尺寸设置
   canvasHeight?: number;
   trackHeight?: number;
@@ -98,6 +102,23 @@ interface TimelineOptions {
   // ... 更多回调
 }
 ```
+
+### 国际化
+
+内置状态提示、默认右键菜单文案和性能面板标签支持通过 `locale` 切换，也可以通过 `messages` 做局部覆盖：
+
+```typescript
+import { Timeline } from "timeline-canvas";
+
+const timeline = new Timeline("timeline-canvas", {
+  locale: "zh-CN",
+  messages: {
+    statusReady: "已准备",
+  },
+});
+```
+
+内置插件元信息里的 `description` 也支持通过 `descriptionI18n` 提供多语言版本；如果需要按当前语言渲染描述，可以使用 `getPluginMetadataDescription(metadata, locale)`。
 
 ## API 参考
 

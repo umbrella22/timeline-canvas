@@ -79,14 +79,18 @@ export class DraggingState extends BaseState {
       eventIndex < 0 ||
       eventIndex >= state.tracks[trackIndex].events.length
     ) {
-      logger.warn("Invalid dragging state:", { value: state.draggingEvent });
+      logger.warn(this.timeline.t("warningInvalidDraggingState"), {
+        value: state.draggingEvent,
+      });
       state.draggingEvent = null;
       return this.createIdleState();
     }
 
     const event = state.tracks[trackIndex].events[eventIndex];
 
-    this.timeline.setStatus(`Dragging: ${event.title}`);
+    this.timeline.setStatus(
+      this.timeline.t("statusDragging", { title: event.title })
+    );
 
     // 计算新的时间位置
     const currentMouseX = logicalX;
@@ -105,7 +109,11 @@ export class DraggingState extends BaseState {
     if (config.autoAddTrack && targetTrackIndex >= state.tracks.length) {
       const newTrack: Track = { id: state.tracks.length, events: [] };
       state.tracks.push(newTrack);
-      this.timeline.setStatus(`自动新增轨道 ${state.tracks.length}`);
+      this.timeline.setStatus(
+        this.timeline.t("statusAutoTrackAdded", {
+          count: state.tracks.length,
+        })
+      );
       if (this.timeline.callbacks.onTrackAdd) {
         this.timeline.callbacks.onTrackAdd(newTrack);
       }
@@ -283,14 +291,20 @@ export class DraggingState extends BaseState {
 
     // 验证轨道索引是否有效
     if (trackIndex < 0 || trackIndex >= state.tracks.length) {
-      logger.warn(`无法找到拖拽的事件, 放弃操作`, { trackIndex, eventIndex });
+      logger.warn(this.timeline.t("warningDraggingEventMissing"), {
+        trackIndex,
+        eventIndex,
+      });
       state.draggingEvent = null;
       return this.createIdleState();
     }
 
     const event = state.tracks[trackIndex]?.events[eventIndex];
     if (!event) {
-      logger.warn(`无法找到拖拽的事件, 放弃操作`, { trackIndex, eventIndex });
+      logger.warn(this.timeline.t("warningDraggingEventMissing"), {
+        trackIndex,
+        eventIndex,
+      });
       state.draggingEvent = null;
       return this.createIdleState();
     }
@@ -301,9 +315,11 @@ export class DraggingState extends BaseState {
 
     if (state.draggingEvent.isDragging) {
       this.timeline.setStatus(
-        `已放置: ${event.title} (${this.timeline.formatTime(
-          event.startTime
-        )} - ${this.timeline.formatTime(event.endTime)})`
+        this.timeline.t("statusEventPlaced", {
+          title: event.title,
+          start: this.timeline.formatTime(event.startTime),
+          end: this.timeline.formatTime(event.endTime),
+        })
       );
 
       if (wasSelected) {
@@ -321,14 +337,18 @@ export class DraggingState extends BaseState {
     } else {
       // 没有实际拖拽,只是点击
       state.selectedEvent = { trackIndex, eventIndex } as SelectedEvent;
-      this.timeline.setStatus(`已选中: ${event.title}`);
+      this.timeline.setStatus(
+        this.timeline.t("statusEventSelected", { title: event.title })
+      );
 
       if (this.timeline.callbacks.onEventClick) {
         this.timeline.callbacks.onEventClick({
           trackIndex,
           eventIndex,
           event: cloneEvent(event),
-          trackName: `轨道 ${trackIndex + 1}`,
+          trackName: this.timeline.t("labelTrackName", {
+            index: trackIndex + 1,
+          }),
           formattedTimeRange: `${this.timeline.formatTime(
             event.startTime
           )} - ${this.timeline.formatTime(event.endTime)}`,

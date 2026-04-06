@@ -5,7 +5,11 @@ import type {
   ChangeType,
   CoreLayerHook,
   PluginContext,
+  PluginLocalizedText,
+  PluginMetadata,
   RenderLayer,
+  TimelineI18nMessages,
+  TimelineLocale,
   TimeIndicatorHighlightData,
   TimelineCallbacks,
   TimelineConfig,
@@ -36,6 +40,8 @@ describe("public type regressions", () => {
       .parameters.toEqualTypeOf<[CoreLayerHook]>();
     expectTypeOf<PluginContext["api"]["getData"]>()
       .returns.toEqualTypeOf<unknown>();
+    expectTypeOf<PluginMetadata["descriptionI18n"]>()
+      .toEqualTypeOf<PluginLocalizedText | undefined>();
   });
 
   it("保留配置、回调与变更类型导出", () => {
@@ -47,6 +53,10 @@ describe("public type regressions", () => {
     >().parameters.toEqualTypeOf<[TimeIndicatorHighlightData]>();
     expectTypeOf<TimelineOptions["theme"]>()
       .toEqualTypeOf<TimelinePlugin | undefined>();
+    expectTypeOf<TimelineOptions["locale"]>()
+      .toEqualTypeOf<TimelineLocale | undefined>();
+    expectTypeOf<TimelineOptions["messages"]>()
+      .toEqualTypeOf<Partial<TimelineI18nMessages> | undefined>();
     expectTypeOf<TimelineOptions["eventDurationPrefix"]>()
       .toEqualTypeOf<string | undefined>();
     expectTypeOf<TimelineConfig["formatEventDuration"]>()

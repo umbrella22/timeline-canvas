@@ -5,12 +5,14 @@ export { ContextMenuPlugin } from "./plugins/builtin/ContextMenuPlugin";
 export { PerformanceOverlayPlugin } from "./plugins/builtin/PerformanceOverlayPlugin";
 export { EventMediaPlugin } from "./plugins/builtin/EventMediaPlugin";
 export { EventTooltipPlugin } from "./plugins/builtin/EventTooltipPlugin";
+export { getPluginMetadataDescription } from "./plugins/metadata";
 export type { ChangeType } from "./core/managers/ChangeScheduler";
 export type {
   TimelinePlugin,
   PluginContext,
   PluginAPI,
   PluginMetadata,
+  PluginLocalizedText,
   RenderLayer,
   RenderLayerPosition,
   CoreRenderTarget,
@@ -29,6 +31,9 @@ export type {
   ContextMenuItem,
   ContextMenuStyle,
   ContextMenuData,
+  TimelineLocale,
+  TimelineI18nMessages,
+  TimelineMessageParams,
   LoadDataFormat,
   EventAddData,
   EventUpdateData,
@@ -40,4 +45,8 @@ export type {
   ZoomData,
   InteractionTarget,
 } from "./types";
-export { formatTime, getCurrentTime } from "./utils";
+export {
+  formatTime,
+  getCurrentTime,
+  createTimelineMessages,
+} from "./utils";

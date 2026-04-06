@@ -1,4 +1,18 @@
-import type { TimelineColors, EventTextStyle, EventBlockStyle, TimelineConfig, ContextMenuItem, ContextMenuStyle } from "../types";
+import type {
+  TimelineColors,
+  EventTextStyle,
+  EventBlockStyle,
+  TimelineConfig,
+  ContextMenuItem,
+  ContextMenuStyle,
+} from "../types";
+import {
+  DEFAULT_TIMELINE_LOCALE,
+  createDefaultContextMenuItems,
+  createTimelineMessages,
+} from "./i18n";
+
+const DEFAULT_MESSAGES = createTimelineMessages(DEFAULT_TIMELINE_LOCALE);
 
 export const DEFAULT_COLORS: TimelineColors = {
   canvasBackground: "#1E1E2E",
@@ -62,11 +76,8 @@ export const DEFAULT_EVENT_BLOCK_STYLE: EventBlockStyle = {
   selectionGlowBlur: 10,
 };
 
-export const DEFAULT_CONTEXT_MENU_ITEMS: ContextMenuItem[] = [
-  { type: "edit", name: "Edit" },
-  { type: "delete", name: "Delete" },
-  { type: "export", name: "Export" },
-];
+export const DEFAULT_CONTEXT_MENU_ITEMS: ContextMenuItem[] =
+  createDefaultContextMenuItems(DEFAULT_MESSAGES);
 
 export const DEFAULT_CONTEXT_MENU_STYLE: ContextMenuStyle = {
   fontSize: 14,
@@ -99,6 +110,8 @@ export const DEFAULT_CONFIG: Omit<
   autoFitOnInit: true,
   minAutoFitZoom: 1.0,
   maxAutoFitZoom: 3.0,
+  locale: DEFAULT_TIMELINE_LOCALE,
+  messages: DEFAULT_MESSAGES,
   timeUnit: "second",
   timeFormat: "24h",
   snapInterval: 15,
@@ -124,7 +137,7 @@ export const DEFAULT_CONFIG: Omit<
   autoRemoveEmptyLastTrack: true,
   readOnly: false,
   showEventDurationLabel: true,
-  eventDurationPrefix: "Duration",
+  eventDurationPrefix: DEFAULT_MESSAGES.labelDurationPrefix,
   formatEventDuration: null,
   scale: null,
   scaleSplitCount: 10,
