@@ -2,17 +2,17 @@
 title: EventMediaPlugin
 ---
 
-Event media plugin. Renders images or waveforms inside event blocks.
+Renders images and waveforms inside event blocks.
 
-## Basic Usage
+## Basic usage
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
 ```
 
-## Data Format
+## Data shape
 
 ```ts
 timeline.loadData({
@@ -22,14 +22,15 @@ timeline.loadData({
         {
           startTime: 0,
           endTime: 900,
-          title: "Media Event",
+          title: "Media event",
           media: {
             images: [
-              { src: "path/to/image.jpg", fit: "cover", opacity: 0.8 },
+              { src: "/cover.jpg", fit: "cover", opacity: 0.35 },
             ],
             waveform: {
               data: [0.1, 0.5, -0.2],
               color: "#1890ff",
+              backgroundColor: "rgba(24, 144, 255, 0.08)",
               opacity: 0.6,
             },
           },
@@ -40,10 +41,10 @@ timeline.loadData({
 });
 ```
 
-## Media Type Definition
+## `media` field
 
-```typescript
-interface EventMedia {
+```ts
+interface TimelineEvent["media"] {
   images?: Array<{
     src: string;
     fit?: "cover" | "contain" | "stretch";
@@ -58,10 +59,9 @@ interface EventMedia {
 }
 ```
 
-## Advanced Usage
+## Mixed-media example
 
 ```ts
-// Mixed media types
 timeline.loadData({
   tracks: [
     {
@@ -69,17 +69,17 @@ timeline.loadData({
         {
           startTime: 0,
           endTime: 100,
-          title: "Audio/Video Event",
+          title: "Audio / video event",
           media: {
             images: [
               {
-                src: "thumbnail.jpg",
-                fit: "cover",
-                opacity: 0.3,
+                src: "/thumbnail.jpg",
+                fit: "contain",
+                opacity: 0.25,
               },
             ],
             waveform: {
-              data: audioSamples, // Float32Array or number[]
+              data: audioSamples,
               color: "#ff6b6b",
               opacity: 0.8,
             },
@@ -90,3 +90,28 @@ timeline.loadData({
   ],
 });
 ```
+
+## Implementation details
+
+- Images are fetched asynchronously and cached as `ImageBitmap`
+- Waveform data is cached as `Float32Array`
+- When available, the plugin pre-renders waveforms with `OffscreenCanvas`
+- Images and waveforms are clipped to the event block bounds
+- Images render first, then waveforms
+
+## Plugin event hook
+
+Internally, the plugin registers this event handler:
+
+```ts
+"render:event:media"
+```
+
+If you build a similar plugin, this is the hook to look at.
+
+## Plugin ID
+
+```ts
+"event-media@1.0.0"
+```
+

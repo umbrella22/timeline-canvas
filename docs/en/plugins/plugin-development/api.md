@@ -11,30 +11,25 @@ sequenceDiagram
 
     User->>Timeline: usePlugin(plugin)
     Timeline->>PM: loadPlugin(plugin)
-
+    PM->>PM: Check dependencies
     PM->>PM: Create PluginContext
     PM->>Plugin: init(context)
     PM->>Plugin: activate(context)
-    PM->>PM: Register plugin resources
+    PM-->>Timeline: true / false
 
-    PM-->>Timeline: true/false
-    Timeline-->>User: Load result
-
-    Note over User,Plugin: Plugin running...
+    Note over User,Plugin: Plugin is running
 
     User->>Timeline: removePlugin(pluginId)
     Timeline->>PM: unloadPlugin(pluginId)
     PM->>Plugin: deactivate(context)
     PM->>Plugin: destroy(context)
-    PM->>PM: Cleanup plugin resources
-    PM-->>Timeline: true/false
+    PM->>PM: Clean up plugin resources
+    PM-->>Timeline: true / false
 ```
 
-## Plugin Interface
+## TimelinePlugin
 
-### TimelinePlugin
-
-```typescript
+```ts
 interface TimelinePlugin {
   metadata: PluginMetadata;
   init?: (context: PluginContext) => Promise<void> | void;
@@ -44,76 +39,110 @@ interface TimelinePlugin {
 }
 ```
 
-### Plugin metadata
+## PluginMetadata
 
-```typescript
+```ts
 interface PluginMetadata {
-  name: string; // plugin name (required)
-  version: string; // version (required)
-  description: string; // description (required)
-  author?: string; // author (optional)
-  type: PluginType; // plugin type (required)
-  priority?: PluginPriority; // priority (optional, default: NORMAL)
-  dependencies?: string[]; // dependencies (optional)
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  type: PluginType;
+  priority?: PluginPriority;
+  dependencies?: string[];
 }
 ```
 
-### Plugin context
+Notes:
 
-```typescript
+- Plugin IDs use the format `${name}@${version}`
+- `dependencies` can use either full plugin IDs or plugin names
+- If `priority` is omitted, the runtime currently falls back to `0`
+
+## PluginContext
+
+```ts
 interface PluginContext {
-  timeline: Timeline; // timeline instance
-  config: any; // config object
-  state: any; // state object
-  api: PluginAPI; // API surface
+  timeline: Timeline;
+  config: TimelineConfig;
+  state: TimelineState;
+  api: PluginAPI;
 }
 ```
 
-### Plugin API
+## PluginAPI
 
-```typescript
+```ts
 interface PluginAPI {
-  // Render layer management
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
-
-  // Event handler management
-  registerEventHandler: (event: string, handler: Function) => void;
-  unregisterEventHandler: (event: string, handler: Function) => void;
-
-  // Notifications and debugging
+  registerCoreLayerHook: (hook: CoreLayerHook) => void;
+  unregisterCoreLayerHook: (name: string) => void;
+  registerEventHandler: (event: string, handler: PluginEventHandler) => void;
+  unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
   showNotification: (
     message: string,
     type?: "info" | "warning" | "error"
   ) => void;
-
-  // Data storage
-  getData: (key: string) => any;
-  setData: (key: string, value: any) => void;
-
-  // Performance
+  getData: (key: string) => unknown;
+  setData: (key: string, value: unknown) => void;
   setPerformanceProvider: (provider: PerformanceProvider) => void;
   getPerformanceStats: () => Map<string, PerformanceStats>;
   getFPS: () => number;
 }
 ```
 
-## Data Storage
+### RenderLayer
 
-### Plugin data storage
+```ts
+interface RenderLayer {
+  name: string;
+  position: "background" | "overlay";
+  render: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState
+  ) => void;
+}
+```
 
-```javascript
-// Store data
+### CoreLayerHook
+
+```ts
+interface CoreLayerHook {
+  name: string;
+  target: "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "interaction";
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    next: () => void
+  ) => void;
+}
+```
+
+Notes:
+
+- `registerRenderLayer()` is for top-level or bottom-level custom drawing
+- `registerCoreLayerHook()` is for wrapping or replacing core rendering layers
+- Call `next()` to continue the default core render path; skip it to fully take over that layer
+
+## Plugin data storage
+
+Each plugin gets its own isolated key-value store:
+
+```ts
 context.api.setData("counter", 0);
-context.api.setData("settings", { theme: "dark", language: "en" });
+context.api.setData("settings", { enabled: true });
 
-// Read data
 const counter = context.api.getData("counter");
 const settings = context.api.getData("settings");
 ```
 
-### Notes
+Storage behavior:
 
-- Data persists for the plugin’s lifecycle
-- Data is cleaned up automatically when the plugin is unloaded
-- Data is isolated between plugins
+- Data persists for the life of the plugin
+- Data is cleaned up automatically when the plugin unloads
+- One plugin cannot read another plugin’s store

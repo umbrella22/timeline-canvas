@@ -11,30 +11,25 @@ sequenceDiagram
 
     User->>Timeline: usePlugin(plugin)
     Timeline->>PM: loadPlugin(plugin)
-
-    PM->>PM: 创建PluginContext
+    PM->>PM: 检查 dependencies
+    PM->>PM: 创建 PluginContext
     PM->>Plugin: init(context)
     PM->>Plugin: activate(context)
-    PM->>PM: 注册插件资源
+    PM-->>Timeline: true / false
 
-    PM-->>Timeline: true/false
-    Timeline-->>User: 加载结果
-
-    Note over User,Plugin: 插件运行中...
+    Note over User,Plugin: 插件运行中
 
     User->>Timeline: removePlugin(pluginId)
     Timeline->>PM: unloadPlugin(pluginId)
     PM->>Plugin: deactivate(context)
     PM->>Plugin: destroy(context)
     PM->>PM: 清理插件资源
-    PM-->>Timeline: true/false
+    PM-->>Timeline: true / false
 ```
 
-## 插件接口详解
+## TimelinePlugin
 
-### TimelinePlugin 接口
-
-```typescript
+```ts
 interface TimelinePlugin {
   metadata: PluginMetadata;
   init?: (context: PluginContext) => Promise<void> | void;
@@ -44,76 +39,110 @@ interface TimelinePlugin {
 }
 ```
 
-### 插件元数据
+## PluginMetadata
 
-```typescript
+```ts
 interface PluginMetadata {
-  name: string; // 插件名称（必填）
-  version: string; // 版本号（必填）
-  description: string; // 描述（必填）
-  author?: string; // 作者（可选）
-  type: PluginType; // 插件类型（必填）
-  priority?: PluginPriority; // 优先级（可选，默认NORMAL）
-  dependencies?: string[]; // 依赖插件（可选）
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  type: PluginType;
+  priority?: PluginPriority;
+  dependencies?: string[];
 }
 ```
 
-### 插件上下文
+说明：
 
-```typescript
+- 插件 ID 的格式是 `${name}@${version}`
+- `dependencies` 既可以写完整插件 ID，也可以只写插件名
+- 当前运行时里，如果不显式设置 `priority`，排序回退值是 `0`
+
+## PluginContext
+
+```ts
 interface PluginContext {
-  timeline: Timeline; // 时间轴实例
-  config: any; // 配置对象
-  state: any; // 状态对象
-  api: PluginAPI; // API 接口
+  timeline: Timeline;
+  config: TimelineConfig;
+  state: TimelineState;
+  api: PluginAPI;
 }
 ```
 
-### 插件 API
+## PluginAPI
 
-```typescript
+```ts
 interface PluginAPI {
-  // 渲染层管理
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
-
-  // 事件处理器管理
-  registerEventHandler: (event: string, handler: Function) => void;
-  unregisterEventHandler: (event: string, handler: Function) => void;
-
-  // 通知和调试
+  registerCoreLayerHook: (hook: CoreLayerHook) => void;
+  unregisterCoreLayerHook: (name: string) => void;
+  registerEventHandler: (event: string, handler: PluginEventHandler) => void;
+  unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
   showNotification: (
     message: string,
     type?: "info" | "warning" | "error"
   ) => void;
-
-  // 数据存储
-  getData: (key: string) => any;
-  setData: (key: string, value: any) => void;
-
-  // 性能监控
+  getData: (key: string) => unknown;
+  setData: (key: string, value: unknown) => void;
   setPerformanceProvider: (provider: PerformanceProvider) => void;
   getPerformanceStats: () => Map<string, PerformanceStats>;
   getFPS: () => number;
 }
 ```
 
+### RenderLayer
+
+```ts
+interface RenderLayer {
+  name: string;
+  position: "background" | "overlay";
+  render: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState
+  ) => void;
+}
+```
+
+### CoreLayerHook
+
+```ts
+interface CoreLayerHook {
+  name: string;
+  target: "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "interaction";
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    next: () => void
+  ) => void;
+}
+```
+
+说明：
+
+- `registerRenderLayer()` 适合加最底层或最顶层的自定义绘制
+- `registerCoreLayerHook()` 适合拦截或包裹核心渲染层
+- 调用 `next()` 表示继续执行默认渲染；不调用则表示完全接管该核心层
+
 ## 数据存储
 
-### 插件数据存储
+每个插件都拥有独立的数据存储区：
 
-```javascript
-// 存储数据
+```ts
 context.api.setData("counter", 0);
-context.api.setData("settings", { theme: "dark", language: "zh" });
+context.api.setData("settings", { enabled: true });
 
-// 获取数据
 const counter = context.api.getData("counter");
 const settings = context.api.getData("settings");
 ```
 
-### 数据
+数据特点：
 
-- 数据在插件生命周期内持续存在
-- 插件卸载时数据自动清理
-- 不同插件的数据相互隔离
+- 生命周期内持续存在
+- 插件卸载时自动清理
+- 不同插件之间彼此隔离

@@ -76,7 +76,7 @@ import {
   ContextMenuPlugin,
   LightThemePlugin,
   PerformanceOverlayPlugin,
-} from "timeline-canvas/plugins";
+} from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -286,7 +286,7 @@ graph TB
       ContextMenuPlugin,
       LightThemePlugin,
       PerformanceOverlayPlugin,
-    } from 'timeline-canvas/plugins';
+    } from 'timeline-canvas';
 
     const timeline = new Timeline('timelineCanvas', {
       startTime: 0,
@@ -315,3 +315,4 @@ graph TB
 </body>
 </html>
 ```
+

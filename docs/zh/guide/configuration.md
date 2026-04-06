@@ -2,215 +2,205 @@
 title: 配置项
 ---
 
-> Timeline Canvas 使用秒制相对时间系统。配置类型建议以 TypeScript 类型为准：见 [类型定义](../api/timeline/types)。
+> Timeline Canvas 使用秒制相对时间系统。构造函数接收的是 `TimelineOptions`，不是完整的 `TimelineConfig`。`TimelineConfig` 是内部合并默认值后的运行时配置。
 
-## TimelineConfig 接口
+## 你在构造函数里真正传入的类型
 
-Timeline Canvas 使用秒制时间系统，所有时间值都是从时间起点开始的相对秒数。
-
-```typescript
-interface TimelineConfig {
-  // 基础时间配置
-  startTime: number;
-  endTime: number;
-  startPaddingTime: number;
-  endPaddingTime: number;
-  secondWidth: number;
-
-  // 尺寸与布局
-  canvasHeight?: number;
-  timelineHeight: number;
-  trackHeight: number;
-  trackMargin: number;
-  firstTrackTopMargin: number;
-
-  // 功能开关
-  enableEventResize: boolean;
-  enableEventSplit: boolean;
-  enableTimeIndicator: boolean;
-  enableContextMenu: boolean;
-  debug: boolean;
-  enablePerformanceMonitor: boolean;
-  readOnly: boolean;
-
-  // 轨道自动管理
-  autoAddTrack: boolean;
-  autoRemoveEmptyLastTrack: boolean;
-
-  // 事件配置
-  minEventDuration: number;
-  resizeHandleWidth: number;
-  showEventDurationLabel: boolean;
-  formatEventDuration: ((duration: number) => string) | null;
-
-  // 自动缩放
-  autoFitOnInit: boolean;
-  minAutoFitZoom: number;
-  maxAutoFitZoom: number;
-
-  // 吸附配置
-  snapInterval: number;
-  snapToSeconds: boolean;
-  secondPrecisionZoomThreshold: number;
-
-  // 时间指示器配置
-  timeIndicatorWidth: number;
-  timeIndicatorSnapThreshold: number;
-  timeIndicatorHeadSize: number;
-  timeIndicatorTriangleHeight: number;
-
-  // 辅助线配置
-  guideLineSnapThreshold: number;
-
-  // 文本与块样式
-  eventTextStyle: EventTextStyle;
-  eventBlockStyle: EventBlockStyle;
-  colors: TimelineColors;
-
-  // 右键菜单配置
-  contextMenuItems: ContextMenuItem[];
-  contextMenuStyle: ContextMenuStyle;
-  contextMenuHtml?: string | HTMLElement;
-
-  // 回调事件
-  onEventAdd?: (data: EventAddData) => void;
-  onEventUpdate?: (data: EventUpdateData) => void;
-  onEventDelete?: (data: EventDeleteData) => void;
-  onEventMove?: (data: EventMoveData) => void;
-  onEventClick?: (data: EventClickData) => void;
-  onEventEdit?: (data: EventEditData) => void;
-  onTimeIndicatorHighlight?: (data: TimeIndicatorHighlightData) => void;
-  onContextMenu?: (data: ContextMenuData) => void;
-  onTrackAdd?: (track: Track) => void;
-  onTrackRemove?: (track: Track) => void;
-  onTimeIndicatorMove?: (data: TimeIndicatorMoveData) => void;
-  onZoom?: (data: ZoomData) => void;
-  onStatusChange?: (statusText: string) => void;
-  onEventHighlight?: (data: EventHighlightData) => void;
-}
-```
-
-## 样式配置接口
-
-### EventTextStyle
-
-```typescript
-interface EventTextStyle {
-  titleFontSize: number | "auto";
-  timeFontSize: number | "auto";
-  titleFontFamily: string;
-  timeFontFamily: string;
-  titleFontWeight: string;
-  timeFontWeight: string;
-  titleColor: string | null;
-  timeColor: string | null;
-  textAlign: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-  titleOffsetY: number;
-  timeOffsetY: number;
-  showTitle: boolean;
-  showTime: boolean;
-  minHeightForTitle: number;
-  minHeightForTime: number;
-}
-```
-
-### EventBlockStyle
-
-```typescript
-interface EventBlockStyle {
-  borderRadius: number;
-  enableSelectionGlow: boolean;
-  selectionGlowBlur: number;
-}
-```
-
-### TimelineColors
-
-```typescript
-interface TimelineColors {
-  canvasBackground: string;
-  timelineBackground: string;
-  trackBackground: string;
-  trackBackgroundSelected: string;
-  trackBackgroundOdd?: string;
-  trackBackgroundEven?: string;
-  timelineText: string;
-  timelineGrid: string;
-  timelineSubGrid: string;
-  trackText: string;
-  eventColors: string[];
-  eventText: string;
-  eventBorder: string;
-  eventBorderSelected: string;
-  eventOverlay: string;
-  dragPreviewValid: string;
-  dragPreviewInvalid: string;
-  dragPreviewBorderValid: string;
-  dragPreviewBorderInvalid: string;
-  timeIndicator: string;
-  guideLine: string;
-  guideLineLabel: string;
-  dragTimeReferenceLine: string;
-  dragTimeReferenceLabel: string;
-  dragTimeReferenceLabelBackground: string;
-  scrollbarTrack: string;
-  scrollbarHandle: string;
-  scrollbarHandleHover: string;
-  scrollbarHandleHighlight: string;
-  scrollbarBorder: string;
-  contextMenuBackground: string;
-  contextMenuBorder: string;
-  contextMenuText: string;
-  contextMenuHoverBackground: string;
-  contextMenuHoverText: string;
-  eventDurationLabel: string;
-}
-```
-
-## 完整配置示例（与 Demo 一致）
-
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
-  // 时间范围（秒）
+  startTime: 0,
+  endTime: 3600,
+  canvasHeight: 600,
+  trackHeight: 46,
+  enableTimeIndicator: true,
+  theme: LightThemePlugin,
+  onZoom: (data) => console.log(data),
+});
+```
+
+也就是说：
+
+- 初始化参数请看 `TimelineOptions`
+- 运行时内部完整配置请看 `TimelineConfig`
+- 详细字段定义见 [类型定义](../api/timeline/types)
+
+## 常用配置分组
+
+### 时间与布局
+
+```ts
+const options = {
+  startTime: 0,
+  endTime: 3600,
+  startPaddingTime: 10,
+  endPaddingTime: 60,
+  secondWidth: 0.022,
+  canvasHeight: 600,
+  timelineHeight: 60,
+  trackHeight: 46,
+  trackMargin: 10,
+  firstTrackTopMargin: 16,
+};
+```
+
+### 自动缩放与刻度
+
+```ts
+const options = {
+  autoFitOnInit: true,
+  minAutoFitZoom: 1,
+  maxAutoFitZoom: 3,
+  snapInterval: 15,
+  snapToSeconds: true,
+  secondPrecisionZoomThreshold: 1.5,
+  scale: null,
+  scaleSplitCount: 10,
+  getScaleRender: null,
+};
+```
+
+### 交互行为
+
+```ts
+const options = {
+  enableTimeIndicator: true,
+  enableEventResize: true,
+  enableEventSplit: true,
+  enableContextMenu: true,
+  minEventDuration: 0.25,
+  resizeHandleWidth: 8,
+  readOnly: false,
+  autoAddTrack: true,
+  autoRemoveEmptyLastTrack: true,
+};
+```
+
+### 时间指示器与边缘滚动
+
+```ts
+const options = {
+  timeIndicatorWidth: 3,
+  timeIndicatorSnapThreshold: 10,
+  timeIndicatorHeadSize: 12,
+  timeIndicatorTriangleHeight: 8,
+  edgeScrollThrottle: 80,
+  edgeScrollTriggerMargin: 30,
+  edgeScrollViewportMargin: 50,
+  guideLineSnapThreshold: 1,
+};
+```
+
+### 文字、块样式与颜色
+
+```ts
+const options = {
+  eventTextStyle: {
+    showTitle: true,
+    showTime: false,
+    textAlign: "left",
+  },
+  eventBlockStyle: {
+    borderRadius: 2,
+    enableSelectionGlow: false,
+  },
+  colors: {
+    timeIndicator: "#3F76FC",
+  },
+};
+```
+
+### 右键菜单
+
+```ts
+const options = {
+  enableContextMenu: true,
+  contextMenuItems: [
+    { type: "edit", name: "编辑" },
+    { type: "delete", name: "删除" },
+  ],
+  contextMenuStyle: {
+    minWidth: 140,
+  },
+  contextMenuHtml: "<div>自定义菜单模板</div>",
+};
+```
+
+### 插件与回调
+
+```ts
+const options = {
+  theme: LightThemePlugin,
+  onEventClick: (data) => console.log("事件点击", data),
+  onZoom: (data) => console.log("缩放", data),
+  onStatusChange: (text) => console.log("状态", text),
+};
+```
+
+## 当前默认值中的几个关键点
+
+来自源码默认配置的常用默认值：
+
+- `autoFitOnInit: true`
+- `enableTimeIndicator: true`
+- `enableEventResize: true`
+- `enableEventSplit: true`
+- `enableContextMenu: true`
+- `enablePerformanceMonitor: false`
+- `readOnly: false`
+- `snapInterval: 15`
+- `minEventDuration: 0.25`
+- `trackHeight: 80`
+- `timelineHeight: 40`
+
+## 运行时修改配置
+
+如果你在实例创建后直接改 `timeline.config`，请记得配合 `notifyChange()`：
+
+```ts
+timeline.config.readOnly = true;
+timeline.notifyChange("config:readOnly");
+
+timeline.config.debug = true;
+timeline.notifyChange("config:debug");
+```
+
+如果存在对应的公开方法，优先使用方法：
+
+```ts
+timeline.setReadOnly(true);
+timeline.setDebug(true);
+timeline.setEnableTimeIndicator(false);
+timeline.setEndTime(7200);
+```
+
+## 完整示例
+
+```ts
+import { Timeline, LightThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   endPaddingTime: 60,
-
-  // 尺寸与布局
   secondWidth: 0.022,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
   firstTrackTopMargin: 16,
   timelineHeight: 60,
-
-  // 功能开关
   enableEventResize: true,
   enableEventSplit: true,
   enableTimeIndicator: true,
   enableContextMenu: true,
-  debug: false,
-
-  // 轨道自动管理
   autoAddTrack: true,
   autoRemoveEmptyLastTrack: true,
-
-  // 事件配置
   minEventDuration: 0.25,
   resizeHandleWidth: 8,
-  minAutoFitZoom: 14.0,
-
-  // 吸附配置
   snapInterval: 15,
   snapToSeconds: true,
-  secondPrecisionZoomThreshold: 1.0,
-
-  // 文本与块样式（示例）
   eventTextStyle: { showTitle: true, showTime: false },
   eventBlockStyle: { borderRadius: 2, enableSelectionGlow: false },
-
-  // 回调事件（示例）
+  theme: LightThemePlugin,
   onEventClick: (data) => console.log("事件点击", data),
   onZoom: (data) => console.log("缩放", data),
 });

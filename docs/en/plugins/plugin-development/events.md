@@ -2,60 +2,102 @@
 title: Event System
 ---
 
-## Event Types
+## Core plugin events that actually exist in the current source
 
-### Render events
+### render:event:media
 
-- `render:background` - background layer render
-- `render:overlay` - overlay layer render
-- `render:event:media` - event media render
+Fires during event rendering so media-style plugins can draw inside event blocks.
 
-### Validation events
-
-- `validate:event:move` - validate event move
-- `validate:event:add` - validate event add
-- `validate:event:split` - validate event split
-
-### Interaction events
-
-- `event:click` - event click
-- `event:highlight` - event highlight
-- `zoom:change` - zoom level change
-- `track:add` - track added
-- `track:remove` - track removed
-
-## Handlers
-
-### Render handler
+Handler signature:
 
 ```ts
-renderOverlay(ctx, canvas, config, state) {
-  // draw custom content
-  ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-  ctx.fillRect(0, 0, 100, 100);
-}
+type RenderEventMediaHandler = (
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  config: TimelineConfig,
+  state: TimelineState,
+  trackIndex: number,
+  eventIndex: number,
+  eventX: number,
+  trackY: number,
+  eventWidth: number,
+  eventVerticalPadding: number,
+  eventHeight: number
+) => void;
 ```
 
-### Validation handler
+Example:
 
 ```ts
-validateEventMove(payload) {
-  const { fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration } = payload;
+context.api.registerEventHandler("render:event:media", (
+  ctx,
+  _canvas,
+  _config,
+  state,
+  trackIndex,
+  eventIndex,
+  eventX,
+  trackY,
+  eventWidth,
+  eventVerticalPadding,
+  eventHeight
+) => {
+  const event = state.tracks[trackIndex].events[eventIndex];
+  if (!event.customData?.badge) return;
 
-  // custom validation logic
-  if (newStartTime < 0) {
-    return false; // block the move
+  ctx.save();
+  ctx.fillStyle = "#fff";
+  ctx.fillText(
+    String(event.customData.badge),
+    eventX + 8,
+    trackY + eventVerticalPadding + eventHeight / 2
+  );
+  ctx.restore();
+});
+```
+
+### validate:event:move
+
+Fires during move and resize validation. If any handler returns `false`, the interaction is blocked.
+
+```ts
+context.api.registerEventHandler("validate:event:move", (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return true;
   }
 
-  return true; // allow the move
-}
+  const data = payload as {
+    newStartTime: number;
+    duration: number;
+  };
+
+  return data.newStartTime >= 0 && data.duration > 0;
+});
 ```
 
-## Priority Order
+## Event names you should not rely on
 
-Events are processed in plugin priority order:
+These names are not emitted as core plugin events in the current source:
 
-1. CRITICAL (200)
-2. HIGH (100)
-3. NORMAL (50)
-4. LOW (0)
+- `render:background`
+- `render:overlay`
+- `validate:event:add`
+- `validate:event:split`
+- `event:click`
+- `event:highlight`
+
+If you need background or overlay drawing, use:
+
+- `registerRenderLayer()`
+- `registerCoreLayerHook()`
+
+## Execution order
+
+Handlers run in plugin-priority order:
+
+1. `CRITICAL (200)`
+2. `HIGH (100)`
+3. `NORMAL (50)`
+4. `LOW (0)`
+
+Within the same priority, handlers run in registration order.

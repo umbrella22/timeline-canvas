@@ -2,22 +2,59 @@
 title: Built-in Plugins
 ---
 
-Timeline Canvas includes a set of built-in plugins. You can load them via `timeline.usePlugin()`.
+Timeline Canvas ships with a small set of built-in plugins that cover themes, media rendering, context menus, tooltips, and runtime diagnostics.
 
-## 📋 Plugin Directory
+## Import styles
+
+The simplest option is to import from the package root:
+
+```ts
+import {
+  ContextMenuPlugin,
+  EventTooltipPlugin,
+  EventMediaPlugin,
+  LightThemePlugin,
+  DarkThemePlugin,
+  PerformanceOverlayPlugin,
+  MutexGuardPlugin,
+} from "timeline-canvas";
+```
+
+If you prefer a stable built-in subpath, that works too:
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
+
+## Direct plugins vs factory plugins
+
+### Pass these directly
+
+- `LightThemePlugin`
+- `DarkThemePlugin`
+- `PerformanceOverlayPlugin`
+
+### Call these before passing them in
+
+- `ContextMenuPlugin()`
+- `EventTooltipPlugin()`
+- `EventMediaPlugin()`
+- `MutexGuardPlugin()`
+
+## Plugin index
 
 ### Essentials
 
-- [ContextMenuPlugin](./context-menu) - context menu plugin
-- [EventTooltipPlugin](./event-tooltip) - event tooltip plugin
-- [LightThemePlugin](./light-theme) - light theme plugin
-- [DarkThemePlugin](./dark-theme) - dark theme plugin
-- [PerformanceOverlayPlugin](./performance-overlay) - performance overlay plugin
+- [ContextMenuPlugin](./context-menu) - context menus with optional HTML takeover
+- [EventTooltipPlugin](./event-tooltip) - hover tooltips for truncated event titles
+- [LightThemePlugin](./light-theme) - built-in light theme
+- [DarkThemePlugin](./dark-theme) - built-in dark theme
+- [PerformanceOverlayPlugin](./performance-overlay) - FPS and render-timing overlay
 
 ### Media
 
-- [EventMediaPlugin](./event-media) - event media plugin
+- [EventMediaPlugin](./event-media) - image and waveform rendering inside events
 
 ### Utilities
 
-- [MutexGuardPlugin](./mutex-guard) - event mutex plugin
+- [MutexGuardPlugin](./mutex-guard) - mutex-based move and resize constraints

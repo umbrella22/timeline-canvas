@@ -2,66 +2,120 @@
 title: Plugin Management API
 ---
 
-## usePlugin
+## Import styles
 
-`usePlugin(plugin: any): Promise<boolean>`
-
-Use a plugin.
+You can import built-in plugins directly from the package root:
 
 ```ts
-// Some built-in plugins are factory functions (call to pass options)
-await timeline.usePlugin(ContextMenuPlugin());
+import {
+  Timeline,
+  LightThemePlugin,
+  DarkThemePlugin,
+  PerformanceOverlayPlugin,
+  ContextMenuPlugin,
+} from "timeline-canvas";
+```
 
-// Some built-in plugins are plugin objects (pass directly)
+Or use the stable built-in subpath:
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
+
+## Which plugins are objects vs factory functions?
+
+### Pass these directly
+
+- `LightThemePlugin`
+- `DarkThemePlugin`
+- `PerformanceOverlayPlugin`
+
+### Call these first
+
+- `ContextMenuPlugin()`
+- `EventTooltipPlugin()`
+- `EventMediaPlugin()`
+- `MutexGuardPlugin()`
+
+## usePlugin(plugin: TimelinePlugin): Promise<boolean>
+
+Loads a plugin and runs its lifecycle.
+
+```ts
+await timeline.usePlugin(LightThemePlugin);
 await timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## removePlugin
+Notes:
 
-`removePlugin(pluginId: string): Promise<boolean>`
+- Returns `true` when the plugin loads successfully
+- Re-loading the same non-theme plugin currently returns `false`
+- Theme plugins go through a dedicated theme-switching path
+- If a plugin declares `metadata.dependencies`, those dependencies are checked before activation
 
-Remove a plugin.
+## getLoadedPlugins(): TimelinePlugin[]
 
-```ts
-await timeline.removePlugin("performance-overlay@1.0.0");
-```
-
-## setTheme
-
-`setTheme(theme: 'light' | 'dark'): Promise<boolean>`
-
-Switch built-in themes at runtime.
-
-```ts
-// Set default theme at initialization
-const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
-
-// Switch to dark theme
-await timeline.setTheme("dark");
-
-// Switch back to light theme
-await timeline.setTheme("light");
-```
-
-## getLoadedPlugins
-
-`getLoadedPlugins(): any[]`
-
-Get the list of loaded plugins.
+Returns the loaded plugin objects.
 
 ```ts
 const plugins = timeline.getLoadedPlugins();
-console.log("Loaded plugins:", plugins);
 ```
 
-## isPluginLoaded
+## isPluginLoaded(pluginName: string): boolean
 
-`isPluginLoaded(pluginName: string): boolean`
-
-Check whether a plugin is loaded.
+Checks whether a plugin with the given name is loaded.
 
 ```ts
-if (timeline.isPluginLoaded("performance-overlay")) {
-  console.log("Performance overlay plugin is loaded");
-}
+timeline.isPluginLoaded("performance-overlay");
+timeline.isPluginLoaded("theme-dark");
 ```
+
+Notes:
+
+- Pass the plugin name, not the full plugin ID
+- Internally this behaves like a prefix match on `name@version`
+
+## removePlugin(pluginId: string): Promise<boolean>
+
+Unloads a plugin by full plugin ID.
+
+```ts
+await timeline.removePlugin("performance-overlay@1.0.0");
+await timeline.removePlugin("theme-light@1.0.0");
+```
+
+Plugin IDs use this format:
+
+```ts
+`${plugin.metadata.name}@${plugin.metadata.version}`
+```
+
+## setTheme(theme: "light" | "dark"): Promise<boolean>
+
+Switches between the built-in light and dark themes.
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  theme: LightThemePlugin,
+});
+
+await timeline.setTheme("dark");
+await timeline.setTheme("light");
+```
+
+Notes:
+
+- `setTheme()` switches between `LightThemePlugin` and `DarkThemePlugin`
+- The old theme is unloaded before the new one is loaded
+- A successful switch triggers `theme:change`
+
+## Set a theme at construction time
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  theme: DarkThemePlugin,
+});
+```
+
+The constructor accepts a theme plugin object and loads it asynchronously during initialization.

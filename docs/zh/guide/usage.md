@@ -115,7 +115,7 @@ timeline.deleteEvent(0, 0);
 ### 性能监控插件
 
 ```ts
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { PerformanceOverlayPlugin } from "timeline-canvas";
 
 // 基础使用
 timeline.usePlugin(PerformanceOverlayPlugin);
@@ -128,7 +128,7 @@ timeline.usePlugin(PerformanceOverlayPlugin);
 ### 上下文菜单插件
 
 ```ts
-import { ContextMenuPlugin } from "timeline-canvas/plugins";
+import { ContextMenuPlugin } from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -145,7 +145,7 @@ await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
 ### 主题插件
 
 ```ts
-import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas/plugins";
+import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas";
 
 // 使用亮色主题
 await timeline.usePlugin(LightThemePlugin);
@@ -160,7 +160,7 @@ await timeline.setTheme("dark");
 ### 媒体插件
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
 
@@ -276,3 +276,4 @@ window.addEventListener("resize", () => {
   }
 });
 ```
+

@@ -125,7 +125,7 @@ npm install my-timeline-plugin
 ```
 ````
 
-## 使用
+## Usage
 
 ```javascript
 import { Timeline } from "timeline-canvas";

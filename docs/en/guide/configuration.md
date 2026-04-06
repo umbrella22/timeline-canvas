@@ -2,216 +2,206 @@
 title: Configuration
 ---
 
-> Timeline Canvas uses a seconds-based relative time model. For the most accurate configuration types, refer to the TypeScript definitions: see [Type Definitions](../api/timeline/types).
+> Timeline Canvas uses a seconds-based relative time model. The constructor takes `TimelineOptions`, not the full `TimelineConfig`. `TimelineConfig` is the fully resolved runtime config after defaults are applied.
 
-## TimelineConfig Interface
+## What you actually pass to the constructor
 
-Timeline Canvas uses a seconds-based time model. All time values are relative seconds from the timeline start.
-
-```typescript
-interface TimelineConfig {
-  // Time range
-  startTime: number;
-  endTime: number;
-  startPaddingTime: number;
-  endPaddingTime: number;
-  secondWidth: number;
-
-  // Layout & sizing
-  canvasHeight?: number;
-  timelineHeight: number;
-  trackHeight: number;
-  trackMargin: number;
-  firstTrackTopMargin: number;
-
-  // Feature toggles
-  enableEventResize: boolean;
-  enableEventSplit: boolean;
-  enableTimeIndicator: boolean;
-  enableContextMenu: boolean;
-  debug: boolean;
-  enablePerformanceMonitor: boolean;
-  readOnly: boolean;
-
-  // Track auto-management
-  autoAddTrack: boolean;
-  autoRemoveEmptyLastTrack: boolean;
-
-  // Event config
-  minEventDuration: number;
-  resizeHandleWidth: number;
-  showEventDurationLabel: boolean;
-  formatEventDuration: ((duration: number) => string) | null;
-
-  // Auto-fit
-  autoFitOnInit: boolean;
-  minAutoFitZoom: number;
-  maxAutoFitZoom: number;
-
-  // Snapping
-  snapInterval: number;
-  snapToSeconds: boolean;
-  secondPrecisionZoomThreshold: number;
-
-  // Time indicator
-  timeIndicatorWidth: number;
-  timeIndicatorSnapThreshold: number;
-  timeIndicatorHeadSize: number;
-  timeIndicatorTriangleHeight: number;
-
-  // Guide lines
-  guideLineSnapThreshold: number;
-
-  // Text & block styles
-  eventTextStyle: EventTextStyle;
-  eventBlockStyle: EventBlockStyle;
-  colors: TimelineColors;
-
-  // Context menu
-  contextMenuItems: ContextMenuItem[];
-  contextMenuStyle: ContextMenuStyle;
-  contextMenuHtml?: string | HTMLElement;
-
-  // Callbacks
-  onEventAdd?: (data: EventAddData) => void;
-  onEventUpdate?: (data: EventUpdateData) => void;
-  onEventDelete?: (data: EventDeleteData) => void;
-  onEventMove?: (data: EventMoveData) => void;
-  onEventClick?: (data: EventClickData) => void;
-  onEventEdit?: (data: EventEditData) => void;
-  onTimeIndicatorHighlight?: (data: TimeIndicatorHighlightData) => void;
-  onContextMenu?: (data: ContextMenuData) => void;
-  onTrackAdd?: (track: Track) => void;
-  onTrackRemove?: (track: Track) => void;
-  onTimeIndicatorMove?: (data: TimeIndicatorMoveData) => void;
-  onZoom?: (data: ZoomData) => void;
-  onStatusChange?: (statusText: string) => void;
-  onEventHighlight?: (data: EventHighlightData) => void;
-}
-```
-
-## Style Interfaces
-
-### EventTextStyle
-
-```typescript
-interface EventTextStyle {
-  titleFontSize: number | "auto";
-  timeFontSize: number | "auto";
-  titleFontFamily: string;
-  timeFontFamily: string;
-  titleFontWeight: string;
-  timeFontWeight: string;
-  titleColor: string | null;
-  timeColor: string | null;
-  textAlign: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-  titleOffsetY: number;
-  timeOffsetY: number;
-  showTitle: boolean;
-  showTime: boolean;
-  minHeightForTitle: number;
-  minHeightForTime: number;
-}
-```
-
-### EventBlockStyle
-
-```typescript
-interface EventBlockStyle {
-  borderRadius: number;
-  enableSelectionGlow: boolean;
-  selectionGlowBlur: number;
-}
-```
-
-### TimelineColors
-
-```typescript
-interface TimelineColors {
-  canvasBackground: string;
-  timelineBackground: string;
-  trackBackground: string;
-  trackBackgroundSelected: string;
-  trackBackgroundOdd?: string;
-  trackBackgroundEven?: string;
-  timelineText: string;
-  timelineGrid: string;
-  timelineSubGrid: string;
-  trackText: string;
-  eventColors: string[];
-  eventText: string;
-  eventBorder: string;
-  eventBorderSelected: string;
-  eventOverlay: string;
-  dragPreviewValid: string;
-  dragPreviewInvalid: string;
-  dragPreviewBorderValid: string;
-  dragPreviewBorderInvalid: string;
-  timeIndicator: string;
-  guideLine: string;
-  guideLineLabel: string;
-  dragTimeReferenceLine: string;
-  dragTimeReferenceLabel: string;
-  dragTimeReferenceLabelBackground: string;
-  scrollbarTrack: string;
-  scrollbarHandle: string;
-  scrollbarHandleHover: string;
-  scrollbarHandleHighlight: string;
-  scrollbarBorder: string;
-  contextMenuBackground: string;
-  contextMenuBorder: string;
-  contextMenuText: string;
-  contextMenuHoverBackground: string;
-  contextMenuHoverText: string;
-  eventDurationLabel: string;
-}
-```
-
-## Full Configuration Example (Same as the Demo)
-
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
-  // Time range (seconds)
+  startTime: 0,
+  endTime: 3600,
+  canvasHeight: 600,
+  trackHeight: 46,
+  enableTimeIndicator: true,
+  theme: LightThemePlugin,
+  onZoom: (data) => console.log(data),
+});
+```
+
+In other words:
+
+- Use `TimelineOptions` for constructor input
+- Use `TimelineConfig` to reason about the normalized runtime state
+- See [Type Definitions](../api/timeline/types) for the exact field definitions
+
+## Common config groups
+
+### Time range and layout
+
+```ts
+const options = {
+  startTime: 0,
+  endTime: 3600,
+  startPaddingTime: 10,
+  endPaddingTime: 60,
+  secondWidth: 0.022,
+  canvasHeight: 600,
+  timelineHeight: 60,
+  trackHeight: 46,
+  trackMargin: 10,
+  firstTrackTopMargin: 16,
+};
+```
+
+### Auto-fit and scale
+
+```ts
+const options = {
+  autoFitOnInit: true,
+  minAutoFitZoom: 1,
+  maxAutoFitZoom: 3,
+  snapInterval: 15,
+  snapToSeconds: true,
+  secondPrecisionZoomThreshold: 1.5,
+  scale: null,
+  scaleSplitCount: 10,
+  getScaleRender: null,
+};
+```
+
+### Interaction behavior
+
+```ts
+const options = {
+  enableTimeIndicator: true,
+  enableEventResize: true,
+  enableEventSplit: true,
+  enableContextMenu: true,
+  minEventDuration: 0.25,
+  resizeHandleWidth: 8,
+  readOnly: false,
+  autoAddTrack: true,
+  autoRemoveEmptyLastTrack: true,
+};
+```
+
+### Time indicator and edge scrolling
+
+```ts
+const options = {
+  timeIndicatorWidth: 3,
+  timeIndicatorSnapThreshold: 10,
+  timeIndicatorHeadSize: 12,
+  timeIndicatorTriangleHeight: 8,
+  edgeScrollThrottle: 80,
+  edgeScrollTriggerMargin: 30,
+  edgeScrollViewportMargin: 50,
+  guideLineSnapThreshold: 1,
+};
+```
+
+### Text, block styling, and colors
+
+```ts
+const options = {
+  eventTextStyle: {
+    showTitle: true,
+    showTime: false,
+    textAlign: "left",
+  },
+  eventBlockStyle: {
+    borderRadius: 2,
+    enableSelectionGlow: false,
+  },
+  colors: {
+    timeIndicator: "#3F76FC",
+  },
+};
+```
+
+### Context menu
+
+```ts
+const options = {
+  enableContextMenu: true,
+  contextMenuItems: [
+    { type: "edit", name: "Edit" },
+    { type: "delete", name: "Delete" },
+  ],
+  contextMenuStyle: {
+    minWidth: 140,
+  },
+  contextMenuHtml: "<div>Custom menu template</div>",
+};
+```
+
+### Plugins and callbacks
+
+```ts
+const options = {
+  theme: LightThemePlugin,
+  onEventClick: (data) => console.log("Event clicked", data),
+  onZoom: (data) => console.log("Zoom", data),
+  onStatusChange: (text) => console.log("Status", text),
+};
+```
+
+## A few notable defaults from the source
+
+Some of the most important runtime defaults are:
+
+- `autoFitOnInit: true`
+- `enableTimeIndicator: true`
+- `enableEventResize: true`
+- `enableEventSplit: true`
+- `enableContextMenu: true`
+- `enablePerformanceMonitor: false`
+- `readOnly: false`
+- `snapInterval: 15`
+- `minEventDuration: 0.25`
+- `trackHeight: 80`
+- `timelineHeight: 40`
+
+## Updating config at runtime
+
+If you change `timeline.config` directly after construction, follow it with `notifyChange()`:
+
+```ts
+timeline.config.readOnly = true;
+timeline.notifyChange("config:readOnly");
+
+timeline.config.debug = true;
+timeline.notifyChange("config:debug");
+```
+
+If a dedicated public method exists, prefer that instead:
+
+```ts
+timeline.setReadOnly(true);
+timeline.setDebug(true);
+timeline.setEnableTimeIndicator(false);
+timeline.setEndTime(7200);
+```
+
+## Full example
+
+```ts
+import { Timeline, LightThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   endPaddingTime: 60,
-
-  // Layout & sizing
   secondWidth: 0.022,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
   firstTrackTopMargin: 16,
   timelineHeight: 60,
-
-  // Feature toggles
   enableEventResize: true,
   enableEventSplit: true,
   enableTimeIndicator: true,
   enableContextMenu: true,
-  debug: false,
-
-  // Track auto-management
   autoAddTrack: true,
   autoRemoveEmptyLastTrack: true,
-
-  // Event config
   minEventDuration: 0.25,
   resizeHandleWidth: 8,
-  minAutoFitZoom: 14.0,
-
-  // Snapping
   snapInterval: 15,
   snapToSeconds: true,
-  secondPrecisionZoomThreshold: 1.0,
-
-  // Text & block styles (example)
   eventTextStyle: { showTitle: true, showTime: false },
   eventBlockStyle: { borderRadius: 2, enableSelectionGlow: false },
-
-  // Callbacks (example)
-  onEventClick: (data) => console.log("Event click", data),
+  theme: LightThemePlugin,
+  onEventClick: (data) => console.log("Event clicked", data),
   onZoom: (data) => console.log("Zoom", data),
 });
 ```

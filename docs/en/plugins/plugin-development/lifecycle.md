@@ -2,90 +2,105 @@
 title: Plugin Lifecycle
 ---
 
-## Lifecycle Flow
+## Lifecycle flow
 
+```text
+loadPlugin()
+  → check dependencies
+  → init()
+  → activate()
+  → running
+removePlugin()
+  → deactivate()
+  → destroy()
+  → cleanup
 ```
-Load plugin → init() → activate() → running → deactivate() → destroy()
-```
 
-## Stages
+## init()
 
-### init()
+Good uses for `init()`:
 
-- **When**: called when the plugin is loaded
-- **Purpose**: initialize internal state, validate dependencies, set defaults
-- **Note**: the plugin is not active yet; avoid registering event handlers here
+- initialize plugin options
+- create caches
+- write initial values with `setData()`
+- run lightweight validation
 
 ```ts
 init(context) {
-  // initialize plugin data
-  context.api.setData('initialized', true);
-  context.api.setData('config', this.config);
-
-  // validate dependencies
-  if (!context.timeline.config.enableEventResize) {
-    context.api.showNotification('Event resizing must be enabled', 'warning');
-  }
+  context.api.setData("enabled", true);
+  context.api.setData("createdAt", Date.now());
 }
 ```
 
-### activate()
+## activate()
 
-- **When**: called when the plugin is activated
-- **Purpose**: register event handlers, render layers, and listeners
-- **Note**: this is the main stage where the plugin starts working
+Good uses for `activate()`:
+
+- register `RenderLayer`
+- register `CoreLayerHook`
+- register event handlers
+- attach DOM listeners
 
 ```ts
 activate(context) {
-  // register event handlers
-  context.api.registerEventHandler('render:overlay', this.renderOverlay);
-  context.api.registerEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = (payload: unknown) => {
+    return true;
+  };
 
-  // register a render layer
+  context.api.registerEventHandler("validate:event:move", validateMove);
+  context.api.setData("validateMove", validateMove);
+
   context.api.registerRenderLayer({
-    name: 'MyPluginLayer',
-    position: 'overlay',
-    render: this.render.bind(this)
+    name: "my-plugin-overlay",
+    position: "overlay",
+    render(ctx, canvas) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,0,0,0.1)";
+      ctx.fillRect(0, 0, canvas.width, 24);
+      ctx.restore();
+    },
   });
-
-  console.log('Plugin activated:', this.metadata.name);
 }
 ```
 
-### Running
+## deactivate()
 
-- **Event handling**: respond to various events
-- **Rendering**: draw content in the render loop
-- **State management**: maintain plugin internal state
+Good uses for `deactivate()`:
 
-### deactivate()
+- unregister event handlers
+- unregister render layers and core-layer hooks
+- remove DOM listeners
 
-- **When**: called when the plugin is deactivated
-- **Purpose**: unregister handlers and remove listeners
-- **Note**: plugin functionality stops at this stage
-
-```javascript
+```ts
 deactivate(context) {
-  // unregister event handlers
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
-  context.api.unregisterEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = context.api.getData("validateMove") as
+    | ((payload: unknown) => boolean)
+    | undefined;
 
-  console.log('Plugin deactivated:', this.metadata.name);
+  if (validateMove) {
+    context.api.unregisterEventHandler("validate:event:move", validateMove);
+  }
+
+  context.api.unregisterRenderLayer("my-plugin-overlay");
 }
 ```
 
-### destroy()
+## destroy()
 
-- **When**: called when the plugin is destroyed
-- **Purpose**: release resources and cleanup data
-- **Note**: this is the final stage of the plugin lifecycle
+Good uses for `destroy()`:
 
-```javascript
+- release external resources
+- clear timers
+- remove DOM nodes created by the plugin
+
+```ts
 destroy(context) {
-  // cleanup plugin data
-  context.api.setData('initialized', null);
-  context.api.setData('config', null);
-
-  console.log('Plugin destroyed:', this.metadata.name);
+  context.api.setData("validateMove", undefined);
 }
 ```
+
+## Runtime behavior worth knowing
+
+- If `init()` or `activate()` throws, the plugin manager attempts rollback-style `deactivate()` and `destroy()` calls
+- During unload, cleanup continues even if one lifecycle step fails
+- Resources registered through `registerRenderLayer()`, `registerCoreLayerHook()`, and `registerEventHandler()` also have manager-level cleanup as a safety net

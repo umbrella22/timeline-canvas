@@ -449,12 +449,12 @@ Purpose: Static analysis of render hot paths to annotate potential performance i
 
 Rules:
 
-- 循环内的 O(N) 操作（`.some`、`.find`、`.filter`、`.indexOf` → 可能 O(N²)）
-- 循环内的对象/数组分配（GC 压力）
-- 循环内的字符串拼接
+- O(N) work inside loops (`.some`, `.find`, `.filter`, `.indexOf` can easily become O(N²)`)
+- object or array allocations inside loops (GC pressure)
+- string concatenation inside loops
 - iterating over all events without visibility culling
-- 每帧创建 Date 对象
-- Canvas save/restore 不配对风险
+- creating `Date` objects every frame
+- mismatched `canvas.save()` / `canvas.restore()` calls
 
 Inputs:
 
@@ -478,8 +478,8 @@ Purpose: Compare current code exports with documentation content to detect sync 
 
 Detects:
 
-- 新增的导出但未在文档中提及
-- 文档中引用但已删除/重命名的 API
+- newly exported items that are missing from the docs
+- APIs that are still documented even though they were removed or renamed
 - whether PluginType enum values are in sync with scaffold templates
 
 Inputs:

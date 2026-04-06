@@ -2,52 +2,69 @@
 title: 性能与监控
 ---
 
-Timeline Canvas 的性能主要来自三点：分层渲染、索引加速、批量调度。
+Timeline Canvas 的性能主要来自三部分：分层渲染、索引查询和批量调度。
 
-## 性能监控
+## 性能面板
 
 ### PerformanceOverlayPlugin
 
-> 性能面板是否启用由 `TimelineOptions.enablePerformanceMonitor` 或 `TimelineOptions.debug` 控制。
+> 面板是否显示由 `enablePerformanceMonitor` 或 `debug` 控制。
 
 ```ts
-import { Timeline } from "timeline-canvas";
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { Timeline, PerformanceOverlayPlugin } from "timeline-canvas";
 
 const timeline = new Timeline("timelineCanvas", {
   enablePerformanceMonitor: true,
-  debug: true,
 });
 
 await timeline.usePlugin(PerformanceOverlayPlugin);
 
-const layerTimes = timeline.getLastLayerTimes();
-console.log(layerTimes);
+console.log(timeline.getLastLayerTimes());
 ```
+
+当前面板会显示：
+
+- FPS
+- 各逻辑层最近一次耗时
+- 性能采样统计
 
 ## 分层渲染与脏检查
 
-Timeline 内部使用 `RenderPipeline` 将画布拆分为多个逻辑层（background / timeline / tracks / guideLines / indicator / interaction / scrollbar / overlay），只重绘受影响的图层。
+源码里的 `RenderPipeline` 会按以下顺序渲染逻辑层：
 
-### 手动触发重绘
+- `background`
+- `tracks`
+- `timeline`
+- `guideLines`
+- `indicator`
+- `interaction`
+- `scrollbar`
+- `overlay`
+
+只有被标记为脏的图层才会重绘。
+
+### 手动标记脏层
 
 ```ts
-timeline.markDirty();
 timeline.markDirty(["tracks", "indicator"]);
 ```
 
-### 建议：通过变更通知驱动重绘
-
-当你手动修改了 `timeline.config` 或 `timeline.state`，更推荐调用 `notifyChange(changeType)`，让调度器决定脏层标记、派生状态计算与回调触发。
+### 更推荐的方式：通知变更
 
 ```ts
 timeline.config.readOnly = true;
 timeline.notifyChange("config:readOnly");
 ```
 
+这样可以让调度器同时处理：
+
+- 派生状态更新
+- 脏层标记
+- 必要回调
+
 ## 批量更新
 
-### 批量变更（减少重绘次数）
+### 批量变更
 
 ```ts
 timeline.beginChangeBatch();
@@ -60,39 +77,29 @@ for (let i = 0; i < 1000; i++) {
 timeline.endChangeBatch();
 ```
 
-### 批量索引（大量写入）
+### 批量索引
 
-> 对大量 add/update/delete 操作，使用索引批处理减少索引重建开销。
+当你直接修改底层数据结构或进行大量外部写入时，可以手动包裹索引批处理：
 
 ```ts
 timeline.beginIndexBatch();
-for (let i = 0; i < 1000; i++) {
-  timeline.addEvent(0, i * 10, i * 10 + 5, `Event ${i}`);
-}
+// 外部批量写入 timeline.state.tracks ...
 timeline.endIndexBatch();
 ```
 
-## 多媒体渲染（EventMediaPlugin）
+## 媒体渲染的缓存策略
 
-EventMediaPlugin 在事件块内部渲染图片/波形，并使用缓存降低重复解码与绘制成本。
+`EventMediaPlugin` 会在事件块内部渲染图片和波形，并在源码中使用多级缓存减少重复开销。
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
-
-timeline.loadData({
-  tracks: [
-    {
-      events: [
-        {
-          startTime: 0,
-          endTime: 30,
-          title: "Waveform",
-          media: { waveform: { data: [0.1, 0.5, -0.2] } },
-        },
-      ],
-    },
-  ],
-});
 ```
+
+当前实现会做这些优化：
+
+- 图片缓存为 `ImageBitmap`
+- 波形缓存为 `Float32Array`
+- 支持时优先使用 `OffscreenCanvas` 预渲染波形位图
+

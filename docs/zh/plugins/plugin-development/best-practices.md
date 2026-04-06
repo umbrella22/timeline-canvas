@@ -5,11 +5,11 @@ title: 最佳实践
 ## 命名规范
 
 ```javascript
-// 插件名称使用 PascalCase
+// metadata.name 建议使用稳定、可读、唯一的字符串，推荐 kebab-case
 const MyCustomPlugin = () => ({
   metadata: {
-    name: "MyCustomPlugin", // ✅ 正确
-    name: "my_custom_plugin", // ❌ 错误
+    name: "my-custom-plugin", // ✅ 推荐
+    name: "MyCustomPlugin", // ⚠️ 可用，但不利于统一
   },
 });
 
@@ -142,7 +142,7 @@ destroy(context) {
   }
 
   // 清理事件监听器
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
+  context.api.unregisterEventHandler('validate:event:move', this.validateMove);
 }
 ```
 

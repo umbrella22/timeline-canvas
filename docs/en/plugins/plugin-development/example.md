@@ -2,137 +2,92 @@
 title: Example Plugin
 ---
 
-## Full Example: Grid Plugin
+## Full example: background grid plugin
 
-```javascript
-/**
- * Grid plugin - draw a grid on the timeline background
- */
-const GridPlugin = (userConfig = {}) => {
-  // defaults
-  const defaultConfig = {
-    color: "#e0e0e0",
-    spacing: 50,
+```ts
+import {
+  PluginPriority,
+  PluginType,
+  type TimelinePlugin,
+} from "timeline-canvas";
+
+interface GridPluginOptions {
+  color?: string;
+  spacing?: number;
+  opacity?: number;
+}
+
+export function GridPlugin(
+  userOptions: GridPluginOptions = {}
+): TimelinePlugin {
+  const options = {
+    color: "#d0d7e2",
+    spacing: 40,
     opacity: 0.5,
-    enabled: true,
+    ...userOptions,
   };
-
-  // merge config
-  const config = { ...defaultConfig, ...userConfig };
 
   return {
     metadata: {
-      name: "GridPlugin",
+      name: "grid-plugin",
       version: "1.0.0",
-      description: "Draw a grid on the timeline background",
-      type: "extension",
+      description: "Draws helper grid lines in the background layer",
+      type: PluginType.RENDER,
       priority: PluginPriority.NORMAL,
     },
 
     init(context) {
-      // store config
-      context.api.setData("config", config);
-      context.api.setData("enabled", config.enabled);
-
-      console.log("Grid plugin initialized");
+      context.api.setData("gridOptions", options);
     },
 
     activate(context) {
-      if (!context.api.getData("enabled")) {
-        return;
-      }
-
-      // register render layer
       context.api.registerRenderLayer({
-        name: "GridPlugin",
+        name: "grid-plugin-layer",
         position: "background",
-        render: this.renderGrid.bind(this),
+        render(ctx, canvas) {
+          const cfg = context.api.getData("gridOptions") as GridPluginOptions;
+          if (!cfg) return;
+
+          ctx.save();
+          ctx.strokeStyle = cfg.color || "#d0d7e2";
+          ctx.globalAlpha = cfg.opacity ?? 0.5;
+          ctx.lineWidth = 1;
+
+          const spacing = cfg.spacing || 40;
+          for (let x = 0; x < canvas.width; x += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        },
       });
-
-      // register event handler
-      context.api.registerEventHandler(
-        "config:changed",
-        this.onConfigChanged.bind(this)
-      );
-
-      console.log("Grid plugin activated");
     },
 
     deactivate(context) {
-      // cleanup render layer
-      context.api.unregisterRenderLayer("GridPlugin");
-
-      // cleanup event handler
-      context.api.unregisterEventHandler(
-        "config:changed",
-        this.onConfigChanged
-      );
-
-      console.log("Grid plugin deactivated");
-    },
-
-    destroy(context) {
-      // cleanup data
-      context.api.setData("config", null);
-      context.api.setData("enabled", null);
-
-      console.log("Grid plugin destroyed");
-    },
-
-    renderGrid(ctx, canvas, config, state) {
-      const pluginConfig = ctx.api.getData("config");
-
-      if (!pluginConfig || !pluginConfig.enabled) {
-        return;
-      }
-
-      const { color, spacing, opacity } = pluginConfig;
-
-      // save canvas state
-      ctx.save();
-
-      // set styles
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = opacity;
-
-      // draw vertical lines
-      for (let x = 0; x < canvas.width; x += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-
-      // draw horizontal lines
-      for (let y = 0; y < canvas.height; y += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-
-      // restore canvas state
-      ctx.restore();
-    },
-
-    onConfigChanged(newConfig) {
-      // handle config changes
-      if (newConfig.gridColor !== undefined) {
-        const config = this.getData("config");
-        config.color = newConfig.gridColor;
-        this.setData("config", config);
-      }
+      context.api.unregisterRenderLayer("grid-plugin-layer");
     },
   };
-};
+}
+```
 
-// use the plugin
-timeline.usePlugin(
+## Usage
+
+```ts
+await timeline.usePlugin(
   GridPlugin({
-    color: "#d0d0d0",
-    spacing: 40,
-    opacity: 0.3,
+    color: "#c8d2df",
+    spacing: 48,
+    opacity: 0.35,
   })
 );
 ```
+
+## What this example demonstrates
+
+- wrapping user config in a factory function
+- storing plugin-private data in `init()`
+- registering a `background` render layer in `activate()`
+- cleaning up the layer in `deactivate()`
