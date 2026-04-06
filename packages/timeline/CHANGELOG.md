@@ -1,5 +1,28 @@
 # timeline-canvas
 
+## 1.4.0
+
+### New Features
+
+- **新增**：为时间轴组件引入国际化支持，新增 `locale`、`messages` 配置项以及 `createTimelineMessages` 能力，支持内置状态提示、右键菜单和性能面板文案的多语言定制
+- **新增**：为插件元数据增加 `descriptionI18n` 字段，并导出 `getPluginMetadataDescription` 辅助函数，便于按语言解析内置插件描述
+- **新增**：支持边界自动滚动配置，新增 `edgeScrollThrottle`、`edgeScrollTriggerMargin`、`edgeScrollViewportMargin` 参数，优化拖拽与缩放时的视口跟随体验
+
+### Enhancements
+
+- **增强**：引入 `HitTestService` 统一交互命中检测路径，提升复杂交互场景下的命中性能与代码可维护性
+- **增强**：拆分 `EventMutationService`、`GuideLineService` 以及空闲态交互控制器，重构 `Timeline` 与 `PluginManager`，降低核心流程耦合并提升资源清理与类型安全
+- **增强**：补齐 `Vitest` 测试基础设施，新增集成测试、类型回归测试和关键模块单元测试，增强 API 稳定性与回归防护
+
+### Bug Fixes
+
+- **修复**：增强错误处理器在调试模式下的安全失败能力，并修复插件管理过程中的资源清理与类型安全问题
+
+### Internal
+
+- **文档**：更新包级 README 与内置插件说明文档，补充国际化与插件使用说明
+- **维护**：更新构建脚本与测试配置，支持测试运行和覆盖率报告
+
 ## 1.3.1
 
 ### New Features
