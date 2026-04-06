@@ -1,29 +1,40 @@
-Dark theme plugin. Applies a dark color palette and draws the background layer.
+Built-in dark theme. Like `LightThemePlugin`, this is a plugin object you pass directly.
 
-## Basic Usage
+## Basic usage
 
 ```ts
-import { DarkThemePlugin } from "timeline-canvas/plugins";
+import { DarkThemePlugin } from "timeline-canvas";
 
 await timeline.usePlugin(DarkThemePlugin);
-
-// Or use the convenience method
-await timeline.setTheme("dark");
 ```
 
-## Switching Themes at Runtime
+More commonly, you will switch themes with:
 
 ```ts
-import { Timeline } from "timeline-canvas";
-import { LightThemePlugin } from "timeline-canvas/plugins";
-
-// Set default theme at initialization
-const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
-
-// Switch at runtime
 await timeline.setTheme("dark");
-// Switch back to light
 await timeline.setTheme("light");
 ```
 
-Tip: For a custom theme, follow the plugin development guide to implement your own theme plugin.
+## Set a default theme
+
+```ts
+import { Timeline, DarkThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  theme: DarkThemePlugin,
+});
+```
+
+## Current behavior
+
+* Merges the built-in dark palette into `timeline.config.colors`
+* Registers a `background` layer for the dark canvas background
+* When used through `setTheme()`, the old theme is unloaded before the new one is loaded
+
+## Plugin ID
+
+```ts
+"theme-dark@1.0.0"
+```
+
+For custom theming, implement your own `PluginType.THEME` plugin.

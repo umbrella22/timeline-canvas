@@ -1,13 +1,12 @@
-import { C as Track, S as TimelineState, _ as TimelineCallbacks, a as ContextMenuItem, b as TimelineEvent, c as EventClickData, d as EventMoveData, f as EventTextStyle, g as TimeIndicatorMoveData, h as LoadDataFormat, i as ContextMenuData, l as EventDeleteData, m as InteractionTarget, n as Timeline, o as ContextMenuStyle, p as EventUpdateData, r as ChangeType, s as EventAddData, u as EventEditData, v as TimelineColors, w as ZoomData, x as TimelineOptions, y as TimelineConfig } from "./types-CutIkjn4.mjs";
-import { t as ContextMenuPlugin } from "./ContextMenuPlugin-HeXhKHl7.mjs";
-import { t as DarkThemePlugin } from "./DarkThemePlugin-Dy3wNEsj.mjs";
-import { t as EventMediaPlugin } from "./EventMediaPlugin-oiYZdX1E.mjs";
-import { t as EventTooltipPlugin } from "./EventTooltipPlugin-BVStLFz2.mjs";
-import { t as LightThemePlugin } from "./LightThemePlugin-ChMBy0bg.mjs";
-import { t as PerformanceOverlayPlugin } from "./PerformanceOverlayPlugin-DFK_Clxo.mjs";
+import { A as TimelineCallbacks, B as ZoomData, C as EventEditData, D as InteractionTarget, E as EventUpdateData, F as TimelineLocale, I as TimelineMessageParams, L as TimelineOptions, M as TimelineConfig, N as TimelineEvent, O as LoadDataFormat, P as TimelineI18nMessages, R as TimelineState, S as EventDeleteData, T as EventTextStyle, _ as ContextMenuData, a as PluginLocalizedText, b as EventAddData, c as PluginType, d as TimelinePlugin, f as Timeline, g as getCurrentTime, h as formatTime, i as PluginContext, j as TimelineColors, k as TimeIndicatorMoveData, l as RenderLayer, m as createTimelineMessages, n as CoreRenderTarget, o as PluginMetadata, p as ChangeType, r as PluginAPI, s as PluginPriority, t as CoreLayerHook, u as RenderLayerPosition, v as ContextMenuItem, w as EventMoveData, x as EventClickData, y as ContextMenuStyle, z as Track } from "./types-BovVI9wC.mjs";
+import { t as ContextMenuPlugin } from "./ContextMenuPlugin-Ce29-J1v.mjs";
+import { t as DarkThemePlugin } from "./DarkThemePlugin-CLhvSrRp.mjs";
+import { t as EventMediaPlugin } from "./EventMediaPlugin-DOIU5CZW.mjs";
+import { t as EventTooltipPlugin } from "./EventTooltipPlugin-BtU0ZtyW.mjs";
+import { t as LightThemePlugin } from "./LightThemePlugin-KFUJdO1V.mjs";
+import { t as PerformanceOverlayPlugin } from "./PerformanceOverlayPlugin-BmjL92Bg.mjs";
 
-//#region src/utils/time.d.ts
-declare function formatTime(seconds: number, showSeconds?: boolean): string;
-declare function getCurrentTime(): number;
+//#region src/plugins/metadata.d.ts
+declare function getPluginMetadataDescription(metadata: PluginMetadata, locale?: string): string;
 //#endregion
-export { type ChangeType, type ContextMenuData, type ContextMenuItem, ContextMenuPlugin, type ContextMenuStyle, DarkThemePlugin, type EventAddData, type EventClickData, type EventDeleteData, type EventEditData, EventMediaPlugin, type EventMoveData, type EventTextStyle, EventTooltipPlugin, type EventUpdateData, type InteractionTarget, LightThemePlugin, type LoadDataFormat, PerformanceOverlayPlugin, type TimeIndicatorMoveData, Timeline, type TimelineCallbacks, type TimelineColors, type TimelineConfig, type TimelineEvent, type TimelineOptions, type TimelineState, type Track, type ZoomData, formatTime, getCurrentTime };
+export { type ChangeType, type ContextMenuData, type ContextMenuItem, ContextMenuPlugin, type ContextMenuStyle, type CoreLayerHook, type CoreRenderTarget, DarkThemePlugin, type EventAddData, type EventClickData, type EventDeleteData, type EventEditData, EventMediaPlugin, type EventMoveData, type EventTextStyle, EventTooltipPlugin, type EventUpdateData, type InteractionTarget, LightThemePlugin, type LoadDataFormat, PerformanceOverlayPlugin, type PluginAPI, type PluginContext, type PluginLocalizedText, type PluginMetadata, PluginPriority, PluginType, type RenderLayer, type RenderLayerPosition, type TimeIndicatorMoveData, Timeline, type TimelineCallbacks, type TimelineColors, type TimelineConfig, type TimelineEvent, type TimelineI18nMessages, type TimelineLocale, type TimelineMessageParams, type TimelineOptions, type TimelinePlugin, type TimelineState, type Track, type ZoomData, createTimelineMessages, formatTime, getCurrentTime, getPluginMetadataDescription };

@@ -1,3 +1,3 @@
-import "../types-CutIkjn4.mjs";
-import { t as LightThemePlugin } from "../LightThemePlugin-ChMBy0bg.mjs";
+import "../types-BovVI9wC.mjs";
+import { t as LightThemePlugin } from "../LightThemePlugin-KFUJdO1V.mjs";
 export { LightThemePlugin as LightTheme, LightThemePlugin };

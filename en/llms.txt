@@ -24,7 +24,7 @@
 ## API
 
 - [Data Management API](/timeline-canvas/en/api/timeline/data-management.md)
-- [View Control API](/timeline-canvas/en/api/timeline/view-control.md)
+- [View, Interaction, and State API](/timeline-canvas/en/api/timeline/view-control.md)
 - [Plugin Management API](/timeline-canvas/en/api/timeline/plugin-management.md)
 - [Event Callbacks API](/timeline-canvas/en/api/timeline/event-listeners.md)
 - [Type Definitions](/timeline-canvas/en/api/timeline/types.md)

@@ -1,1 +1,0 @@
-let e=function(e){return e.RENDER=`render`,e.EVENT_HANDLER=`event_handler`,e.DATA_SOURCE=`data_source`,e.THEME=`theme`,e.TOOL=`tool`,e.EXTENSION=`extension`,e}({});export{e as t};

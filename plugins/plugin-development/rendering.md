@@ -1,43 +1,101 @@
-## 渲染层接口
+## 两种扩展方式
 
-```typescript
+### 1. RenderLayer
+
+用于在最底层或最顶层增加自定义绘制。
+
+```ts
 interface RenderLayer {
-  name: string; // 渲染层名称
-  position: "background" | "overlay"; // 渲染位置
+  name: string;
+  position: "background" | "overlay";
   render: (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any
+    config: TimelineConfig,
+    state: TimelineState
   ) => void;
 }
 ```
 
-## 渲染位置
+位置说明：
 
-* `background` - 在事件块之前渲染（背景层）
-* `overlay` - 在事件块之后渲染（覆盖层）
+* `background`: 在核心层之前绘制
+* `overlay`: 在核心层之后绘制
 
-> **注意**: 核心渲染层（如时间轴刻度、轨道背景、事件块、辅助线等）现在由内部的 `RenderPipeline` 管理。插件目前只能在 `background`（最底层）和 `overlay`（最顶层）进行绘制。如果需要修改核心渲染行为，目前只能通过修改源码或等待未来开放更多钩子。
+### 2. CoreLayerHook
 
-## 渲染示例
+用于包裹、修改或完全替换核心层的绘制行为。
 
 ```ts
-registerRenderLayer({
-  name: "GridPlugin",
+interface CoreLayerHook {
+  name: string;
+  target: "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "interaction";
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    next: () => void
+  ) => void;
+}
+```
+
+说明：
+
+* 调用 `next()` 表示继续执行默认渲染
+* 不调用 `next()` 表示完全接管该核心层
+* 多个 hook 会形成一条中间件链
+
+## RenderLayer 示例
+
+```ts
+context.api.registerRenderLayer({
+  name: "grid-background",
   position: "background",
-  render(ctx, canvas, config, state) {
-    // 绘制网格
-    ctx.strokeStyle = config.colors.grid || "#e0e0e0";
+  render(ctx, canvas) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.06)";
     ctx.lineWidth = 1;
 
-    // 绘制垂直线
-    for (let x = 0; x < canvas.width; x += 50) {
+    for (let x = 0; x < canvas.width; x += 40) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
+
+    ctx.restore();
   },
 });
 ```
+
+## CoreLayerHook 示例
+
+```ts
+context.api.registerCoreLayerHook({
+  name: "timeline-watermark",
+  target: "timeline",
+  handler(ctx, canvas, _config, _state, next) {
+    next();
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("Preview", canvas.width - 64, 18);
+    ctx.restore();
+  },
+});
+```
+
+## 当前核心层顺序
+
+源码里的 `RenderPipeline` 渲染顺序是：
+
+* `background`
+* `tracks`
+* `timeline`
+* `guideLines`
+* `indicator`
+* `interaction`
+* `scrollbar`
+* `overlay`

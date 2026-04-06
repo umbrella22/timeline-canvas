@@ -24,7 +24,7 @@
 ## API
 
 - [数据管理 API](/timeline-canvas/api/timeline/data-management.md)
-- [视图控制 API](/timeline-canvas/api/timeline/view-control.md)
+- [视图、交互与状态 API](/timeline-canvas/api/timeline/view-control.md)
 - [插件管理 API](/timeline-canvas/api/timeline/plugin-management.md)
 - [事件监听 API](/timeline-canvas/api/timeline/event-listeners.md)
 - [类型定义](/timeline-canvas/api/timeline/types.md)

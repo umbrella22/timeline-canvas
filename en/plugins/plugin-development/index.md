@@ -55,7 +55,7 @@ graph TB
     BACKGROUND -->|plugin render| PM
     OVERLAY -->|plugin render| PM
 
-    %% 样式定义
+    %% Styles
     classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef plugin fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef render fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px

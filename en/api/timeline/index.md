@@ -1,71 +1,95 @@
-`Timeline` is the core class that provides the primary capabilities of the timeline (data management, view control, plugins, and event callbacks).
+`Timeline` is the runtime core of Timeline Canvas. It ties together data, interaction handling, rendering, and plugins.
 
 ## Constructor
 
 ```ts
-class Timeline {
-  constructor(canvasId: string, options?: TimelineOptions);
-}
-```
+import { Timeline, LightThemePlugin } from "timeline-canvas";
 
-### Parameters
-
-* `canvasId`: the `id` of the canvas element
-* `options`: timeline config and callbacks (seconds-based, see [Type Definitions](/timeline-canvas/en/api/timeline/types.md))
-
-### Example
-
-```ts
 const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
+  theme: LightThemePlugin,
 });
 ```
 
-## 📋 API Directory
+### Parameters
+
+* `canvasId`: the `id` of the target `<canvas>`
+* `options`: constructor options, typed as `TimelineOptions`
+
+### Public properties
+
+* `config`: normalized runtime config
+* `callbacks`: the current callback set
+* `state`: the current runtime state
+
+> If you mutate `timeline.config` or `timeline.state` directly, call `notifyChange()` afterward. When a public method exists, prefer the method over mutating internals.
+
+## API map
 
 ### [Data Management](/timeline-canvas/en/api/timeline/data-management.md)
 
-* `loadData` - load data
-* `addEvent` - add an event
-* `updateEvent` - update an event
-* `deleteEvent` - delete an event
-* `addTrack` - add a track
-* `removeTrack` - remove a track
-* `setEndTime` - set end time
-* `beginIndexBatch` - start batch indexing
-* `endIndexBatch` - end batch indexing
+* `loadData`
+* `addEvent`
+* `updateEvent`
+* `updateEventData`
+* `deleteEvent`
+* `addTrack` / `removeTrack`
+* `autoRemoveEmptyLastTrack`
+* `setEndTime` / `getEndTime`
+* `beginIndexBatch` / `endIndexBatch`
+* `invalidateIndexTrack` / `invalidateIndexAll`
 
-### [View Control](/timeline-canvas/en/api/timeline/view-control.md)
+### [View, Interaction, and State](/timeline-canvas/en/api/timeline/view-control.md)
 
-* `setZoomLevel` - set zoom level
-* `zoom` - zoom
-* `setTimeIndicator` - set time indicator
-* `setCanvasSize` - set canvas size
-* `markDirty` - trigger a redraw
-* `notifyChange` - notify change
-* `beginChangeBatch` - start batch changes
-* `endChangeBatch` - end batch changes
+* `setZoomLevel` / `zoom` / `getZoomLevel`
+* `setTimeIndicator` / `setTimeIndicatorDuringDrag`
+* `setCanvasSize` / `adjustCanvasSize` / `draw`
+* `markDirty` / `notifyChange`
+* `beginChangeBatch` / `endChangeBatch`
+* `getInteractionTarget` / `getEventAtPosition` / `getResizeHandle`
+* `calculateGuideLines` / `snapToGuideLines` / `snapEdgeToGuideLines`
+* `canMoveEvent`
+* `showSplitLine` / `hideSplitLine` / `splitEvent`
+* `setReadOnly` / `isReadOnly`
+* `highlightEvent` / `clearHighlight` / `getHighlightedEvent`
+* `setDebug` / `setEnableTimeIndicator`
+* `setStatus` / `getStatus`
 
 ### [Plugin Management](/timeline-canvas/en/api/timeline/plugin-management.md)
 
-* `usePlugin` - use a plugin
-* `removePlugin` - remove a plugin
-* `setTheme` - switch theme
-* `getLoadedPlugins` - get loaded plugins
+* `usePlugin`
+* `removePlugin`
+* `setTheme`
+* `getLoadedPlugins`
+* `isPluginLoaded`
 
 ### [Event Callbacks](/timeline-canvas/en/api/timeline/event-listeners.md)
 
 * `onEventAdd`
 * `onEventUpdate`
+* `onEventDelete`
+* `onEventMove`
 * `onEventClick`
-* ...more callbacks
+* `onEventHighlight`
+* `onTimeIndicatorHighlight`
+* `onStatusChange`
 
 ### [Type Definitions](/timeline-canvas/en/api/timeline/types.md)
 
-* `TimelineEvent`
+* `TimelineOptions`
 * `TimelineConfig`
+* `TimelineEvent`
+* `InteractionTarget`
 * `LoadDataFormat`
+
+## Destroying an instance
+
+```ts
+timeline.destroy();
+```
+
+Call `destroy()` when the canvas is going away, such as during component unmount or page teardown.

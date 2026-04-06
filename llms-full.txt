@@ -77,7 +77,7 @@ import {
   ContextMenuPlugin,
   LightThemePlugin,
   PerformanceOverlayPlugin,
-} from "timeline-canvas/plugins";
+} from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -287,7 +287,7 @@ graph TB
       ContextMenuPlugin,
       LightThemePlugin,
       PerformanceOverlayPlugin,
-    } from 'timeline-canvas/plugins';
+    } from 'timeline-canvas';
 
     const timeline = new Timeline('timelineCanvas', {
       startTime: 0,
@@ -319,220 +319,211 @@ graph TB
 
 
 
+
 ---
 url: /timeline-canvas/guide/configuration.md
 ---
 
 
-> Timeline Canvas 使用秒制相对时间系统。配置类型建议以 TypeScript 类型为准：见 [类型定义](../api/timeline/types)。
+> Timeline Canvas 使用秒制相对时间系统。构造函数接收的是 `TimelineOptions`，不是完整的 `TimelineConfig`。`TimelineConfig` 是内部合并默认值后的运行时配置。
 
-## TimelineConfig 接口
+## 你在构造函数里真正传入的类型
 
-Timeline Canvas 使用秒制时间系统，所有时间值都是从时间起点开始的相对秒数。
-
-```typescript
-interface TimelineConfig {
-  // 基础时间配置
-  startTime: number;
-  endTime: number;
-  startPaddingTime: number;
-  endPaddingTime: number;
-  secondWidth: number;
-
-  // 尺寸与布局
-  canvasHeight?: number;
-  timelineHeight: number;
-  trackHeight: number;
-  trackMargin: number;
-  firstTrackTopMargin: number;
-
-  // 功能开关
-  enableEventResize: boolean;
-  enableEventSplit: boolean;
-  enableTimeIndicator: boolean;
-  enableContextMenu: boolean;
-  debug: boolean;
-  enablePerformanceMonitor: boolean;
-  readOnly: boolean;
-
-  // 轨道自动管理
-  autoAddTrack: boolean;
-  autoRemoveEmptyLastTrack: boolean;
-
-  // 事件配置
-  minEventDuration: number;
-  resizeHandleWidth: number;
-  showEventDurationLabel: boolean;
-  formatEventDuration: ((duration: number) => string) | null;
-
-  // 自动缩放
-  autoFitOnInit: boolean;
-  minAutoFitZoom: number;
-  maxAutoFitZoom: number;
-
-  // 吸附配置
-  snapInterval: number;
-  snapToSeconds: boolean;
-  secondPrecisionZoomThreshold: number;
-
-  // 时间指示器配置
-  timeIndicatorWidth: number;
-  timeIndicatorSnapThreshold: number;
-  timeIndicatorHeadSize: number;
-  timeIndicatorTriangleHeight: number;
-
-  // 辅助线配置
-  guideLineSnapThreshold: number;
-
-  // 文本与块样式
-  eventTextStyle: EventTextStyle;
-  eventBlockStyle: EventBlockStyle;
-  colors: TimelineColors;
-
-  // 右键菜单配置
-  contextMenuItems: ContextMenuItem[];
-  contextMenuStyle: ContextMenuStyle;
-  contextMenuHtml?: string | HTMLElement;
-
-  // 回调事件
-  onEventAdd?: (data: EventAddData) => void;
-  onEventUpdate?: (data: EventUpdateData) => void;
-  onEventDelete?: (data: EventDeleteData) => void;
-  onEventMove?: (data: EventMoveData) => void;
-  onEventClick?: (data: EventClickData) => void;
-  onEventEdit?: (data: EventEditData) => void;
-  onTimeIndicatorHighlight?: (data: TimeIndicatorHighlightData) => void;
-  onContextMenu?: (data: ContextMenuData) => void;
-  onTrackAdd?: (track: Track) => void;
-  onTrackRemove?: (track: Track) => void;
-  onTimeIndicatorMove?: (data: TimeIndicatorMoveData) => void;
-  onZoom?: (data: ZoomData) => void;
-  onStatusChange?: (statusText: string) => void;
-  onEventHighlight?: (data: EventHighlightData) => void;
-}
-```
-
-## 样式配置接口
-
-### EventTextStyle
-
-```typescript
-interface EventTextStyle {
-  titleFontSize: number | "auto";
-  timeFontSize: number | "auto";
-  titleFontFamily: string;
-  timeFontFamily: string;
-  titleFontWeight: string;
-  timeFontWeight: string;
-  titleColor: string | null;
-  timeColor: string | null;
-  textAlign: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-  titleOffsetY: number;
-  timeOffsetY: number;
-  showTitle: boolean;
-  showTime: boolean;
-  minHeightForTitle: number;
-  minHeightForTime: number;
-}
-```
-
-### EventBlockStyle
-
-```typescript
-interface EventBlockStyle {
-  borderRadius: number;
-  enableSelectionGlow: boolean;
-  selectionGlowBlur: number;
-}
-```
-
-### TimelineColors
-
-```typescript
-interface TimelineColors {
-  canvasBackground: string;
-  timelineBackground: string;
-  trackBackground: string;
-  trackBackgroundSelected: string;
-  trackBackgroundOdd?: string;
-  trackBackgroundEven?: string;
-  timelineText: string;
-  timelineGrid: string;
-  timelineSubGrid: string;
-  trackText: string;
-  eventColors: string[];
-  eventText: string;
-  eventBorder: string;
-  eventBorderSelected: string;
-  eventOverlay: string;
-  dragPreviewValid: string;
-  dragPreviewInvalid: string;
-  dragPreviewBorderValid: string;
-  dragPreviewBorderInvalid: string;
-  timeIndicator: string;
-  guideLine: string;
-  guideLineLabel: string;
-  dragTimeReferenceLine: string;
-  dragTimeReferenceLabel: string;
-  dragTimeReferenceLabelBackground: string;
-  scrollbarTrack: string;
-  scrollbarHandle: string;
-  scrollbarHandleHover: string;
-  scrollbarHandleHighlight: string;
-  scrollbarBorder: string;
-  contextMenuBackground: string;
-  contextMenuBorder: string;
-  contextMenuText: string;
-  contextMenuHoverBackground: string;
-  contextMenuHoverText: string;
-  eventDurationLabel: string;
-}
-```
-
-## 完整配置示例（与 Demo 一致）
-
-```javascript
+```ts
 const timeline = new Timeline("timelineCanvas", {
-  // 时间范围（秒）
+  startTime: 0,
+  endTime: 3600,
+  canvasHeight: 600,
+  trackHeight: 46,
+  enableTimeIndicator: true,
+  theme: LightThemePlugin,
+  onZoom: (data) => console.log(data),
+});
+```
+
+也就是说：
+
+- 初始化参数请看 `TimelineOptions`
+- 运行时内部完整配置请看 `TimelineConfig`
+- 详细字段定义见 [类型定义](../api/timeline/types)
+
+## 常用配置分组
+
+### 时间与布局
+
+```ts
+const options = {
+  startTime: 0,
+  endTime: 3600,
+  startPaddingTime: 10,
+  endPaddingTime: 60,
+  secondWidth: 0.022,
+  canvasHeight: 600,
+  timelineHeight: 60,
+  trackHeight: 46,
+  trackMargin: 10,
+  firstTrackTopMargin: 16,
+};
+```
+
+### 自动缩放与刻度
+
+```ts
+const options = {
+  autoFitOnInit: true,
+  minAutoFitZoom: 1,
+  maxAutoFitZoom: 3,
+  snapInterval: 15,
+  snapToSeconds: true,
+  secondPrecisionZoomThreshold: 1.5,
+  scale: null,
+  scaleSplitCount: 10,
+  getScaleRender: null,
+};
+```
+
+### 交互行为
+
+```ts
+const options = {
+  enableTimeIndicator: true,
+  enableEventResize: true,
+  enableEventSplit: true,
+  enableContextMenu: true,
+  minEventDuration: 0.25,
+  resizeHandleWidth: 8,
+  readOnly: false,
+  autoAddTrack: true,
+  autoRemoveEmptyLastTrack: true,
+};
+```
+
+### 时间指示器与边缘滚动
+
+```ts
+const options = {
+  timeIndicatorWidth: 3,
+  timeIndicatorSnapThreshold: 10,
+  timeIndicatorHeadSize: 12,
+  timeIndicatorTriangleHeight: 8,
+  edgeScrollThrottle: 80,
+  edgeScrollTriggerMargin: 30,
+  edgeScrollViewportMargin: 50,
+  guideLineSnapThreshold: 1,
+};
+```
+
+### 文字、块样式与颜色
+
+```ts
+const options = {
+  eventTextStyle: {
+    showTitle: true,
+    showTime: false,
+    textAlign: "left",
+  },
+  eventBlockStyle: {
+    borderRadius: 2,
+    enableSelectionGlow: false,
+  },
+  colors: {
+    timeIndicator: "#3F76FC",
+  },
+};
+```
+
+### 右键菜单
+
+```ts
+const options = {
+  enableContextMenu: true,
+  contextMenuItems: [
+    { type: "edit", name: "编辑" },
+    { type: "delete", name: "删除" },
+  ],
+  contextMenuStyle: {
+    minWidth: 140,
+  },
+  contextMenuHtml: "<div>自定义菜单模板</div>",
+};
+```
+
+### 插件与回调
+
+```ts
+const options = {
+  theme: LightThemePlugin,
+  onEventClick: (data) => console.log("事件点击", data),
+  onZoom: (data) => console.log("缩放", data),
+  onStatusChange: (text) => console.log("状态", text),
+};
+```
+
+## 当前默认值中的几个关键点
+
+来自源码默认配置的常用默认值：
+
+- `autoFitOnInit: true`
+- `enableTimeIndicator: true`
+- `enableEventResize: true`
+- `enableEventSplit: true`
+- `enableContextMenu: true`
+- `enablePerformanceMonitor: false`
+- `readOnly: false`
+- `snapInterval: 15`
+- `minEventDuration: 0.25`
+- `trackHeight: 80`
+- `timelineHeight: 40`
+
+## 运行时修改配置
+
+如果你在实例创建后直接改 `timeline.config`，请记得配合 `notifyChange()`：
+
+```ts
+timeline.config.readOnly = true;
+timeline.notifyChange("config:readOnly");
+
+timeline.config.debug = true;
+timeline.notifyChange("config:debug");
+```
+
+如果存在对应的公开方法，优先使用方法：
+
+```ts
+timeline.setReadOnly(true);
+timeline.setDebug(true);
+timeline.setEnableTimeIndicator(false);
+timeline.setEndTime(7200);
+```
+
+## 完整示例
+
+```ts
+import { Timeline, LightThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   endPaddingTime: 60,
-
-  // 尺寸与布局
   secondWidth: 0.022,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
   firstTrackTopMargin: 16,
   timelineHeight: 60,
-
-  // 功能开关
   enableEventResize: true,
   enableEventSplit: true,
   enableTimeIndicator: true,
   enableContextMenu: true,
-  debug: false,
-
-  // 轨道自动管理
   autoAddTrack: true,
   autoRemoveEmptyLastTrack: true,
-
-  // 事件配置
   minEventDuration: 0.25,
   resizeHandleWidth: 8,
-  minAutoFitZoom: 14.0,
-
-  // 吸附配置
   snapInterval: 15,
   snapToSeconds: true,
-  secondPrecisionZoomThreshold: 1.0,
-
-  // 文本与块样式（示例）
   eventTextStyle: { showTitle: true, showTime: false },
   eventBlockStyle: { borderRadius: 2, enableSelectionGlow: false },
-
-  // 回调事件（示例）
+  theme: LightThemePlugin,
   onEventClick: (data) => console.log("事件点击", data),
   onZoom: (data) => console.log("缩放", data),
 });
@@ -545,21 +536,29 @@ url: /timeline-canvas/plugins/builtin/context-menu.md
 ---
 
 
-> 右键菜单插件。菜单项由 `TimelineConfig.contextMenuItems` 驱动，可选用 HTML 模板接管渲染。
+> 右键菜单插件。菜单项由 `contextMenuItems` 驱动，可选用 HTML 模板接管渲染。
 
 ## 基本用法
 
 ```ts
-import { ContextMenuPlugin } from "timeline-canvas/plugins";
+import { Timeline, ContextMenuPlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+});
 
 await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## 开启与菜单项
+如果你更喜欢稳定子路径导入：
 
 ```ts
-import { Timeline } from "timeline-canvas";
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
 
+## 菜单项配置
+
+```ts
 const timeline = new Timeline("timelineCanvas", {
   enableContextMenu: true,
   contextMenuItems: [
@@ -571,13 +570,51 @@ const timeline = new Timeline("timelineCanvas", {
     console.log(menuType, trackIndex, eventIndex, event);
   },
 });
+
+await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## HTML 接管（可选）
+## HTML 接管
+
+可以通过工厂参数传入模板字符串：
 
 ```ts
-await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
+await timeline.usePlugin(
+  ContextMenuPlugin({
+    htmlTemplate: "<div class='my-menu'>自定义菜单</div>",
+  })
+);
 ```
+
+也可以通过构造配置传入：
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+  contextMenuHtml: "<div class='my-menu'>自定义菜单</div>",
+});
+```
+
+说明：
+
+- 工厂参数 `htmlTemplate` 的优先级高于 `contextMenuHtml`
+- 模板为空字符串时，当前实现会回退到 Canvas 菜单渲染
+- 当前内置插件只会把 `contextMenuHtml` 的字符串值当作模板使用
+
+## 渲染行为
+
+当前实现的行为特点：
+
+- Canvas 模式下，菜单绘制在 `overlay` 层
+- HTML 模式下，会在画布父容器内挂一个绝对定位的菜单容器
+- 当菜单隐藏时，插件会自动隐藏或移除对应容器
+
+## 插件 ID
+
+```ts
+"context-menu@1.0.0"
+```
+
 
 
 
@@ -586,12 +623,12 @@ url: /timeline-canvas/plugins/builtin/event-tooltip.md
 ---
 
 
-事件提示插件，当鼠标悬停在事件上时显示详细信息。
+事件提示插件。当事件标题在块内被截断时，鼠标悬停会显示完整标题。
 
 ## 基本用法
 
 ```ts
-import { EventTooltipPlugin } from "timeline-canvas/plugins";
+import { EventTooltipPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventTooltipPlugin());
 ```
@@ -603,12 +640,37 @@ await timeline.usePlugin(
   EventTooltipPlugin({
     showDelay: 300,
     maxWidth: 300,
+    padding: 8,
+    borderRadius: 4,
     backgroundColor: "#333",
     textColor: "#fff",
+    borderColor: "#555",
+    fontSize: 12,
+    fontFamily: "Arial, sans-serif",
     htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
   })
 );
 ```
+
+## 源码中的实际行为
+
+- 只有标题文本被截断时才显示 tooltip
+- 默认延迟 `300ms`
+- 使用 `mousemove` + `requestAnimationFrame` 节流来做命中检测
+- HTML 模式下，如果 `htmlTemplate(title)` 返回空字符串，会回退到 Canvas 模式
+
+## 适合的场景
+
+- 事件块较窄，无法完整显示标题
+- 希望在不改变主渲染密度的情况下保留完整文本
+- 需要悬停时展示自定义 HTML 结构
+
+## 插件 ID
+
+```ts
+"event-tooltip@1.0.0"
+```
+
 
 
 
@@ -617,18 +679,43 @@ url: /timeline-canvas/plugins/builtin/light-theme.md
 ---
 
 
-亮色主题插件，设置时间轴的亮色配色并绘制背景层。
+亮色主题插件。它是一个插件对象，不是工厂函数。
 
 ## 基本用法
 
 ```ts
-import { LightThemePlugin } from "timeline-canvas/plugins";
+import { LightThemePlugin } from "timeline-canvas";
 
 await timeline.usePlugin(LightThemePlugin);
+```
 
-// 或者使用便捷方法
+更推荐的主题切换写法：
+
+```ts
 await timeline.setTheme("light");
 ```
+
+## 初始化时指定主题
+
+```ts
+import { Timeline, LightThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  theme: LightThemePlugin,
+});
+```
+
+## 当前实现行为
+
+- 会把内置亮色调色板合并进 `timeline.config.colors`
+- 会注册一个 `background` 层用于绘制画布背景
+
+## 插件 ID
+
+```ts
+"theme-light@1.0.0"
+```
+
 
 
 
@@ -637,35 +724,47 @@ url: /timeline-canvas/plugins/builtin/dark-theme.md
 ---
 
 
-暗色主题插件，设置时间轴的暗色配色并绘制背景层。
+暗色主题插件。它和 `LightThemePlugin` 一样，都是直接传入的插件对象。
 
 ## 基本用法
 
 ```ts
-import { DarkThemePlugin } from "timeline-canvas/plugins";
+import { DarkThemePlugin } from "timeline-canvas";
 
 await timeline.usePlugin(DarkThemePlugin);
-
-// 或者使用便捷方法
-await timeline.setTheme("dark");
 ```
 
-## 动态切换主题
+更常见的运行时切换方式：
 
 ```ts
-import { Timeline } from "timeline-canvas";
-import { LightThemePlugin } from "timeline-canvas/plugins";
-
-// 初始化时指定默认主题
-const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
-
-// 运行时动态切换
 await timeline.setTheme("dark");
-// 切回亮色
 await timeline.setTheme("light");
 ```
 
-提示：如需自定义主题，可参考插件开发指南实现自定义主题插件。
+## 初始化时指定默认主题
+
+```ts
+import { Timeline, DarkThemePlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  theme: DarkThemePlugin,
+});
+```
+
+## 当前实现行为
+
+- 会把内置暗色调色板合并进 `timeline.config.colors`
+- 会注册一个 `background` 层来绘制暗色背景
+- 通过 `setTheme()` 切换时，旧主题会先卸载，再加载新主题
+
+## 插件 ID
+
+```ts
+"theme-dark@1.0.0"
+```
+
+提示：如需自定义主题，可参考插件开发指南实现自定义 `PluginType.THEME` 插件。
+
 
 
 
@@ -674,32 +773,61 @@ url: /timeline-canvas/plugins/builtin/performance-overlay.md
 ---
 
 
-性能监控插件，显示 FPS、内存使用等性能指标。
+性能监控插件，用于显示 FPS、图层耗时和性能采样结果。
 
 ## 基本用法
 
 ```ts
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
-
-await timeline.usePlugin(PerformanceOverlayPlugin);
-```
-
-## 配置选项
-
-```ts
-import { Timeline } from "timeline-canvas";
+import { Timeline, PerformanceOverlayPlugin } from "timeline-canvas";
 
 const timeline = new Timeline("timelineCanvas", {
   enablePerformanceMonitor: true,
-  debug: true,
 });
 
 await timeline.usePlugin(PerformanceOverlayPlugin);
 ```
 
-## 配置接口
+## 开关方式
 
-性能监控插件目前不接受直接的配置对象，而是依赖 `TimelineConfig` 中的 `enablePerformanceMonitor` 和 `debug` 选项。
+该插件本身不接收工厂参数，显示与否由以下配置控制：
+
+- `enablePerformanceMonitor`
+- `debug`
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  enablePerformanceMonitor: true,
+  debug: false,
+});
+
+await timeline.usePlugin(PerformanceOverlayPlugin);
+```
+
+## 当前面板里会显示什么
+
+根据源码，面板会显示：
+
+- FPS
+- 最近一次渲染的各逻辑层耗时
+- `PerformanceMonitor` 收集到的采样统计
+
+```ts
+const layerTimes = timeline.getLastLayerTimes();
+console.log(layerTimes);
+```
+
+## 交互行为
+
+- 面板绘制在 `overlay` 层
+- 可以直接拖拽面板位置
+- 当 `enablePerformanceMonitor` 和 `debug` 都关闭时，插件仍可保留加载状态，但面板会隐藏
+
+## 插件 ID
+
+```ts
+"performance-overlay@1.0.0"
+```
+
 
 
 
@@ -708,12 +836,12 @@ url: /timeline-canvas/plugins/builtin/event-media.md
 ---
 
 
-事件媒体插件，在事件块内部渲染图片或波形。
+事件媒体插件，在事件块内部渲染图片和波形。
 
 ## 基本用法
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
 ```
@@ -731,11 +859,12 @@ timeline.loadData({
           title: "媒体事件",
           media: {
             images: [
-              { src: "path/to/image.jpg", fit: "cover", opacity: 0.8 },
+              { src: "/cover.jpg", fit: "cover", opacity: 0.35 },
             ],
             waveform: {
               data: [0.1, 0.5, -0.2],
               color: "#1890ff",
+              backgroundColor: "rgba(24, 144, 255, 0.08)",
               opacity: 0.6,
             },
           },
@@ -746,10 +875,10 @@ timeline.loadData({
 });
 ```
 
-## 媒体类型配置
+## media 字段结构
 
-```typescript
-interface EventMedia {
+```ts
+interface TimelineEvent["media"] {
   images?: Array<{
     src: string;
     fit?: "cover" | "contain" | "stretch";
@@ -764,10 +893,9 @@ interface EventMedia {
 }
 ```
 
-## 高级用法
+## 混合渲染示例
 
 ```ts
-// 混合媒体类型
 timeline.loadData({
   tracks: [
     {
@@ -779,13 +907,13 @@ timeline.loadData({
           media: {
             images: [
               {
-                src: "thumbnail.jpg",
-                fit: "cover",
-                opacity: 0.3,
+                src: "/thumbnail.jpg",
+                fit: "contain",
+                opacity: 0.25,
               },
             ],
             waveform: {
-              data: audioSamples, // Float32Array 或 number[]
+              data: audioSamples,
               color: "#ff6b6b",
               opacity: 0.8,
             },
@@ -797,6 +925,31 @@ timeline.loadData({
 });
 ```
 
+## 当前实现细节
+
+- 图片会通过 `fetch()` 异步加载并缓存为 `ImageBitmap`
+- 波形数据会缓存为 `Float32Array`
+- 在支持 `OffscreenCanvas` 的环境下，波形会尽量预渲染为位图
+- 图片和波形都会被裁剪在事件块内部
+- 渲染顺序是“先图片，后波形”
+
+## 插件事件钩子
+
+该插件内部注册的是：
+
+```ts
+"render:event:media"
+```
+
+如果你自己实现类似插件，可以复用同一类事件钩子。
+
+## 插件 ID
+
+```ts
+"event-media@1.0.0"
+```
+
+
 
 
 ---
@@ -804,19 +957,19 @@ url: /timeline-canvas/plugins/builtin/mutex-guard.md
 ---
 
 
-事件互斥插件，防止同一互斥组的事件在时间上重叠。
+事件互斥插件，用于阻止带有相同互斥标签的事件在时间上重叠。
 
 ## 基本用法
 
 ```ts
-import { MutexGuardPlugin } from "timeline-canvas/plugins";
+import { MutexGuardPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(MutexGuardPlugin());
 ```
 
 ## 配置互斥组
 
-在事件的 `customData` 中设置 `mutex` 属性，指定该事件所属的互斥组。
+在事件的 `customData.mutex` 中放置字符串数组：
 
 ```ts
 timeline.loadData({
@@ -827,13 +980,13 @@ timeline.loadData({
           startTime: 0,
           endTime: 100,
           title: "任务A",
-          customData: { mutex: ["group1"] }, // 属于 group1
+          customData: { mutex: ["group1"] },
         },
         {
-          startTime: 50,
-          endTime: 150,
+          startTime: 120,
+          endTime: 180,
           title: "任务B",
-          customData: { mutex: ["group1"] }, // 也属于 group1，将无法放置在与任务A重叠的位置
+          customData: { mutex: ["group1"] },
         },
       ],
     },
@@ -841,9 +994,33 @@ timeline.loadData({
 });
 ```
 
-## 工作原理
+## 当前实现是如何生效的
 
-当用户尝试移动或调整事件大小时，插件会检查目标位置是否与同一互斥组的其他事件重叠。如果重叠，操作将被阻止或回滚。
+插件会注册验证钩子：
+
+```ts
+"validate:event:move"
+```
+
+也就是说它影响的是会走 `canMoveEvent()` 的交互路径，包括：
+
+- 拖拽移动事件
+- 调整事件左右边界
+
+当目标时间区间与任意“同 mutex 标签”的其他事件重叠时，验证会返回 `false`，本次操作被阻止。
+
+## 注意点
+
+- `mutex` 必须是字符串数组
+- 检查范围是全轨道，而不是只看当前轨道
+- 当前插件元数据里的名称是 `MutexGuardPlugin`
+
+## 插件 ID
+
+```ts
+"MutexGuardPlugin@1.0.0"
+```
+
 
 
 
@@ -852,25 +1029,62 @@ url: /timeline-canvas/plugins/builtin/index.md
 ---
 
 
-Timeline Canvas 提供了多个内置插件，可以通过 `timeline.usePlugin()` 方法使用。
+Timeline Canvas 内置了一组可直接复用的插件。
 
-## 📋 插件目录
+## 导入方式
+
+推荐直接从包根导入：
+
+```ts
+import {
+  ContextMenuPlugin,
+  EventTooltipPlugin,
+  EventMediaPlugin,
+  LightThemePlugin,
+  DarkThemePlugin,
+  PerformanceOverlayPlugin,
+  MutexGuardPlugin,
+} from "timeline-canvas";
+```
+
+如果你希望按稳定子路径单独导入，也可以使用：
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
+
+## 先分清两种使用方式
+
+### 直接传插件对象
+
+- `LightThemePlugin`
+- `DarkThemePlugin`
+- `PerformanceOverlayPlugin`
+
+### 调用工厂函数后再传入
+
+- `ContextMenuPlugin()`
+- `EventTooltipPlugin()`
+- `EventMediaPlugin()`
+- `MutexGuardPlugin()`
+
+## 插件目录
 
 ### 基础插件
 
-- [ContextMenuPlugin](./context-menu) - 右键菜单插件
-- [EventTooltipPlugin](./event-tooltip) - 事件提示插件
-- [LightThemePlugin](./light-theme) - 亮色主题插件
-- [DarkThemePlugin](./dark-theme) - 暗色主题插件
-- [PerformanceOverlayPlugin](./performance-overlay) - 性能监控插件
+- [ContextMenuPlugin](./context-menu) - 右键菜单与 HTML 接管
+- [EventTooltipPlugin](./event-tooltip) - 标题截断时的提示层
+- [LightThemePlugin](./light-theme) - 亮色主题
+- [DarkThemePlugin](./dark-theme) - 暗色主题
+- [PerformanceOverlayPlugin](./performance-overlay) - FPS 与图层耗时面板
 
 ### 媒体插件
 
-- [EventMediaPlugin](./event-media) - 事件媒体插件
+- [EventMediaPlugin](./event-media) - 事件块内图片与波形渲染
 
 ### 功能插件
 
-- [MutexGuardPlugin](./mutex-guard) - 事件互斥插件
+- [MutexGuardPlugin](./mutex-guard) - 基于互斥标签的移动/缩放约束
 
 
 
@@ -879,13 +1093,13 @@ url: /timeline-canvas/api/timeline/data-management.md
 ---
 
 
-## loadData(data: LoadDataFormat)
+## loadData(data: LoadDataFormat): boolean
 
-加载时间轴数据（秒制时间）。
+加载整份时间轴数据。当前实现会先清空已有轨道和选中态，再把 `LoadDataFormat` 转成运行时 `TimelineEvent`。
 
 ```ts
 timeline.loadData({
-  timeIndicatorPosition: 0,
+  timeIndicatorPosition: 300,
   tracks: [
     {
       events: [
@@ -895,133 +1109,175 @@ timeline.loadData({
           title: "早班",
           description: "上午工作时段",
         },
+        {
+          startTime: 1200,
+          duration: 600,
+          title: "复盘",
+        },
       ],
     },
   ],
 });
 ```
 
-## addEvent
+说明：
 
-`addEvent(trackIndex: number, startTime: number, endTime: number, title: string, description?: string, customData?: any, readonly?: boolean)`
+- `events` 既支持 `startTime + endTime`，也支持 `startTime + duration`
+- 如果载入后没有任何轨道，`Timeline` 会补一条空轨道
+- 如果提供了 `timeIndicatorPosition`，内部会继续调用 `setTimeIndicator()`
 
-在指定轨道添加事件。
+## addEvent(...)
 
 ```ts
-timeline.addEvent(0, 1200, 1800, "自动生成的事件", "示例描述", {
-  note: "示例",
-});
+timeline.addEvent(
+  0,
+  1200,
+  1800,
+  "自动生成的事件",
+  "示例描述",
+  { note: "示例" },
+  false
+);
 ```
 
-## updateEvent
+签名：
 
-`updateEvent(trackIndex: number, eventIndex: number, updates: Partial<TimelineEvent>)`
+```ts
+addEvent(
+  trackIndex: number,
+  startTime: number,
+  endTime: number,
+  title: string,
+  description?: string,
+  customData?: Record<string, unknown>,
+  readonly?: boolean
+): void
+```
 
-更新事件。
+说明：
+
+- `trackIndex` 必须是现有轨道索引
+- 公开签名的第三个参数语义是 `endTime`
+- 当前实现兼容某些“传时长”的场景，但为了避免歧义，文档建议始终传真实结束时间
+
+## updateEvent(trackIndex, eventIndex, updates): boolean
+
+用 `Partial<TimelineEvent>` 直接更新运行时事件对象。
 
 ```ts
 timeline.updateEvent(0, 1, {
   title: "更新后的标题",
+  color: "#1890ff",
+  customData: { owner: "alice" },
 });
 ```
 
-## deleteEvent
+## updateEventData(trackIndex, eventIndex, eventData): boolean
 
-`deleteEvent(trackIndex: number, eventIndex: number)`
+面向表单场景的轻量更新接口，适合只改标题、开始时间、时长和描述。
 
-删除事件。
+```ts
+timeline.updateEventData(0, 1, {
+  title: "剪辑完成",
+  startTime: 2400,
+  duration: 300,
+  description: "导出第一版",
+});
+```
+
+## deleteEvent(trackIndex, eventIndex): boolean
+
+删除指定事件。
 
 ```ts
 timeline.deleteEvent(0, 1);
 ```
 
-## addTrack
+说明：
 
-`addTrack()`
+- 删除成功后会触发 `events:delete`
+- 若启用了 `autoRemoveEmptyLastTrack`，最后一条空轨道可能被自动移除
 
-添加一个新的空轨道。
+## addTrack(): void
+
+添加一条新的空轨道。
 
 ```ts
 timeline.addTrack();
 ```
 
-## removeTrack
+## removeTrack(): void
 
-`removeTrack()`
-
-移除最后一个轨道。
+移除最后一条轨道。
 
 ```ts
 timeline.removeTrack();
 ```
 
-## autoRemoveEmptyLastTrack
+说明：
 
-`autoRemoveEmptyLastTrack()`
+- 至少会保留一条轨道
+- 轨道数量不足时不会抛异常，而是更新状态文本
 
-自动移除最后一个空轨道（如果存在）。
+## autoRemoveEmptyLastTrack(): void
+
+如果最后一条轨道为空，并且启用了 `autoRemoveEmptyLastTrack`，则自动递归移除它。
 
 ```ts
 timeline.autoRemoveEmptyLastTrack();
 ```
 
-## setEndTime
+## setEndTime(endTime: number): boolean
 
-`setEndTime(endTime: number)`
-
-设置时间轴结束时间（秒）。
+更新时间轴结束时间。
 
 ```ts
-timeline.setEndTime(86400); // 设置结束时间为24小时
+timeline.setEndTime(86400);
 ```
 
-## getEndTime
+说明：
 
-`getEndTime(): number`
+- `endTime` 必须大于 `startTime`
+- 如果已有事件超出新结束时间，当前实现会给出警告，但不会主动裁剪事件
+- 超出范围的时间指示器位置会被钳制到新的 `endTime`
 
-获取时间轴结束时间（秒）。
+## getEndTime(): number
+
+返回当前结束时间。
 
 ```ts
-const endTime = timeline.getEndTime(); // 返回秒数
+const endTime = timeline.getEndTime();
 ```
 
-## beginIndexBatch
+## 索引批处理
 
-`beginIndexBatch()`
+当你直接修改 `timeline.state.tracks` 或进行大量外部写入时，索引相关 API 可以减少重建开销。
 
-开始批量索引更新。在批量添加或修改大量事件时使用，可以提高性能。
+### beginIndexBatch(): void
 
 ```ts
 timeline.beginIndexBatch();
-// 批量添加事件...
+```
+
+### endIndexBatch(): void
+
+```ts
 timeline.endIndexBatch();
 ```
 
-## endIndexBatch
-
-`endIndexBatch()`
-
-结束批量索引更新，并重建索引。
-
-## invalidateIndexTrack
-
-`invalidateIndexTrack(trackIndex: number)`
-
-使指定轨道的索引失效，下次查询时会重新构建。
+### invalidateIndexTrack(trackIndex: number): void
 
 ```ts
 timeline.invalidateIndexTrack(0);
 ```
 
-## invalidateIndexAll
-
-`invalidateIndexAll()`
-
-使所有轨道的索引失效。
+### invalidateIndexAll(): void
 
 ```ts
 timeline.invalidateIndexAll();
 ```
+
+> 如果你只是通过 `addEvent`、`updateEvent`、`deleteEvent`、`loadData` 等公开方法操作数据，索引一般会自动失效并刷新。
 
 
 
@@ -1030,150 +1286,319 @@ url: /timeline-canvas/api/timeline/view-control.md
 ---
 
 
-## setZoomLevel
+## 缩放与时间指示器
 
-`setZoomLevel(zoomLevel: number)`
+### setZoomLevel(zoomLevel: number): boolean
 
-设置缩放级别。
+设置绝对缩放级别，合法范围是 `1.0 ~ 1000.0`。
 
 ```ts
 timeline.setZoomLevel(2);
 ```
 
-## zoom
+### zoom(factor: number): void
 
-`zoom(factor: number)`
-
-按因子缩放。
+按比例缩放，内部会尽量保持视口中心对应的时间位置不跳变。
 
 ```ts
-timeline.zoom(1.2); // 放大 20%
-timeline.zoom(0.8); // 缩小 20%
+timeline.zoom(1.2);
+timeline.zoom(0.8);
 ```
 
-## setTimeIndicator
-
-`setTimeIndicator(seconds: number, applySnap?: boolean)`
-
-设置时间指示器位置（秒）。
+### getZoomLevel(): number
 
 ```ts
-timeline.setTimeIndicator(18000);
+const zoom = timeline.getZoomLevel();
 ```
 
-## setCanvasSize
+### setTimeIndicator(seconds: number, applySnap = false): boolean
 
-`setCanvasSize(width: number, height: number)`
+设置时间指示器位置，并在需要时自动滚动到可见区域。
 
-设置画布尺寸。
+```ts
+timeline.setTimeIndicator(1800);
+timeline.setTimeIndicator(1813, true);
+```
+
+说明：
+
+- 位置会被钳制在 `startTime ~ endTime`
+- `applySnap = true` 时，会按照当前缩放和刻度配置执行吸附
+- 该方法会触发 `onTimeIndicatorMove`
+
+### setTimeIndicatorDuringDrag(seconds: number): void
+
+用于拖拽过程中的轻量更新版本。
+
+```ts
+timeline.setTimeIndicatorDuringDrag(1813);
+```
+
+说明：
+
+- 会触发 `timeIndicator:drag`
+- 不会触发 `onTimeIndicatorMove`
+- 不会触发 `onTimeIndicatorHighlight`
+- 使用了节流的边缘滚动逻辑
+
+### setEnableTimeIndicator(enabled: boolean): void
+
+```ts
+timeline.setEnableTimeIndicator(false);
+```
+
+## 画布尺寸与渲染
+
+### setCanvasSize(width: number, height: number): void
+
+显式设置画布逻辑尺寸。
 
 ```ts
 timeline.setCanvasSize(800, 600);
 ```
 
-## adjustCanvasSize
+### adjustCanvasSize(): void
 
-`adjustCanvasSize()`
-
-根据容器大小自动调整画布尺寸。
+重新计算滚动范围并触发 `canvas:resize` 对应的重绘链路。
 
 ```ts
 timeline.adjustCanvasSize();
 ```
 
-## getCanvas
+> 如果容器本身尺寸变了，先调用 `setCanvasSize()` 更新画布宽高，再调用 `adjustCanvasSize()` 或直接依赖 `setCanvasSize()` 触发的重绘。
 
-`getCanvas(): HTMLCanvasElement`
+### draw(): void
 
-获取画布元素。
+立即执行一次绘制。
+
+```ts
+timeline.draw();
+```
+
+### getCanvas(): HTMLCanvasElement
 
 ```ts
 const canvas = timeline.getCanvas();
 ```
 
-## markDirty
-
-`markDirty(layerIds?: string[])`
-
-标记画布图层为脏，触发重绘。如果不指定图层，将重绘所有图层。
+### getCanvasLogicalHeight(): number
 
 ```ts
-// 重绘所有图层
-timeline.markDirty();
-
-// 仅重绘特定图层
-timeline.markDirty(["tracks", "indicator"]);
+const height = timeline.getCanvasLogicalHeight();
 ```
 
-## notifyChange
+### getCachedLogicalHeight(): number
 
-`notifyChange(change: ChangeType)`
-
-通知状态变更，由调度器自动处理脏层标记、派生状态计算和回调触发。
+返回渲染管理器缓存的逻辑高度。
 
 ```ts
-timeline.notifyChange("data:load");
+const cachedHeight = timeline.getCachedLogicalHeight();
 ```
 
-## beginChangeBatch
-
-`beginChangeBatch()`
-
-开始批量变更操作。在此期间的变更不会立即触发重绘，直到调用 `endChangeBatch`。
-
-```ts
-timeline.beginChangeBatch();
-// 执行多次变更...
-timeline.endChangeBatch();
-```
-
-## endChangeBatch
-
-`endChangeBatch()`
-
-结束批量变更操作。
-
-## getLastLayerTimes
-
-`getLastLayerTimes(): Record<string, number>`
-
-获取各图层最后一次渲染的时间戳。
-
-```ts
-const times = timeline.getLastLayerTimes();
-console.log(times);
-```
-
-## getContentWidthForZoom
-
-`getContentWidthForZoom(zoomLevel: number): number`
-
-获取指定缩放级别下的内容宽度。
+### getContentWidthForZoom(zoomLevel: number): number
 
 ```ts
 const width = timeline.getContentWidthForZoom(1.0);
 ```
 
-## hasHorizontalScrollbar
-
-`hasHorizontalScrollbar(): boolean`
-
-检查是否显示了水平滚动条。
+### hasHorizontalScrollbar(): boolean
 
 ```ts
-if (timeline.hasHorizontalScrollbar()) {
-  // ...
-}
+const visible = timeline.hasHorizontalScrollbar();
 ```
 
-## getAvailableHeight
-
-`getAvailableHeight(): number`
-
-获取可用高度（减去滚动条等占用的高度）。
+### getAvailableHeight(): number
 
 ```ts
-const height = timeline.getAvailableHeight();
+const availableHeight = timeline.getAvailableHeight();
+```
+
+### getLastLayerTimes(): Record<string, number>
+
+返回最近一次渲染中各逻辑层耗时。
+
+```ts
+const times = timeline.getLastLayerTimes();
+```
+
+### markDirty(layers): void
+
+手动标记脏层。当前公开签名要求显式传入图层数组。
+
+```ts
+timeline.markDirty(["tracks", "indicator", "overlay"]);
+```
+
+可用图层：
+
+- `background`
+- `tracks`
+- `timeline`
+- `guideLines`
+- `indicator`
+- `scrollbar`
+- `overlay`
+- `interaction`
+
+### notifyChange(change: ChangeType): void
+
+推荐在你直接改动内部状态后使用，由调度器自动完成派生状态刷新、脏层标记和必要回调。
+
+```ts
+timeline.config.readOnly = true;
+timeline.notifyChange("config:readOnly");
+```
+
+常见 `ChangeType`：
+
+- `events:add` / `events:update` / `events:delete` / `events:move` / `events:split`
+- `zoom:change`
+- `timeIndicator:move` / `timeIndicator:drag`
+- `canvas:resize`
+- `data:load`
+- `theme:change`
+- `interaction:hover` / `interaction:contextMenu` / `interaction:splitLine`
+- `config:debug` / `config:timeIndicator` / `config:endTime` / `config:readOnly`
+
+### beginChangeBatch(): void
+
+### endChangeBatch(): void
+
+把多次状态变更合并到一次重绘中。
+
+```ts
+timeline.beginChangeBatch();
+timeline.setReadOnly(true);
+timeline.setTimeIndicator(600);
+timeline.endChangeBatch();
+```
+
+## 命中检测与辅助线
+
+### getInteractionTarget(canvasX, canvasY): InteractionTarget
+
+一次查询同时返回轨道、事件和 resize handle 命中信息。
+
+```ts
+const target = timeline.getInteractionTarget(120, 48);
+```
+
+### getEventAtPosition(x, y)
+
+```ts
+const hit = timeline.getEventAtPosition(120, 48);
+```
+
+### getResizeHandle(x, y)
+
+```ts
+const handle = timeline.getResizeHandle(120, 48);
+```
+
+### calculateGuideLines(...)
+
+根据拖拽目标计算可用辅助线。
+
+```ts
+const guideLines = timeline.calculateGuideLines(0, 1, 0, 120, 30);
+```
+
+### snapToGuideLines(newStartTime, duration): number | null
+
+```ts
+const snapped = timeline.snapToGuideLines(120, 30);
+```
+
+### snapEdgeToGuideLines(edgeTime): number | null
+
+用于 resize 场景的单边吸附。
+
+```ts
+const snappedEdge = timeline.snapEdgeToGuideLines(150);
+```
+
+### canMoveEvent(...): boolean
+
+检查事件能否移动到目标位置。当前实现会同时检查：
+
+- 时间范围是否合法
+- 目标轨道上是否和其他事件重叠
+- 插件验证钩子 `validate:event:move`
+
+```ts
+const ok = timeline.canMoveEvent(0, 1, 0, 240, 60);
+```
+
+### showSplitLine(trackIndex, eventIndex, splitTime): void
+
+### hideSplitLine(): void
+
+### splitEvent(trackIndex, eventIndex, splitTime): boolean
+
+用于显示分割预览并执行真正的事件分割。
+
+```ts
+timeline.showSplitLine(0, 1, 300);
+timeline.splitEvent(0, 1, 300);
+timeline.hideSplitLine();
+```
+
+说明：
+
+- 分割点不能让任一侧事件短于 `minEventDuration`
+- 成功分割后会通过 `onEventUpdate` 回传 `type: "split"`
+
+## 状态、高亮与调试
+
+### setReadOnly(readOnly: boolean): void
+
+```ts
+timeline.setReadOnly(true);
+```
+
+进入只读后，当前实现会清空选中态、拖拽态、辅助线和右键菜单态。
+
+### isReadOnly(): boolean
+
+```ts
+const readonly = timeline.isReadOnly();
+```
+
+### highlightEvent(trackIndex, eventIndex): boolean
+
+程序化高亮某个事件。
+
+```ts
+timeline.highlightEvent(0, 1);
+```
+
+### clearHighlight(): void
+
+```ts
+timeline.clearHighlight();
+```
+
+### getHighlightedEvent(): { trackIndex: number; eventIndex: number } | null
+
+```ts
+const highlighted = timeline.getHighlightedEvent();
+```
+
+> `highlightEvent()` / `clearHighlight()` 当前只更新内部状态和渲染，不会触发 `onEventHighlight`。`onEventHighlight` 主要来自交互态里的用户选择流程。
+
+### setDebug(enabled: boolean): void
+
+```ts
+timeline.setDebug(true);
+```
+
+### setStatus(text: string): void
+
+### getStatus(): string
+
+```ts
+timeline.setStatus("Ready");
+console.log(timeline.getStatus());
 ```
 
 
@@ -1183,69 +1608,122 @@ url: /timeline-canvas/api/timeline/plugin-management.md
 ---
 
 
-## usePlugin
+## 导入方式
 
-`usePlugin(plugin: any): Promise<boolean>`
-
-使用插件。
+内置插件有两种推荐导入方式：
 
 ```ts
-// 某些内置插件是“工厂函数”（需要调用以传入配置）
-await timeline.usePlugin(ContextMenuPlugin());
+import {
+  Timeline,
+  LightThemePlugin,
+  DarkThemePlugin,
+  PerformanceOverlayPlugin,
+  ContextMenuPlugin,
+} from "timeline-canvas";
+```
 
-// 某些内置插件是“插件对象”（直接传入）
+或按稳定子路径导入：
+
+```ts
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
+
+## 哪些插件需要调用，哪些直接传
+
+### 直接传插件对象
+
+- `LightThemePlugin`
+- `DarkThemePlugin`
+- `PerformanceOverlayPlugin`
+
+### 先调用工厂函数再传入
+
+- `ContextMenuPlugin()`
+- `EventTooltipPlugin()`
+- `EventMediaPlugin()`
+- `MutexGuardPlugin()`
+
+## usePlugin(plugin: TimelinePlugin): Promise<boolean>
+
+加载插件并执行其生命周期。
+
+```ts
+await timeline.usePlugin(LightThemePlugin);
 await timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## removePlugin
+说明：
 
-`removePlugin(pluginId: string): Promise<boolean>`
+- 返回 `true` 表示插件成功加载或主题切换成功
+- 非主题插件若重复加载，当前实现会返回 `false`
+- 主题插件会走专门的 `switchTheme()` 流程
+- 如果插件声明了 `metadata.dependencies`，加载前会先检查依赖是否存在
 
-移除插件。
+## getLoadedPlugins(): TimelinePlugin[]
 
-```ts
-await timeline.removePlugin("performance-overlay@1.0.0");
-```
-
-## setTheme
-
-`setTheme(theme: 'light' | 'dark'): Promise<boolean>`
-
-在运行时切换内置主题。
-
-```ts
-// 初始化时设置默认主题
-const timeline = new Timeline("timelineCanvas", { theme: LightThemePlugin });
-
-// 动态切换到暗色主题
-await timeline.setTheme("dark");
-
-// 切回亮色主题
-await timeline.setTheme("light");
-```
-
-## getLoadedPlugins
-
-`getLoadedPlugins(): any[]`
-
-获取已加载的插件列表。
+返回已加载的插件对象列表。
 
 ```ts
 const plugins = timeline.getLoadedPlugins();
-console.log("已加载插件:", plugins);
 ```
 
-## isPluginLoaded
+## isPluginLoaded(pluginName: string): boolean
 
-`isPluginLoaded(pluginName: string): boolean`
-
-检查插件是否已加载。
+按插件名判断是否已加载。
 
 ```ts
-if (timeline.isPluginLoaded("performance-overlay")) {
-  console.log("性能监控插件已加载");
-}
+timeline.isPluginLoaded("performance-overlay");
+timeline.isPluginLoaded("theme-dark");
 ```
+
+说明：
+
+- 这里传的是插件名，不是完整插件 ID
+- 内部判断规则等价于“是否存在 `name@version` 前缀匹配的已加载插件”
+
+## removePlugin(pluginId: string): Promise<boolean>
+
+按完整插件 ID 卸载插件。
+
+```ts
+await timeline.removePlugin("performance-overlay@1.0.0");
+await timeline.removePlugin("theme-light@1.0.0");
+```
+
+插件 ID 的格式是：
+
+```ts
+`${plugin.metadata.name}@${plugin.metadata.version}`
+```
+
+## setTheme(theme: "light" | "dark"): Promise<boolean>
+
+切换内置亮色/暗色主题。
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  theme: LightThemePlugin,
+});
+
+await timeline.setTheme("dark");
+await timeline.setTheme("light");
+```
+
+说明：
+
+- `setTheme()` 内部会在 `LightThemePlugin` 和 `DarkThemePlugin` 之间切换
+- 切换主题时会卸载旧主题并触发 `theme:change`
+
+## 构造时指定主题
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  theme: DarkThemePlugin,
+});
+```
+
+构造器中的 `theme` 也是插件对象，当前实现会在初始化完成后异步加载它。
 
 
 
@@ -1254,9 +1732,9 @@ url: /timeline-canvas/api/timeline/event-listeners.md
 ---
 
 
-## 回调事件（推荐）
+## 推荐方式
 
-在初始化配置中传入回调：
+回调统一通过构造参数 `TimelineOptions` 传入：
 
 ```ts
 const timeline = new Timeline("timelineCanvas", {
@@ -1266,15 +1744,119 @@ const timeline = new Timeline("timelineCanvas", {
   onEventMove: (data) => console.log("事件已移动", data),
   onEventClick: (data) => console.log("事件已点击", data),
   onEventEdit: (data) => console.log("事件已编辑", data),
-  onTimeIndicatorHighlight: (data) => console.log("时间指示器高亮", data),
   onContextMenu: (data) => console.log("右键菜单触发", data),
   onTrackAdd: (track) => console.log("轨道已添加", track),
   onTrackRemove: (track) => console.log("轨道已删除", track),
   onTimeIndicatorMove: (data) => console.log("时间指示器移动", data),
   onZoom: (data) => console.log("缩放级别已改变", data),
   onStatusChange: (text) => console.log("状态", text),
+  onEventHighlight: (data) => console.log("事件高亮变化", data),
+  onTimeIndicatorHighlight: (data) =>
+    console.log("时间指示器高亮变化", data),
 });
 ```
+
+## 数据变更回调
+
+### onEventAdd(data: EventAddData)
+
+```ts
+interface EventAddData {
+  trackIndex: number;
+  event: TimelineEvent;
+}
+```
+
+### onEventUpdate(data: EventUpdateData)
+
+```ts
+interface EventUpdateData {
+  type?: "resize" | "split";
+  trackIndex: number;
+  eventIndex: number;
+  event: TimelineEvent;
+  oldEvent?: TimelineEvent;
+  firstEvent?: TimelineEvent;
+  secondEvent?: TimelineEvent;
+}
+```
+
+说明：
+
+- 常规更新会带 `oldEvent`
+- `splitEvent()` 成功后会通过同一个回调返回 `type: "split"`，并附带 `firstEvent` / `secondEvent`
+
+### onEventDelete(data: EventDeleteData)
+
+### onEventMove(data: EventMoveData)
+
+### onEventEdit(data: EventEditData)
+
+### onEventClick(data: EventClickData)
+
+`onEventClick` / `onEventEdit` 的数据里会带上：
+
+- `trackName`
+- `formattedTimeRange`
+
+## 轨道与界面回调
+
+### onTrackAdd(track: Track)
+
+### onTrackRemove(track: Track)
+
+### onZoom(data: ZoomData)
+
+### onStatusChange(statusText: string)
+
+### onContextMenu(data: ContextMenuData)
+
+当右键菜单项被触发时调用，`menuType` 对应配置项里的 `ContextMenuItem.type`。
+
+### onTimeIndicatorMove(data: TimeIndicatorMoveData)
+
+```ts
+interface TimeIndicatorMoveData {
+  position: number;
+  time: string;
+}
+```
+
+## 高亮相关回调
+
+### onEventHighlight(data: EventHighlightData)
+
+```ts
+interface EventHighlightData {
+  trackIndex: number | null;
+  eventIndex: number | null;
+  event: TimelineEvent | null;
+}
+```
+
+说明：
+
+- 当前实现主要在用户点击选中事件或清空选择时触发它
+- `highlightEvent()` / `clearHighlight()` 这类程序化高亮接口目前不会自动触发该回调
+
+### onTimeIndicatorHighlight(data: TimeIndicatorHighlightData)
+
+```ts
+interface TimeIndicatorHighlightData {
+  position: number;
+  highlightedEvents: Array<{
+    trackIndex: number;
+    eventIndex: number;
+    event: TimelineEvent;
+  }>;
+}
+```
+
+说明：
+
+- 只有高亮结果发生变化时才会触发
+- `setTimeIndicator()` 会触发它
+- `setTimeIndicatorDuringDrag()` 不会触发它
 
 
 
@@ -1283,7 +1865,108 @@ url: /timeline-canvas/api/timeline/types.md
 ---
 
 
+## 先区分两个最容易混淆的类型
+
+### TimelineOptions
+
+构造 `new Timeline(canvasId, options)` 时传入的类型。它是“可选项 + 回调 + 主题”的集合。
+
+```ts
+interface TimelineOptions {
+  startTime?: number;
+  endTime?: number;
+  canvasHeight?: number;
+  trackHeight?: number;
+  enableTimeIndicator?: boolean;
+  enableEventResize?: boolean;
+  enableEventSplit?: boolean;
+  enableContextMenu?: boolean;
+  readOnly?: boolean;
+  scale?: number;
+  scaleSplitCount?: number;
+  getScaleRender?: (time: number) => string;
+  colors?: Partial<TimelineColors>;
+  eventTextStyle?: Partial<EventTextStyle>;
+  eventBlockStyle?: Partial<EventBlockStyle>;
+  contextMenuItems?: ContextMenuItem[];
+  contextMenuStyle?: Partial<ContextMenuStyle>;
+  contextMenuHtml?: string | HTMLElement;
+  theme?: TimelinePlugin;
+  onEventAdd?: (data: EventAddData) => void;
+  onEventUpdate?: (data: EventUpdateData) => void;
+  onEventDelete?: (data: EventDeleteData) => void;
+  onEventMove?: (data: EventMoveData) => void;
+  onEventClick?: (data: EventClickData) => void;
+  onEventEdit?: (data: EventEditData) => void;
+  onContextMenu?: (data: ContextMenuData) => void;
+  onTrackAdd?: (track: Track) => void;
+  onTrackRemove?: (track: Track) => void;
+  onTimeIndicatorMove?: (data: TimeIndicatorMoveData) => void;
+  onZoom?: (data: ZoomData) => void;
+  onStatusChange?: (statusText: string) => void;
+  onEventHighlight?: (data: EventHighlightData) => void;
+  onTimeIndicatorHighlight?: (data: TimeIndicatorHighlightData) => void;
+}
+```
+
+### TimelineConfig
+
+`Timeline` 内部合并默认值后的“完整运行时配置”。
+
+```ts
+interface TimelineConfig {
+  timelineHeight: number;
+  trackHeight: number;
+  trackMargin: number;
+  firstTrackTopMargin: number;
+  secondWidth: number;
+  startTime: number;
+  endTime: number;
+  startPaddingTime: number;
+  endPaddingTime: number;
+  autoFitOnInit: boolean;
+  minAutoFitZoom: number;
+  maxAutoFitZoom: number;
+  snapInterval: number;
+  snapToSeconds: boolean;
+  secondPrecisionZoomThreshold: number;
+  timeIndicatorWidth: number;
+  timeIndicatorSnapThreshold: number;
+  timeIndicatorHeadSize: number;
+  timeIndicatorTriangleHeight: number;
+  edgeScrollThrottle: number;
+  edgeScrollTriggerMargin: number;
+  edgeScrollViewportMargin: number;
+  guideLineSnapThreshold: number;
+  enableTimeIndicator: boolean;
+  enableEventResize: boolean;
+  enableEventSplit: boolean;
+  enableContextMenu: boolean;
+  resizeHandleWidth: number;
+  minEventDuration: number;
+  debug: boolean;
+  enablePerformanceMonitor: boolean;
+  autoAddTrack: boolean;
+  autoRemoveEmptyLastTrack: boolean;
+  readOnly: boolean;
+  showEventDurationLabel: boolean;
+  eventDurationPrefix: string;
+  formatEventDuration: ((duration: number) => string) | null;
+  scale: number | null;
+  scaleSplitCount: number;
+  getScaleRender: ((time: number) => string) | null;
+  eventTextStyle: EventTextStyle;
+  eventBlockStyle: EventBlockStyle;
+  colors: TimelineColors;
+  contextMenuItems: ContextMenuItem[];
+  contextMenuStyle: ContextMenuStyle;
+  contextMenuHtml?: string | HTMLElement;
+}
+```
+
 ## TimelineEvent
+
+运行时事件结构：
 
 ```ts
 interface TimelineEvent {
@@ -1295,7 +1978,7 @@ interface TimelineEvent {
   description: string;
   color: string;
   readonly?: boolean;
-  customData?: Record<string, any>;
+  customData?: Record<string, unknown>;
   media?: {
     images?: Array<{
       src: string;
@@ -1312,51 +1995,21 @@ interface TimelineEvent {
 }
 ```
 
-## TimelineConfig（关键项）
+## InteractionTarget
+
+统一命中结果：
 
 ```ts
-interface TimelineConfig {
-  canvasHeight?: number;
-  timelineHeight: number;
-  trackHeight: number;
-  trackMargin: number;
-  firstTrackTopMargin: number;
-  secondWidth: number;
-  startTime: number;
-  endTime: number;
-  startPaddingTime: number;
-  endPaddingTime: number;
-  autoFitOnInit: boolean;
-  minAutoFitZoom: number;
-  maxAutoFitZoom: number;
-  timeUnit: string;
-  timeFormat: string;
-  snapInterval: number;
-  snapToSeconds: boolean;
-  secondPrecisionZoomThreshold: number;
-  enableTimeIndicator: boolean;
-  enableEventResize: boolean;
-  enableEventSplit: boolean;
-  enableContextMenu: boolean;
-  minEventDuration: number;
-  resizeHandleWidth: number;
-  debug: boolean;
-  enablePerformanceMonitor: boolean;
-  autoAddTrack: boolean;
-  autoRemoveEmptyLastTrack: boolean;
-  readOnly: boolean;
-  showEventDurationLabel: boolean;
-  eventTextStyle: EventTextStyle;
-  eventBlockStyle: EventBlockStyle;
-  colors: TimelineColors;
-  contextMenuItems: ContextMenuItem[];
-  contextMenuStyle: ContextMenuStyle;
-  contextMenuHtml?: string | HTMLElement;
-  // 回调事件...
+interface InteractionTarget {
+  trackIndex: number | null;
+  eventIndex: number | null;
+  resizeEdge: "left" | "right" | null;
 }
 ```
 
 ## LoadDataFormat
+
+`loadData()` 接受的输入结构：
 
 ```ts
 interface LoadDataFormat {
@@ -1370,7 +2023,7 @@ interface LoadDataFormat {
       description?: string;
       color?: string;
       readonly?: boolean;
-      customData?: Record<string, any>;
+      customData?: Record<string, unknown>;
       media?: {
         images?: Array<{
           src: string;
@@ -1389,6 +2042,19 @@ interface LoadDataFormat {
 }
 ```
 
+说明：
+
+- 事件输入既支持 `endTime`，也支持 `duration`
+- 载入后会被标准化为运行时 `TimelineEvent`
+
+## 其他常用类型
+
+- `TimelineState`: 运行时状态树
+- `Track`: 轨道，包含 `events: TimelineEvent[]`
+- `TimelinePlugin`: 插件定义
+- `PluginMetadata`: 插件元数据
+- `PluginAPI`: 插件上下文 API
+
 
 
 ---
@@ -1396,77 +2062,101 @@ url: /timeline-canvas/api/timeline/index.md
 ---
 
 
-Timeline 类是核心类，提供了时间轴的主要能力（数据管理、视图控制、插件与事件回调）。
+`Timeline` 是时间轴运行时的核心类，负责把数据、交互、渲染调度和插件系统组织在一起。
 
 ## 构造函数
 
 ```ts
-class Timeline {
-  constructor(canvasId: string, options?: TimelineOptions);
-}
-```
+import { Timeline, LightThemePlugin } from "timeline-canvas";
 
-### 参数
-
-- `canvasId`: 画布元素的 `id`
-- `options`: 时间轴配置与回调（秒制时间系统，见 [类型定义](./types)）
-
-### 示例
-
-```ts
 const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
+  theme: LightThemePlugin,
 });
 ```
 
-## 📋 API 目录
+### 参数
+
+- `canvasId`: 目标 `<canvas>` 元素的 `id`
+- `options`: 构造参数，类型为 `TimelineOptions`
+
+### 公开属性
+
+- `config`: 归一化后的运行时配置
+- `callbacks`: 当前回调集合
+- `state`: 当前运行时状态
+
+> 如果你直接修改了 `timeline.config` 或 `timeline.state`，请配合调用 `notifyChange()`；如果已有对应方法，优先使用公开方法而不是直接改内部状态。
+
+## API 目录
 
 ### [数据管理](./data-management)
 
-- `loadData` - 加载数据
-- `addEvent` - 添加事件
-- `updateEvent` - 更新事件
-- `deleteEvent` - 删除事件
-- `addTrack` - 添加轨道
-- `removeTrack` - 移除轨道
-- `setEndTime` - 设置结束时间
-- `beginIndexBatch` - 开始批量索引
-- `endIndexBatch` - 结束批量索引
+- `loadData`
+- `addEvent`
+- `updateEvent`
+- `updateEventData`
+- `deleteEvent`
+- `addTrack` / `removeTrack`
+- `autoRemoveEmptyLastTrack`
+- `setEndTime` / `getEndTime`
+- `beginIndexBatch` / `endIndexBatch`
+- `invalidateIndexTrack` / `invalidateIndexAll`
 
-### [视图控制](./view-control)
+### [视图、交互与状态](./view-control)
 
-- `setZoomLevel` - 设置缩放级别
-- `zoom` - 缩放
-- `setTimeIndicator` - 设置时间指示器
-- `setCanvasSize` - 设置画布尺寸
-- `markDirty` - 触发重绘
-- `notifyChange` - 通知变更
-- `beginChangeBatch` - 开始批量变更
-- `endChangeBatch` - 结束批量变更
+- `setZoomLevel` / `zoom` / `getZoomLevel`
+- `setTimeIndicator` / `setTimeIndicatorDuringDrag`
+- `setCanvasSize` / `adjustCanvasSize` / `draw`
+- `markDirty` / `notifyChange`
+- `beginChangeBatch` / `endChangeBatch`
+- `getInteractionTarget` / `getEventAtPosition` / `getResizeHandle`
+- `calculateGuideLines` / `snapToGuideLines` / `snapEdgeToGuideLines`
+- `canMoveEvent`
+- `showSplitLine` / `hideSplitLine` / `splitEvent`
+- `setReadOnly` / `isReadOnly`
+- `highlightEvent` / `clearHighlight` / `getHighlightedEvent`
+- `setDebug` / `setEnableTimeIndicator`
+- `setStatus` / `getStatus`
 
 ### [插件管理](./plugin-management)
 
-- `usePlugin` - 使用插件
-- `removePlugin` - 移除插件
-- `setTheme` - 切换主题
-- `getLoadedPlugins` - 获取已加载插件
+- `usePlugin`
+- `removePlugin`
+- `setTheme`
+- `getLoadedPlugins`
+- `isPluginLoaded`
 
-### [事件监听](./event-listeners)
+### [事件回调](./event-listeners)
 
 - `onEventAdd`
 - `onEventUpdate`
+- `onEventDelete`
+- `onEventMove`
 - `onEventClick`
-- ...更多回调事件
+- `onEventHighlight`
+- `onTimeIndicatorHighlight`
+- `onStatusChange`
 
 ### [类型定义](./types)
 
-- `TimelineEvent`
+- `TimelineOptions`
 - `TimelineConfig`
+- `TimelineEvent`
+- `InteractionTarget`
 - `LoadDataFormat`
+
+## 销毁实例
+
+```ts
+timeline.destroy();
+```
+
+`destroy()` 会移除画布监听器并清理交互态。页面卸载或组件销毁时应调用它。
 
 
 
@@ -1489,52 +2179,69 @@ url: /timeline-canvas/advanced/performance.md
 ---
 
 
-Timeline Canvas 的性能主要来自三点：分层渲染、索引加速、批量调度。
+Timeline Canvas 的性能主要来自三部分：分层渲染、索引查询和批量调度。
 
-## 性能监控
+## 性能面板
 
 ### PerformanceOverlayPlugin
 
-> 性能面板是否启用由 `TimelineOptions.enablePerformanceMonitor` 或 `TimelineOptions.debug` 控制。
+> 面板是否显示由 `enablePerformanceMonitor` 或 `debug` 控制。
 
 ```ts
-import { Timeline } from "timeline-canvas";
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { Timeline, PerformanceOverlayPlugin } from "timeline-canvas";
 
 const timeline = new Timeline("timelineCanvas", {
   enablePerformanceMonitor: true,
-  debug: true,
 });
 
 await timeline.usePlugin(PerformanceOverlayPlugin);
 
-const layerTimes = timeline.getLastLayerTimes();
-console.log(layerTimes);
+console.log(timeline.getLastLayerTimes());
 ```
+
+当前面板会显示：
+
+- FPS
+- 各逻辑层最近一次耗时
+- 性能采样统计
 
 ## 分层渲染与脏检查
 
-Timeline 内部使用 `RenderPipeline` 将画布拆分为多个逻辑层（background / timeline / tracks / guideLines / indicator / interaction / scrollbar / overlay），只重绘受影响的图层。
+源码里的 `RenderPipeline` 会按以下顺序渲染逻辑层：
 
-### 手动触发重绘
+- `background`
+- `tracks`
+- `timeline`
+- `guideLines`
+- `indicator`
+- `interaction`
+- `scrollbar`
+- `overlay`
+
+只有被标记为脏的图层才会重绘。
+
+### 手动标记脏层
 
 ```ts
-timeline.markDirty();
 timeline.markDirty(["tracks", "indicator"]);
 ```
 
-### 建议：通过变更通知驱动重绘
-
-当你手动修改了 `timeline.config` 或 `timeline.state`，更推荐调用 `notifyChange(changeType)`，让调度器决定脏层标记、派生状态计算与回调触发。
+### 更推荐的方式：通知变更
 
 ```ts
 timeline.config.readOnly = true;
 timeline.notifyChange("config:readOnly");
 ```
 
+这样可以让调度器同时处理：
+
+- 派生状态更新
+- 脏层标记
+- 必要回调
+
 ## 批量更新
 
-### 批量变更（减少重绘次数）
+### 批量变更
 
 ```ts
 timeline.beginChangeBatch();
@@ -1547,42 +2254,32 @@ for (let i = 0; i < 1000; i++) {
 timeline.endChangeBatch();
 ```
 
-### 批量索引（大量写入）
+### 批量索引
 
-> 对大量 add/update/delete 操作，使用索引批处理减少索引重建开销。
+当你直接修改底层数据结构或进行大量外部写入时，可以手动包裹索引批处理：
 
 ```ts
 timeline.beginIndexBatch();
-for (let i = 0; i < 1000; i++) {
-  timeline.addEvent(0, i * 10, i * 10 + 5, `Event ${i}`);
-}
+// 外部批量写入 timeline.state.tracks ...
 timeline.endIndexBatch();
 ```
 
-## 多媒体渲染（EventMediaPlugin）
+## 媒体渲染的缓存策略
 
-EventMediaPlugin 在事件块内部渲染图片/波形，并使用缓存降低重复解码与绘制成本。
+`EventMediaPlugin` 会在事件块内部渲染图片和波形，并在源码中使用多级缓存减少重复开销。
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
-
-timeline.loadData({
-  tracks: [
-    {
-      events: [
-        {
-          startTime: 0,
-          endTime: 30,
-          title: "Waveform",
-          media: { waveform: { data: [0.1, 0.5, -0.2] } },
-        },
-      ],
-    },
-  ],
-});
 ```
+
+当前实现会做这些优化：
+
+- 图片缓存为 `ImageBitmap`
+- 波形缓存为 `Float32Array`
+- 支持时优先使用 `OffscreenCanvas` 预渲染波形位图
+
 
 
 
@@ -2318,7 +3015,7 @@ timeline.deleteEvent(0, 0);
 ### 性能监控插件
 
 ```ts
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { PerformanceOverlayPlugin } from "timeline-canvas";
 
 // 基础使用
 timeline.usePlugin(PerformanceOverlayPlugin);
@@ -2331,7 +3028,7 @@ timeline.usePlugin(PerformanceOverlayPlugin);
 ### 上下文菜单插件
 
 ```ts
-import { ContextMenuPlugin } from "timeline-canvas/plugins";
+import { ContextMenuPlugin } from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -2348,7 +3045,7 @@ await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
 ### 主题插件
 
 ```ts
-import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas/plugins";
+import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas";
 
 // 使用亮色主题
 await timeline.usePlugin(LightThemePlugin);
@@ -2363,7 +3060,7 @@ await timeline.setTheme("dark");
 ### 媒体插件
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
 
@@ -2479,6 +3176,7 @@ window.addEventListener("resize", () => {
   }
 });
 ```
+
 
 
 
@@ -2669,30 +3367,25 @@ sequenceDiagram
 
     User->>Timeline: usePlugin(plugin)
     Timeline->>PM: loadPlugin(plugin)
-
-    PM->>PM: 创建PluginContext
+    PM->>PM: 检查 dependencies
+    PM->>PM: 创建 PluginContext
     PM->>Plugin: init(context)
     PM->>Plugin: activate(context)
-    PM->>PM: 注册插件资源
+    PM-->>Timeline: true / false
 
-    PM-->>Timeline: true/false
-    Timeline-->>User: 加载结果
-
-    Note over User,Plugin: 插件运行中...
+    Note over User,Plugin: 插件运行中
 
     User->>Timeline: removePlugin(pluginId)
     Timeline->>PM: unloadPlugin(pluginId)
     PM->>Plugin: deactivate(context)
     PM->>Plugin: destroy(context)
     PM->>PM: 清理插件资源
-    PM-->>Timeline: true/false
+    PM-->>Timeline: true / false
 ```
 
-## 插件接口详解
+## TimelinePlugin
 
-### TimelinePlugin 接口
-
-```typescript
+```ts
 interface TimelinePlugin {
   metadata: PluginMetadata;
   init?: (context: PluginContext) => Promise<void> | void;
@@ -2702,79 +3395,113 @@ interface TimelinePlugin {
 }
 ```
 
-### 插件元数据
+## PluginMetadata
 
-```typescript
+```ts
 interface PluginMetadata {
-  name: string; // 插件名称（必填）
-  version: string; // 版本号（必填）
-  description: string; // 描述（必填）
-  author?: string; // 作者（可选）
-  type: PluginType; // 插件类型（必填）
-  priority?: PluginPriority; // 优先级（可选，默认NORMAL）
-  dependencies?: string[]; // 依赖插件（可选）
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  type: PluginType;
+  priority?: PluginPriority;
+  dependencies?: string[];
 }
 ```
 
-### 插件上下文
+说明：
 
-```typescript
+- 插件 ID 的格式是 `${name}@${version}`
+- `dependencies` 既可以写完整插件 ID，也可以只写插件名
+- 当前运行时里，如果不显式设置 `priority`，排序回退值是 `0`
+
+## PluginContext
+
+```ts
 interface PluginContext {
-  timeline: Timeline; // 时间轴实例
-  config: any; // 配置对象
-  state: any; // 状态对象
-  api: PluginAPI; // API 接口
+  timeline: Timeline;
+  config: TimelineConfig;
+  state: TimelineState;
+  api: PluginAPI;
 }
 ```
 
-### 插件 API
+## PluginAPI
 
-```typescript
+```ts
 interface PluginAPI {
-  // 渲染层管理
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
-
-  // 事件处理器管理
-  registerEventHandler: (event: string, handler: Function) => void;
-  unregisterEventHandler: (event: string, handler: Function) => void;
-
-  // 通知和调试
+  registerCoreLayerHook: (hook: CoreLayerHook) => void;
+  unregisterCoreLayerHook: (name: string) => void;
+  registerEventHandler: (event: string, handler: PluginEventHandler) => void;
+  unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
   showNotification: (
     message: string,
     type?: "info" | "warning" | "error"
   ) => void;
-
-  // 数据存储
-  getData: (key: string) => any;
-  setData: (key: string, value: any) => void;
-
-  // 性能监控
+  getData: (key: string) => unknown;
+  setData: (key: string, value: unknown) => void;
   setPerformanceProvider: (provider: PerformanceProvider) => void;
   getPerformanceStats: () => Map<string, PerformanceStats>;
   getFPS: () => number;
 }
 ```
 
+### RenderLayer
+
+```ts
+interface RenderLayer {
+  name: string;
+  position: "background" | "overlay";
+  render: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState
+  ) => void;
+}
+```
+
+### CoreLayerHook
+
+```ts
+interface CoreLayerHook {
+  name: string;
+  target: "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "interaction";
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    next: () => void
+  ) => void;
+}
+```
+
+说明：
+
+- `registerRenderLayer()` 适合加最底层或最顶层的自定义绘制
+- `registerCoreLayerHook()` 适合拦截或包裹核心渲染层
+- 调用 `next()` 表示继续执行默认渲染；不调用则表示完全接管该核心层
+
 ## 数据存储
 
-### 插件数据存储
+每个插件都拥有独立的数据存储区：
 
-```javascript
-// 存储数据
+```ts
 context.api.setData("counter", 0);
-context.api.setData("settings", { theme: "dark", language: "zh" });
+context.api.setData("settings", { enabled: true });
 
-// 获取数据
 const counter = context.api.getData("counter");
 const settings = context.api.getData("settings");
 ```
 
-### 数据
+数据特点：
 
-- 数据在插件生命周期内持续存在
-- 插件卸载时数据自动清理
-- 不同插件的数据相互隔离
+- 生命周期内持续存在
+- 插件卸载时自动清理
+- 不同插件之间彼此隔离
 
 
 
@@ -2786,11 +3513,11 @@ url: /timeline-canvas/plugins/plugin-development/best-practices.md
 ## 命名规范
 
 ```javascript
-// 插件名称使用 PascalCase
+// metadata.name 建议使用稳定、可读、唯一的字符串，推荐 kebab-case
 const MyCustomPlugin = () => ({
   metadata: {
-    name: "MyCustomPlugin", // ✅ 正确
-    name: "my_custom_plugin", // ❌ 错误
+    name: "my-custom-plugin", // ✅ 推荐
+    name: "MyCustomPlugin", // ⚠️ 可用，但不利于统一
   },
 });
 
@@ -2923,7 +3650,7 @@ destroy(context) {
   }
 
   // 清理事件监听器
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
+  context.api.unregisterEventHandler('validate:event:move', this.validateMove);
 }
 ```
 
@@ -2962,63 +3689,105 @@ url: /timeline-canvas/plugins/plugin-development/events.md
 ---
 
 
-## 事件类型
+## 当前源码里真正存在的核心插件事件
 
-### 渲染事件
+### render:event:media
 
-- `render:background` - 背景层渲染
-- `render:overlay` - 覆盖层渲染
-- `render:event:media` - 事件媒体渲染
+在事件块绘制阶段发出，供媒体类插件在事件块内部追加内容。
 
-### 验证事件
-
-- `validate:event:move` - 事件移动验证
-- `validate:event:add` - 事件添加验证
-- `validate:event:split` - 事件切割验证
-
-### 交互事件
-
-- `event:click` - 事件点击
-- `event:highlight` - 事件高亮
-- `zoom:change` - 缩放级别变化
-- `track:add` - 轨道添加
-- `track:remove` - 轨道移除
-
-## 事件处理器
-
-### 渲染事件处理器
+处理器签名：
 
 ```ts
-renderOverlay(ctx, canvas, config, state) {
-  // 绘制自定义内容
-  ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-  ctx.fillRect(0, 0, 100, 100);
-}
+type RenderEventMediaHandler = (
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  config: TimelineConfig,
+  state: TimelineState,
+  trackIndex: number,
+  eventIndex: number,
+  eventX: number,
+  trackY: number,
+  eventWidth: number,
+  eventVerticalPadding: number,
+  eventHeight: number
+) => void;
 ```
 
-### 验证事件处理器
+示例：
 
 ```ts
-validateEventMove(payload) {
-  const { fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration } = payload;
+context.api.registerEventHandler("render:event:media", (
+  ctx,
+  _canvas,
+  _config,
+  state,
+  trackIndex,
+  eventIndex,
+  eventX,
+  trackY,
+  eventWidth,
+  eventVerticalPadding,
+  eventHeight
+) => {
+  const event = state.tracks[trackIndex].events[eventIndex];
+  if (!event.customData?.badge) return;
 
-  // 自定义验证逻辑
-  if (newStartTime < 0) {
-    return false; // 阻止移动
+  ctx.save();
+  ctx.fillStyle = "#fff";
+  ctx.fillText(
+    String(event.customData.badge),
+    eventX + 8,
+    trackY + eventVerticalPadding + eventHeight / 2
+  );
+  ctx.restore();
+});
+```
+
+### validate:event:move
+
+在事件移动或 resize 校验路径中发出。只要任意处理器返回 `false`，本次操作就会被阻止。
+
+```ts
+context.api.registerEventHandler("validate:event:move", (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return true;
   }
 
-  return true; // 允许移动
-}
+  const data = payload as {
+    newStartTime: number;
+    duration: number;
+  };
+
+  return data.newStartTime >= 0 && data.duration > 0;
+});
 ```
 
-## 事件优先级
+## 当前不应当写进文档的核心事件
 
-事件按照插件优先级顺序执行：
+下面这些名字在当前源码里并没有作为核心插件事件发出：
 
-1. CRITICAL (200)
-2. HIGH (100)
-3. NORMAL (50)
-4. LOW (0)
+- `render:background`
+- `render:overlay`
+- `validate:event:add`
+- `validate:event:split`
+- `event:click`
+- `event:highlight`
+
+如果你需要插入背景/覆盖层绘制，请使用：
+
+- `registerRenderLayer()`
+- `registerCoreLayerHook()`
+
+## 执行顺序
+
+事件处理器会按插件优先级排序执行：
+
+1. `CRITICAL (200)`
+2. `HIGH (100)`
+3. `NORMAL (50)`
+4. `LOW (0)`
+
+同优先级下，按注册先后顺序执行。
 
 
 
@@ -3027,140 +3796,95 @@ url: /timeline-canvas/plugins/plugin-development/example.md
 ---
 
 
-## 完整示例：网格插件
+## 完整示例：背景网格插件
 
-```javascript
-/**
- * 网格插件 - 在时间轴背景上绘制网格
- */
-const GridPlugin = (userConfig = {}) => {
-  // 默认配置
-  const defaultConfig = {
-    color: "#e0e0e0",
-    spacing: 50,
+```ts
+import {
+  PluginPriority,
+  PluginType,
+  type TimelinePlugin,
+} from "timeline-canvas";
+
+interface GridPluginOptions {
+  color?: string;
+  spacing?: number;
+  opacity?: number;
+}
+
+export function GridPlugin(
+  userOptions: GridPluginOptions = {}
+): TimelinePlugin {
+  const options = {
+    color: "#d0d7e2",
+    spacing: 40,
     opacity: 0.5,
-    enabled: true,
+    ...userOptions,
   };
-
-  // 合并配置
-  const config = { ...defaultConfig, ...userConfig };
 
   return {
     metadata: {
-      name: "GridPlugin",
+      name: "grid-plugin",
       version: "1.0.0",
-      description: "在时间轴背景上绘制网格",
-      type: "extension",
+      description: "在背景层绘制辅助网格",
+      type: PluginType.RENDER,
       priority: PluginPriority.NORMAL,
     },
 
     init(context) {
-      // 存储配置
-      context.api.setData("config", config);
-      context.api.setData("enabled", config.enabled);
-
-      console.log("网格插件已初始化");
+      context.api.setData("gridOptions", options);
     },
 
     activate(context) {
-      if (!context.api.getData("enabled")) {
-        return;
-      }
-
-      // 注册渲染层
       context.api.registerRenderLayer({
-        name: "GridPlugin",
+        name: "grid-plugin-layer",
         position: "background",
-        render: this.renderGrid.bind(this),
+        render(ctx, canvas) {
+          const cfg = context.api.getData("gridOptions") as GridPluginOptions;
+          if (!cfg) return;
+
+          ctx.save();
+          ctx.strokeStyle = cfg.color || "#d0d7e2";
+          ctx.globalAlpha = cfg.opacity ?? 0.5;
+          ctx.lineWidth = 1;
+
+          const spacing = cfg.spacing || 40;
+          for (let x = 0; x < canvas.width; x += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        },
       });
-
-      // 注册事件处理器
-      context.api.registerEventHandler(
-        "config:changed",
-        this.onConfigChanged.bind(this)
-      );
-
-      console.log("网格插件已激活");
     },
 
     deactivate(context) {
-      // 清理渲染层
-      context.api.unregisterRenderLayer("GridPlugin");
-
-      // 清理事件处理器
-      context.api.unregisterEventHandler(
-        "config:changed",
-        this.onConfigChanged
-      );
-
-      console.log("网格插件已停用");
-    },
-
-    destroy(context) {
-      // 清理数据
-      context.api.setData("config", null);
-      context.api.setData("enabled", null);
-
-      console.log("网格插件已销毁");
-    },
-
-    renderGrid(ctx, canvas, config, state) {
-      const pluginConfig = ctx.api.getData("config");
-
-      if (!pluginConfig || !pluginConfig.enabled) {
-        return;
-      }
-
-      const { color, spacing, opacity } = pluginConfig;
-
-      // 保存当前状态
-      ctx.save();
-
-      // 设置样式
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = opacity;
-
-      // 绘制垂直线
-      for (let x = 0; x < canvas.width; x += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-
-      // 绘制水平线
-      for (let y = 0; y < canvas.height; y += spacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-
-      // 恢复状态
-      ctx.restore();
-    },
-
-    onConfigChanged(newConfig) {
-      // 处理配置变化
-      if (newConfig.gridColor !== undefined) {
-        const config = this.getData("config");
-        config.color = newConfig.gridColor;
-        this.setData("config", config);
-      }
+      context.api.unregisterRenderLayer("grid-plugin-layer");
     },
   };
-};
+}
+```
 
-// 使用插件
-timeline.usePlugin(
+## 使用方式
+
+```ts
+await timeline.usePlugin(
   GridPlugin({
-    color: "#d0d0d0",
-    spacing: 40,
-    opacity: 0.3,
+    color: "#c8d2df",
+    spacing: 48,
+    opacity: 0.35,
   })
 );
 ```
+
+## 这个示例体现了什么
+
+- 使用工厂函数封装用户配置
+- 在 `init()` 中保存插件私有数据
+- 在 `activate()` 中注册 `background` 层
+- 在 `deactivate()` 中清理渲染层
 
 
 
@@ -3284,91 +4008,106 @@ url: /timeline-canvas/plugins/plugin-development/lifecycle.md
 
 ## 生命周期流程
 
+```text
+loadPlugin()
+  → 检查 dependencies
+  → init()
+  → activate()
+  → 运行中
+removePlugin()
+  → deactivate()
+  → destroy()
+  → 清理插件资源
 ```
-加载插件 → init() → activate() → 运行阶段 → deactivate() → destroy()
-```
 
-## 各阶段详解
+## init()
 
-### init() 阶段
+适合做：
 
-- **时机**: 插件被加载时调用
-- **用途**: 初始化插件内部状态、验证依赖、设置默认值
-- **注意**: 此时插件尚未激活，不应注册事件处理器
+- 初始化插件配置
+- 创建缓存
+- 写入 `setData()`
+- 做轻量校验
 
 ```ts
 init(context) {
-  // 初始化插件数据
-  context.api.setData('initialized', true);
-  context.api.setData('config', this.config);
-
-  // 验证依赖
-  if (!context.timeline.config.enableEventResize) {
-    context.api.showNotification('需要启用事件调整大小功能', 'warning');
-  }
+  context.api.setData("enabled", true);
+  context.api.setData("createdAt", Date.now());
 }
 ```
 
-### activate() 阶段
+## activate()
 
-- **时机**: 插件被激活时调用
-- **用途**: 注册事件处理器、渲染层、设置监听器
-- **注意**: 这是插件开始工作的主要阶段
+适合做：
+
+- 注册 `RenderLayer`
+- 注册 `CoreLayerHook`
+- 注册事件处理器
+- 挂 DOM 监听器
 
 ```ts
 activate(context) {
-  // 注册事件处理器
-  context.api.registerEventHandler('render:overlay', this.renderOverlay);
-  context.api.registerEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = (payload: unknown) => {
+    return true;
+  };
 
-  // 注册渲染层
+  context.api.registerEventHandler("validate:event:move", validateMove);
+  context.api.setData("validateMove", validateMove);
+
   context.api.registerRenderLayer({
-    name: 'MyPluginLayer',
-    position: 'overlay',
-    render: this.render.bind(this)
+    name: "my-plugin-overlay",
+    position: "overlay",
+    render(ctx, canvas) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,0,0,0.1)";
+      ctx.fillRect(0, 0, canvas.width, 24);
+      ctx.restore();
+    },
   });
-
-  console.log('插件已激活:', this.metadata.name);
 }
 ```
 
-### 运行阶段
+## deactivate()
 
-- **事件处理**: 响应各种事件
-- **渲染参与**: 在渲染循环中绘制内容
-- **状态管理**: 维护插件内部状态
+适合做：
 
-### deactivate() 阶段
+- 注销事件处理器
+- 注销渲染层与核心层 hook
+- 移除 DOM 监听器
 
-- **时机**: 插件被停用时调用
-- **用途**: 清理事件处理器、移除监听器
-- **注意**: 插件功能在此阶段停止
-
-```javascript
+```ts
 deactivate(context) {
-  // 清理事件处理器
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
-  context.api.unregisterEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = context.api.getData("validateMove") as
+    | ((payload: unknown) => boolean)
+    | undefined;
 
-  console.log('插件已停用:', this.metadata.name);
+  if (validateMove) {
+    context.api.unregisterEventHandler("validate:event:move", validateMove);
+  }
+
+  context.api.unregisterRenderLayer("my-plugin-overlay");
 }
 ```
 
-### destroy() 阶段
+## destroy()
 
-- **时机**: 插件被销毁时调用
-- **用途**: 释放资源、清理数据
-- **注意**: 这是插件生命的最后阶段
+适合做：
 
-```javascript
+- 释放外部资源
+- 清理定时器
+- 处理插件创建的 DOM
+
+```ts
 destroy(context) {
-  // 清理插件数据
-  context.api.setData('initialized', null);
-  context.api.setData('config', null);
-
-  console.log('插件已销毁:', this.metadata.name);
+  context.api.setData("validateMove", undefined);
 }
 ```
+
+## 需要知道的源码行为
+
+- 如果 `init()` 或 `activate()` 抛错，插件管理器会尝试执行回滚性的 `deactivate()` / `destroy()`
+- 卸载插件时，即使生命周期里有步骤报错，插件资源清理仍会继续进行
+- 通过 `registerRenderLayer()`、`registerCoreLayerHook()`、`registerEventHandler()` 注册的资源，插件管理器也会在最终清理阶段兜底回收
 
 
 
@@ -3377,48 +4116,106 @@ url: /timeline-canvas/plugins/plugin-development/rendering.md
 ---
 
 
-## 渲染层接口
+## 两种扩展方式
 
-```typescript
+### 1. RenderLayer
+
+用于在最底层或最顶层增加自定义绘制。
+
+```ts
 interface RenderLayer {
-  name: string; // 渲染层名称
-  position: "background" | "overlay"; // 渲染位置
+  name: string;
+  position: "background" | "overlay";
   render: (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
-    config: any,
-    state: any
+    config: TimelineConfig,
+    state: TimelineState
   ) => void;
 }
 ```
 
-## 渲染位置
+位置说明：
 
-- `background` - 在事件块之前渲染（背景层）
-- `overlay` - 在事件块之后渲染（覆盖层）
+- `background`: 在核心层之前绘制
+- `overlay`: 在核心层之后绘制
 
-> **注意**: 核心渲染层（如时间轴刻度、轨道背景、事件块、辅助线等）现在由内部的 `RenderPipeline` 管理。插件目前只能在 `background`（最底层）和 `overlay`（最顶层）进行绘制。如果需要修改核心渲染行为，目前只能通过修改源码或等待未来开放更多钩子。
+### 2. CoreLayerHook
 
-## 渲染示例
+用于包裹、修改或完全替换核心层的绘制行为。
 
 ```ts
-registerRenderLayer({
-  name: "GridPlugin",
+interface CoreLayerHook {
+  name: string;
+  target: "tracks" | "timeline" | "guideLines" | "indicator" | "scrollbar" | "interaction";
+  handler: (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    next: () => void
+  ) => void;
+}
+```
+
+说明：
+
+- 调用 `next()` 表示继续执行默认渲染
+- 不调用 `next()` 表示完全接管该核心层
+- 多个 hook 会形成一条中间件链
+
+## RenderLayer 示例
+
+```ts
+context.api.registerRenderLayer({
+  name: "grid-background",
   position: "background",
-  render(ctx, canvas, config, state) {
-    // 绘制网格
-    ctx.strokeStyle = config.colors.grid || "#e0e0e0";
+  render(ctx, canvas) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.06)";
     ctx.lineWidth = 1;
 
-    // 绘制垂直线
-    for (let x = 0; x < canvas.width; x += 50) {
+    for (let x = 0; x < canvas.width; x += 40) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
+
+    ctx.restore();
   },
 });
 ```
+
+## CoreLayerHook 示例
+
+```ts
+context.api.registerCoreLayerHook({
+  name: "timeline-watermark",
+  target: "timeline",
+  handler(ctx, canvas, _config, _state, next) {
+    next();
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("Preview", canvas.width - 64, 18);
+    ctx.restore();
+  },
+});
+```
+
+## 当前核心层顺序
+
+源码里的 `RenderPipeline` 渲染顺序是：
+
+- `background`
+- `tracks`
+- `timeline`
+- `guideLines`
+- `indicator`
+- `interaction`
+- `scrollbar`
+- `overlay`
 
 

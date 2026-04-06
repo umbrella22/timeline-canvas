@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState, CSSProperties } from 'react';
-import { Timeline } from '../../../packages/timeline/src/index';
+import {
+    Timeline,
+    createTimelineMessages,
+    getPluginMetadataDescription,
+} from '../../../packages/timeline/src/index';
 import { LightThemePlugin } from '../../../packages/timeline/src/plugins/builtin/LightThemePlugin';
 import { DarkThemePlugin } from '../../../packages/timeline/src/plugins/builtin/DarkThemePlugin';
 import { ContextMenuPlugin } from '../../../packages/timeline/src/plugins/builtin/ContextMenuPlugin';
@@ -111,19 +115,44 @@ const styles: Record<string, CSSProperties> = {
     slider: {
         flex: '1',
     },
+    pluginList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+    },
+    pluginItem: {
+        padding: '10px 12px',
+        background: '#45475a',
+        borderRadius: '6px',
+        fontSize: '12px',
+        lineHeight: 1.5,
+    },
+    pluginName: {
+        display: 'block',
+        fontWeight: '600',
+        color: '#f9e2af',
+        marginBottom: '4px',
+    },
+    pluginDescription: {
+        color: '#bac2de',
+    },
 };
 
 type TimelinePlaygroundLang = 'zh' | 'en';
 
-const getText = (lang: TimelinePlaygroundLang) => {
+const getText = (
+    lang: TimelinePlaygroundLang,
+    timelineMessages: ReturnType<typeof createTimelineMessages>
+) => {
   if (lang === 'en') {
     return {
-      ready: 'Ready',
+      ready: timelineMessages.statusReady,
       status: 'Status',
       basicActions: 'Basic Actions',
       viewControls: 'View Controls',
       playback: 'Playback',
       toggles: 'Toggles',
+      builtInPlugins: 'Built-in Plugins',
       addTrack: 'Add Track',
       removeTrack: 'Remove Track',
       addEvent: 'Add Event',
@@ -153,23 +182,24 @@ const getText = (lang: TimelinePlaygroundLang) => {
       shiftMorningDesc: 'Morning work block',
       shiftNight: 'Night Shift',
       shiftNightDesc: 'Night work block',
-      readonlyEvent: 'Read-only Event',
+      readonlyEvent: 'Read-only Event - Media Event',
       mutexExample: 'Mutex Example',
-      menuEdit: '✏️ Edit',
+            menuEdit: `✏️ ${timelineMessages.contextMenuEdit}`,
       menuDuplicate: '📋 Duplicate',
-      menuDelete: '🗑️ Delete',
-      menuExport: '📤 Export',
+            menuDelete: `🗑️ ${timelineMessages.contextMenuDelete}`,
+            menuExport: `📤 ${timelineMessages.contextMenuExport}`,
       duplicateSuffix: ' (Copy)',
     };
   }
 
   return {
-    ready: '就绪',
+        ready: timelineMessages.statusReady,
     status: '状态',
     basicActions: '基础操作',
     viewControls: '视图控制',
     playback: '播放控制',
     toggles: '功能开关',
+        builtInPlugins: '内置插件',
     addTrack: '添加轨道',
     removeTrack: '删除轨道',
     addEvent: '添加事件',
@@ -199,12 +229,12 @@ const getText = (lang: TimelinePlaygroundLang) => {
     shiftMorningDesc: '上午工作时段',
     shiftNight: '夜班',
     shiftNightDesc: '夜间工作时段',
-    readonlyEvent: '只读事件',
+    readonlyEvent: '只读事件-媒体事件',
     mutexExample: '互斥示例',
-    menuEdit: '✏️ 编辑',
+    menuEdit: `✏️ ${timelineMessages.contextMenuEdit}`,
     menuDuplicate: '📋 复制',
-    menuDelete: '🗑️ 删除',
-    menuExport: '📤 导出',
+    menuDelete: `🗑️ ${timelineMessages.contextMenuDelete}`,
+    menuExport: `📤 ${timelineMessages.contextMenuExport}`,
     duplicateSuffix: ' (副本)',
   };
 };
@@ -212,11 +242,29 @@ const getText = (lang: TimelinePlaygroundLang) => {
 const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const timelineRef = useRef<Timeline | null>(null);
-    const t = useMemo(() => getText(lang), [lang]);
-    const [status, setStatus] = useState(t.ready);
+    const timelineLocale = useMemo(() => (lang === 'en' ? 'en' : 'zh-CN'), [lang]);
+    const timelineMessages = useMemo(() => createTimelineMessages(timelineLocale), [timelineLocale]);
+    const t = useMemo(() => getText(lang, timelineMessages), [lang, timelineMessages]);
+    const builtinPlugins = useMemo(() => {
+        const pluginMetadata = [
+            { name: 'LightThemePlugin', metadata: LightThemePlugin.metadata },
+            { name: 'DarkThemePlugin', metadata: DarkThemePlugin.metadata },
+            { name: 'ContextMenuPlugin', metadata: ContextMenuPlugin().metadata },
+            { name: 'PerformanceOverlayPlugin', metadata: PerformanceOverlayPlugin.metadata },
+            { name: 'EventMediaPlugin', metadata: EventMediaPlugin().metadata },
+            { name: 'MutexGuardPlugin', metadata: MutexGuardPlugin().metadata },
+            { name: 'EventTooltipPlugin', metadata: EventTooltipPlugin().metadata },
+        ];
+
+        return pluginMetadata.map((plugin) => ({
+            ...plugin,
+            description: getPluginMetadataDescription(plugin.metadata, timelineLocale),
+        }));
+    }, [timelineLocale]);
+    const [status, setStatus] = useState(timelineMessages.statusReady);
     const [playSpeed, setPlaySpeed] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
-    const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Feature toggles state
     const [config, setConfig] = useState({
@@ -234,6 +282,10 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
     });
 
     useEffect(() => {
+        setStatus(timelineMessages.statusReady);
+    }, [timelineMessages.statusReady]);
+
+    useEffect(() => {
         if (!canvasRef.current) return;
 
         // Generate a unique ID for the canvas if it doesn't have one
@@ -243,6 +295,7 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
         // Initialize Timeline
         const timeline = new Timeline(canvasId, {
             canvasHeight: 600,
+            locale: timelineLocale,
             startTime: 0,
             endTime: 3600,
             endPaddingTime: 60,
@@ -275,9 +328,8 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                 setStatus(t.eventSelected(data.event.title, data.trackName));
                 console.log('Event Clicked:', data);
             },
-            onStatusChange: (_text) => {
-                // Only update if it's a significant status change to avoid too many re-renders
-                // or just log it. For now, we'll use the local status for major events.
+            onStatusChange: (text) => {
+                setStatus(text);
             },
             onContextMenu: (data) => {
                 console.log('Context Menu:', data);
@@ -326,15 +378,12 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                             endTime: 900,
                             title: t.shiftMorning,
                             description: t.shiftMorningDesc,
-                            customData: { priority: "high" },
-                            media: { images: [{ src: "https://picsum.photos/200/300", fit: "contain", opacity: 0.35 }] }
                         },
                         {
                             startTime: 1800,
                             endTime: 3600,
                             title: t.shiftNight,
                             description: t.shiftNightDesc,
-                            customData: { priority: "normal" }
                         }
                     ]
                 },
@@ -345,7 +394,7 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                             endTime: 900,
                             title: t.readonlyEvent,
                             readonly: true,
-                            media: { waveform: { data: waveformData, color: "#FF7F00", backgroundColor: "rgba(255,255,255,0.03)", opacity: 0.5 } }
+                            media: { waveform: { data: waveformData, color: "#FF7F00", opacity: 0.5 } }
                         },
                         {
                             startTime: 1200,
@@ -364,8 +413,9 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
             if (playIntervalRef.current) {
                 clearInterval(playIntervalRef.current);
             }
+            timeline.destroy();
         };
-    }, [t]);
+    }, [t, timelineLocale]);
 
     // Update config when state changes
     useEffect(() => {
@@ -393,11 +443,9 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
         switch (action) {
             case 'addTrack':
                 timeline.addTrack();
-                setStatus(t.trackAdded);
                 break;
             case 'removeTrack':
                 timeline.removeTrack();
-                setStatus(t.trackRemoved);
                 break;
             case 'addEvent':
                 const trackIndex = timeline.state?.selectedTrack || 0;
@@ -524,6 +572,18 @@ const TimelinePlayground = ({ lang = 'zh' }: { lang?: TimelinePlaygroundLang }) 
                             <input type="checkbox" checked={config.readOnly} onChange={() => toggleConfig('readOnly')} style={{ cursor: 'pointer' }} />
                             {t.readOnly}
                         </label>
+                    </div>
+                </div>
+
+                <div style={styles.controlGroup}>
+                    <div style={styles.groupTitle}>{t.builtInPlugins}</div>
+                    <div style={styles.pluginList}>
+                        {builtinPlugins.map((plugin) => (
+                            <div key={plugin.name} style={styles.pluginItem}>
+                                <span style={styles.pluginName}>{plugin.name}</span>
+                                <span style={styles.pluginDescription}>{plugin.description}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

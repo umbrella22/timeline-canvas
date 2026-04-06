@@ -1,11 +1,11 @@
 ## Naming Conventions
 
 ```javascript
-// Plugin names use PascalCase
+// Prefer a stable, readable, unique metadata.name; kebab-case is a good default
 const MyCustomPlugin = () => ({
   metadata: {
-    name: "MyCustomPlugin", // ✅ correct
-    name: "my_custom_plugin", // ❌ incorrect
+    name: "my-custom-plugin", // ✅ recommended
+    name: "MyCustomPlugin", // ⚠️ allowed, but harder to keep consistent
   },
 });
 
@@ -138,7 +138,7 @@ destroy(context) {
   }
 
   // unregister listeners
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
+  context.api.unregisterEventHandler('validate:event:move', this.validateMove);
 }
 ```
 

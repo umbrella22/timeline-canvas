@@ -1,71 +1,95 @@
-Timeline 类是核心类，提供了时间轴的主要能力（数据管理、视图控制、插件与事件回调）。
+`Timeline` 是时间轴运行时的核心类，负责把数据、交互、渲染调度和插件系统组织在一起。
 
 ## 构造函数
 
 ```ts
-class Timeline {
-  constructor(canvasId: string, options?: TimelineOptions);
-}
-```
+import { Timeline, LightThemePlugin } from "timeline-canvas";
 
-### 参数
-
-* `canvasId`: 画布元素的 `id`
-* `options`: 时间轴配置与回调（秒制时间系统，见 [类型定义](/timeline-canvas/api/timeline/types.md)）
-
-### 示例
-
-```ts
 const timeline = new Timeline("timelineCanvas", {
   startTime: 0,
   endTime: 3600,
   canvasHeight: 600,
   trackHeight: 46,
   trackMargin: 10,
+  theme: LightThemePlugin,
 });
 ```
 
-## 📋 API 目录
+### 参数
+
+* `canvasId`: 目标 `<canvas>` 元素的 `id`
+* `options`: 构造参数，类型为 `TimelineOptions`
+
+### 公开属性
+
+* `config`: 归一化后的运行时配置
+* `callbacks`: 当前回调集合
+* `state`: 当前运行时状态
+
+> 如果你直接修改了 `timeline.config` 或 `timeline.state`，请配合调用 `notifyChange()`；如果已有对应方法，优先使用公开方法而不是直接改内部状态。
+
+## API 目录
 
 ### [数据管理](/timeline-canvas/api/timeline/data-management.md)
 
-* `loadData` - 加载数据
-* `addEvent` - 添加事件
-* `updateEvent` - 更新事件
-* `deleteEvent` - 删除事件
-* `addTrack` - 添加轨道
-* `removeTrack` - 移除轨道
-* `setEndTime` - 设置结束时间
-* `beginIndexBatch` - 开始批量索引
-* `endIndexBatch` - 结束批量索引
+* `loadData`
+* `addEvent`
+* `updateEvent`
+* `updateEventData`
+* `deleteEvent`
+* `addTrack` / `removeTrack`
+* `autoRemoveEmptyLastTrack`
+* `setEndTime` / `getEndTime`
+* `beginIndexBatch` / `endIndexBatch`
+* `invalidateIndexTrack` / `invalidateIndexAll`
 
-### [视图控制](/timeline-canvas/api/timeline/view-control.md)
+### [视图、交互与状态](/timeline-canvas/api/timeline/view-control.md)
 
-* `setZoomLevel` - 设置缩放级别
-* `zoom` - 缩放
-* `setTimeIndicator` - 设置时间指示器
-* `setCanvasSize` - 设置画布尺寸
-* `markDirty` - 触发重绘
-* `notifyChange` - 通知变更
-* `beginChangeBatch` - 开始批量变更
-* `endChangeBatch` - 结束批量变更
+* `setZoomLevel` / `zoom` / `getZoomLevel`
+* `setTimeIndicator` / `setTimeIndicatorDuringDrag`
+* `setCanvasSize` / `adjustCanvasSize` / `draw`
+* `markDirty` / `notifyChange`
+* `beginChangeBatch` / `endChangeBatch`
+* `getInteractionTarget` / `getEventAtPosition` / `getResizeHandle`
+* `calculateGuideLines` / `snapToGuideLines` / `snapEdgeToGuideLines`
+* `canMoveEvent`
+* `showSplitLine` / `hideSplitLine` / `splitEvent`
+* `setReadOnly` / `isReadOnly`
+* `highlightEvent` / `clearHighlight` / `getHighlightedEvent`
+* `setDebug` / `setEnableTimeIndicator`
+* `setStatus` / `getStatus`
 
 ### [插件管理](/timeline-canvas/api/timeline/plugin-management.md)
 
-* `usePlugin` - 使用插件
-* `removePlugin` - 移除插件
-* `setTheme` - 切换主题
-* `getLoadedPlugins` - 获取已加载插件
+* `usePlugin`
+* `removePlugin`
+* `setTheme`
+* `getLoadedPlugins`
+* `isPluginLoaded`
 
-### [事件监听](/timeline-canvas/api/timeline/event-listeners.md)
+### [事件回调](/timeline-canvas/api/timeline/event-listeners.md)
 
 * `onEventAdd`
 * `onEventUpdate`
+* `onEventDelete`
+* `onEventMove`
 * `onEventClick`
-* ...更多回调事件
+* `onEventHighlight`
+* `onTimeIndicatorHighlight`
+* `onStatusChange`
 
 ### [类型定义](/timeline-canvas/api/timeline/types.md)
 
-* `TimelineEvent`
+* `TimelineOptions`
 * `TimelineConfig`
+* `TimelineEvent`
+* `InteractionTarget`
 * `LoadDataFormat`
+
+## 销毁实例
+
+```ts
+timeline.destroy();
+```
+
+`destroy()` 会移除画布监听器并清理交互态。页面卸载或组件销毁时应调用它。

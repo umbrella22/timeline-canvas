@@ -72,7 +72,7 @@ import {
   ContextMenuPlugin,
   LightThemePlugin,
   PerformanceOverlayPlugin,
-} from "timeline-canvas/plugins";
+} from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -182,7 +182,7 @@ graph TB
         UTILS[Utilities]
     end
 
-    %% 连接关系
+    %% Relationships
     APP --> TL
     USER --> MH
     USER --> WH
@@ -258,7 +258,7 @@ If you use VS Code + Copilot Chat and want AI to help via tool calls (e.g., gene
 
 * [MCP Service (Copilot Chat)](/timeline-canvas/en/guide/mcp.md)
 
-## Full Example (Seconds-based, Same as the Demo)
+## Full Example
 
 ```html
 <!DOCTYPE html>
@@ -282,7 +282,7 @@ If you use VS Code + Copilot Chat and want AI to help via tool calls (e.g., gene
       ContextMenuPlugin,
       LightThemePlugin,
       PerformanceOverlayPlugin,
-    } from 'timeline-canvas/plugins';
+    } from 'timeline-canvas';
 
     const timeline = new Timeline('timelineCanvas', {
       startTime: 0,

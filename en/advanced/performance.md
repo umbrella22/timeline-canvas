@@ -1,49 +1,66 @@
-Timeline Canvas performance mainly comes from three areas: layered rendering, indexed queries, and batch scheduling.
+Timeline Canvas performance comes from three main areas: layered rendering, indexed lookups, and batched state changes.
 
-## Monitoring
+## Performance overlay
 
 ### PerformanceOverlayPlugin
 
-> Whether the performance panel is enabled is controlled by `TimelineOptions.enablePerformanceMonitor` or `TimelineOptions.debug`.
+> The overlay is controlled by `enablePerformanceMonitor` or `debug`.
 
 ```ts
-import { Timeline } from "timeline-canvas";
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { Timeline, PerformanceOverlayPlugin } from "timeline-canvas";
 
 const timeline = new Timeline("timelineCanvas", {
   enablePerformanceMonitor: true,
-  debug: true,
 });
 
 await timeline.usePlugin(PerformanceOverlayPlugin);
 
-const layerTimes = timeline.getLastLayerTimes();
-console.log(layerTimes);
+console.log(timeline.getLastLayerTimes());
 ```
 
-## 分层渲染与脏检查
+The current overlay shows:
 
-Internally, `Timeline` uses `RenderPipeline` to split the canvas into logical layers (background / timeline / tracks / guideLines / indicator / interaction / scrollbar / overlay) and redraw only the affected layers.
+* FPS
+* timing for each logical render layer
+* aggregated sampling data from `PerformanceMonitor`
 
-### Manual redraw
+## Layered rendering and dirty checks
+
+The source code uses `RenderPipeline` with this render order:
+
+* `background`
+* `tracks`
+* `timeline`
+* `guideLines`
+* `indicator`
+* `interaction`
+* `scrollbar`
+* `overlay`
+
+Only dirty layers are redrawn.
+
+### Mark layers dirty manually
 
 ```ts
-timeline.markDirty();
 timeline.markDirty(["tracks", "indicator"]);
 ```
 
-### Recommendation: drive redraw via change notifications
-
-When you manually mutate `timeline.config` or `timeline.state`, prefer calling `notifyChange(changeType)` so the scheduler can decide dirty-layer marking, derived state computation, and callback triggering.
+### Prefer change notifications when possible
 
 ```ts
 timeline.config.readOnly = true;
 timeline.notifyChange("config:readOnly");
 ```
 
+That lets the scheduler handle:
+
+* derived state updates
+* dirty-layer tracking
+* any related callbacks
+
 ## Batch updates
 
-### Batch changes (reduce redraws)
+### Batch state changes
 
 ```ts
 timeline.beginChangeBatch();
@@ -56,39 +73,28 @@ for (let i = 0; i < 1000; i++) {
 timeline.endChangeBatch();
 ```
 
-### Batch indexing (heavy writes)
+### Batch index work
 
-> For large add/update/delete operations, use index batching to reduce index rebuild overhead.
+If you mutate low-level structures directly or perform large external writes, wrap the work in index batching:
 
 ```ts
 timeline.beginIndexBatch();
-for (let i = 0; i < 1000; i++) {
-  timeline.addEvent(0, i * 10, i * 10 + 5, `Event ${i}`);
-}
+// bulk mutations against timeline.state.tracks ...
 timeline.endIndexBatch();
 ```
 
-## Media rendering (EventMediaPlugin)
+## Media-rendering cache strategy
 
-EventMediaPlugin renders images/waveforms inside event blocks and uses caching to reduce repeated decoding and draw cost.
+`EventMediaPlugin` renders images and waveforms inside event blocks and uses multiple cache layers to reduce repeated work.
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
-
-timeline.loadData({
-  tracks: [
-    {
-      events: [
-        {
-          startTime: 0,
-          endTime: 30,
-          title: "Waveform",
-          media: { waveform: { data: [0.1, 0.5, -0.2] } },
-        },
-      ],
-    },
-  ],
-});
 ```
+
+The current implementation includes:
+
+* `ImageBitmap` caching for images
+* `Float32Array` caching for waveform data
+* `OffscreenCanvas` pre-rendering for waveforms when supported

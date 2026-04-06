@@ -1,87 +1,102 @@
 ## 生命周期流程
 
+```text
+loadPlugin()
+  → 检查 dependencies
+  → init()
+  → activate()
+  → 运行中
+removePlugin()
+  → deactivate()
+  → destroy()
+  → 清理插件资源
 ```
-加载插件 → init() → activate() → 运行阶段 → deactivate() → destroy()
-```
 
-## 各阶段详解
+## init()
 
-### init() 阶段
+适合做：
 
-* **时机**: 插件被加载时调用
-* **用途**: 初始化插件内部状态、验证依赖、设置默认值
-* **注意**: 此时插件尚未激活，不应注册事件处理器
+* 初始化插件配置
+* 创建缓存
+* 写入 `setData()`
+* 做轻量校验
 
 ```ts
 init(context) {
-  // 初始化插件数据
-  context.api.setData('initialized', true);
-  context.api.setData('config', this.config);
-
-  // 验证依赖
-  if (!context.timeline.config.enableEventResize) {
-    context.api.showNotification('需要启用事件调整大小功能', 'warning');
-  }
+  context.api.setData("enabled", true);
+  context.api.setData("createdAt", Date.now());
 }
 ```
 
-### activate() 阶段
+## activate()
 
-* **时机**: 插件被激活时调用
-* **用途**: 注册事件处理器、渲染层、设置监听器
-* **注意**: 这是插件开始工作的主要阶段
+适合做：
+
+* 注册 `RenderLayer`
+* 注册 `CoreLayerHook`
+* 注册事件处理器
+* 挂 DOM 监听器
 
 ```ts
 activate(context) {
-  // 注册事件处理器
-  context.api.registerEventHandler('render:overlay', this.renderOverlay);
-  context.api.registerEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = (payload: unknown) => {
+    return true;
+  };
 
-  // 注册渲染层
+  context.api.registerEventHandler("validate:event:move", validateMove);
+  context.api.setData("validateMove", validateMove);
+
   context.api.registerRenderLayer({
-    name: 'MyPluginLayer',
-    position: 'overlay',
-    render: this.render.bind(this)
+    name: "my-plugin-overlay",
+    position: "overlay",
+    render(ctx, canvas) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,0,0,0.1)";
+      ctx.fillRect(0, 0, canvas.width, 24);
+      ctx.restore();
+    },
   });
-
-  console.log('插件已激活:', this.metadata.name);
 }
 ```
 
-### 运行阶段
+## deactivate()
 
-* **事件处理**: 响应各种事件
-* **渲染参与**: 在渲染循环中绘制内容
-* **状态管理**: 维护插件内部状态
+适合做：
 
-### deactivate() 阶段
+* 注销事件处理器
+* 注销渲染层与核心层 hook
+* 移除 DOM 监听器
 
-* **时机**: 插件被停用时调用
-* **用途**: 清理事件处理器、移除监听器
-* **注意**: 插件功能在此阶段停止
-
-```javascript
+```ts
 deactivate(context) {
-  // 清理事件处理器
-  context.api.unregisterEventHandler('render:overlay', this.renderOverlay);
-  context.api.unregisterEventHandler('validate:event:move', this.validateEventMove);
+  const validateMove = context.api.getData("validateMove") as
+    | ((payload: unknown) => boolean)
+    | undefined;
 
-  console.log('插件已停用:', this.metadata.name);
+  if (validateMove) {
+    context.api.unregisterEventHandler("validate:event:move", validateMove);
+  }
+
+  context.api.unregisterRenderLayer("my-plugin-overlay");
 }
 ```
 
-### destroy() 阶段
+## destroy()
 
-* **时机**: 插件被销毁时调用
-* **用途**: 释放资源、清理数据
-* **注意**: 这是插件生命的最后阶段
+适合做：
 
-```javascript
+* 释放外部资源
+* 清理定时器
+* 处理插件创建的 DOM
+
+```ts
 destroy(context) {
-  // 清理插件数据
-  context.api.setData('initialized', null);
-  context.api.setData('config', null);
-
-  console.log('插件已销毁:', this.metadata.name);
+  context.api.setData("validateMove", undefined);
 }
 ```
+
+## 需要知道的源码行为
+
+* 如果 `init()` 或 `activate()` 抛错，插件管理器会尝试执行回滚性的 `deactivate()` / `destroy()`
+* 卸载插件时，即使生命周期里有步骤报错，插件资源清理仍会继续进行
+* 通过 `registerRenderLayer()`、`registerCoreLayerHook()`、`registerEventHandler()` 注册的资源，插件管理器也会在最终清理阶段兜底回收

@@ -111,7 +111,7 @@ timeline.deleteEvent(0, 0);
 ### Performance Overlay Plugin
 
 ```ts
-import { PerformanceOverlayPlugin } from "timeline-canvas/plugins";
+import { PerformanceOverlayPlugin } from "timeline-canvas";
 
 // Basic usage
 timeline.usePlugin(PerformanceOverlayPlugin);
@@ -124,7 +124,7 @@ timeline.usePlugin(PerformanceOverlayPlugin);
 ### Context Menu Plugin
 
 ```ts
-import { ContextMenuPlugin } from "timeline-canvas/plugins";
+import { ContextMenuPlugin } from "timeline-canvas";
 
 timeline.config.enableContextMenu = true;
 timeline.config.contextMenuItems = [
@@ -141,7 +141,7 @@ await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
 ### Theme Plugins
 
 ```ts
-import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas/plugins";
+import { LightThemePlugin, DarkThemePlugin } from "timeline-canvas";
 
 // Use light theme
 await timeline.usePlugin(LightThemePlugin);
@@ -156,7 +156,7 @@ await timeline.setTheme("dark");
 ### Media Plugin
 
 ```ts
-import { EventMediaPlugin } from "timeline-canvas/plugins";
+import { EventMediaPlugin } from "timeline-canvas";
 
 await timeline.usePlugin(EventMediaPlugin());
 

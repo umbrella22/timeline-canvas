@@ -10,7 +10,7 @@
 <script defer src="/timeline-canvas/static/js/lib-react.e4b23afe.js"></script>
 <script defer src="/timeline-canvas/static/js/lib-router.be457688.js"></script>
 <script defer src="/timeline-canvas/static/js/5748.e6e775c7.js"></script>
-<script defer src="/timeline-canvas/static/js/index.fd0b0f36.js"></script>
+<script defer src="/timeline-canvas/static/js/index.8e7aaa49.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.2">
 <meta property="og:type" content="website">
@@ -355,12 +355,12 @@
 <p>Purpose: Static analysis of render hot paths to annotate potential performance issues.</p>
 <p>Rules:</p>
 <ul>
-<li>循环内的 O(N) 操作（<code>.some</code>、<code>.find</code>、<code>.filter</code>、<code>.indexOf</code> → 可能 O(N²)）</li>
-<li>循环内的对象/数组分配（GC 压力）</li>
-<li>循环内的字符串拼接</li>
+<li>O(N) work inside loops (<code>.some</code>, <code>.find</code>, <code>.filter</code>, <code>.indexOf</code> can easily become O(N²)`)</li>
+<li>object or array allocations inside loops (GC pressure)</li>
+<li>string concatenation inside loops</li>
 <li>iterating over all events without visibility culling</li>
-<li>每帧创建 Date 对象</li>
-<li>Canvas save/restore 不配对风险</li>
+<li>creating <code>Date</code> objects every frame</li>
+<li>mismatched <code>canvas.save()</code> / <code>canvas.restore()</code> calls</li>
 </ul>
 <p>Inputs:</p>
 <ul>
@@ -375,8 +375,8 @@
 <p>Purpose: Compare current code exports with documentation content to detect sync issues.</p>
 <p>Detects:</p>
 <ul>
-<li>新增的导出但未在文档中提及</li>
-<li>文档中引用但已删除/重命名的 API</li>
+<li>newly exported items that are missing from the docs</li>
+<li>APIs that are still documented even though they were removed or renamed</li>
 <li>whether PluginType enum values are in sync with scaffold templates</li>
 </ul>
 <p>Inputs:</p>

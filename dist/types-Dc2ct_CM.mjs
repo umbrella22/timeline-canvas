@@ -1,0 +1,1 @@
+let e=function(e){return e.RENDER=`render`,e.EVENT_HANDLER=`event_handler`,e.DATA_SOURCE=`data_source`,e.THEME=`theme`,e.TOOL=`tool`,e.EXTENSION=`extension`,e}({}),t=function(e){return e[e.LOW=0]=`LOW`,e[e.NORMAL=50]=`NORMAL`,e[e.HIGH=100]=`HIGH`,e[e.CRITICAL=200]=`CRITICAL`,e}({});export{e as n,t};

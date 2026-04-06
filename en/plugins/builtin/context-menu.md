@@ -1,18 +1,26 @@
-> Context menu plugin. Menu items are driven by `TimelineConfig.contextMenuItems`. Optionally, you can take over rendering with an HTML template.
+> Adds a context menu for event interactions. Menu items come from `contextMenuItems`, and rendering can be handed off to custom HTML if needed.
 
-## Basic Usage
+## Basic usage
 
 ```ts
-import { ContextMenuPlugin } from "timeline-canvas/plugins";
+import { Timeline, ContextMenuPlugin } from "timeline-canvas";
+
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+});
 
 await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## Enable & Menu Items
+If you prefer the stable subpath:
 
 ```ts
-import { Timeline } from "timeline-canvas";
+import { ContextMenuPlugin } from "timeline-canvas/builtin-plugin/ContextMenuPlugin";
+```
 
+## Menu items
+
+```ts
 const timeline = new Timeline("timelineCanvas", {
   enableContextMenu: true,
   contextMenuItems: [
@@ -24,10 +32,45 @@ const timeline = new Timeline("timelineCanvas", {
     console.log(menuType, trackIndex, eventIndex, event);
   },
 });
+
+await timeline.usePlugin(ContextMenuPlugin());
 ```
 
-## HTML Override (Optional)
+## HTML takeover
+
+You can pass a template string through the factory:
 
 ```ts
-await timeline.usePlugin(ContextMenuPlugin({ htmlTemplate: "<div>...</div>" }));
+await timeline.usePlugin(
+  ContextMenuPlugin({
+    htmlTemplate: "<div class='my-menu'>Custom menu</div>",
+  })
+);
+```
+
+Or through constructor config:
+
+```ts
+const timeline = new Timeline("timelineCanvas", {
+  enableContextMenu: true,
+  contextMenuHtml: "<div class='my-menu'>Custom menu</div>",
+});
+```
+
+Notes:
+
+* The factory `htmlTemplate` takes precedence over `contextMenuHtml`
+* If the template is empty, the plugin falls back to canvas rendering
+* Only string-valued `contextMenuHtml` is treated as a template by the current implementation
+
+## Runtime behavior
+
+* In canvas mode, the menu is drawn in the `overlay` layer
+* In HTML mode, the plugin mounts an absolutely positioned container under the canvas parent
+* When the menu closes, the plugin hides or removes that container automatically
+
+## Plugin ID
+
+```ts
+"context-menu@1.0.0"
 ```
