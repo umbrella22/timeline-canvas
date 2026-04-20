@@ -7,11 +7,12 @@ title: MCP 服务（面向 Copilot Chat / AI CLI）
 本页给出启动方式、配置示例与推荐工作流。
 
 - **脚手架**：基于模板生成内置插件骨架，支持特性选择和测试文件生成
-- **校验**：深度检查插件完整性（metadata 字段、activate/deactivate 配对、TODO 扫描）
+- **校验**：深度检查插件完整性（metadata 字段、activate/deactivate 配对、TODO 扫描、清理告警）
 - **语义查询**：符号依赖图、类型定义与成员引用追踪（基于 TypeScript Compiler API）
-- **一致性检查**：插件导出、渲染层、状态字段、变更类型、边界条件 5 类规则
-- **性能分析**：渲染热路径静态标注（循环内 O(N) 操作、GC 压力、缺失可见性裁剪等）
-- **迁移辅助**：API 导出与文档同步检查
+- **一致性检查**：覆盖插件导出、渲染层、状态字段、变更类型、dirty mapping、buffer compose、interaction API 边界等规则
+- **性能分析**：渲染和交互热路径静态标注（循环内 O(N) 操作、GC 压力、缺失可见性裁剪等）
+- **重构辅助**：语义重命名与符号级影响分析
+- **迁移辅助**：API 导出、文档和 MCP 服务自身漂移检查
 
 ## 前置条件
 
@@ -47,7 +48,7 @@ pnpm -C packages/mcp-service start
 
 ### 方案 B：npx（适用于已发布版本）
 
-本 MCP server 已发布到 npm（`timeline-canvas-mcp@2.0.0`），可以直接用 `npx` 启动（建议加 `-y` 避免交互确认）。
+本 MCP server 已发布到 npm，可以直接用 `npx` 启动（建议加 `-y` 避免交互确认）。
 
 ## VS Code / Copilot Chat 配置（stdio）
 
@@ -83,7 +84,7 @@ pnpm -C packages/mcp-service start
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -97,7 +98,7 @@ pnpm -C packages/mcp-service start
 只要你的 AI CLI **支持 MCP 并能以 stdio 方式启动 server**（即：通过一个进程的 stdin/stdout 与 server 通讯），通常都可以复用同一套启动参数：
 
 - `command`: `npx`（或 `pnpm`）
-- `args`: `-y timeline-canvas-mcp@2.0.0`（或 `-C packages/mcp-service start`）
+- `args`: `-y timeline-canvas-mcp@latest`（或 `-C packages/mcp-service start`）
 - `env.MCP_WORKSPACE_ROOT`: 指向仓库根目录（非常关键）
 
 > 提示：如果你后续升级了 npm 包版本，请同步更新这里的 `timeline-canvas-mcp@x.y.z` 以及仓库内的示例配置（例如 `.vscode/mcp.json`）。
@@ -111,7 +112,7 @@ pnpm -C packages/mcp-service start
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -130,7 +131,7 @@ pnpm -C packages/mcp-service start
     "timeline-canvas": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "cwd": "${workspaceFolder}",
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
@@ -161,6 +162,7 @@ pnpm -C packages/mcp-service start
 - 调用 `timeline_list_builtin_plugins`：应列出 `packages/timeline/src/plugins/builtin` 下的插件
 - 调用 `timeline_validate_plugin`（不传参数）：应返回所有内置插件的校验报告
 - 调用 `timeline_consistency_check`：应返回项目一致性检查结果
+- 调用 `timeline_migration_helper` 并传入 `{ "scope": "mcp" }`：应能检查 MCP 服务与文档漂移
 
 ## 推荐工作流
 
@@ -411,13 +413,53 @@ pnpm -C packages/mcp-service start
 
 ---
 
+### `timeline_rename_symbol`
+
+**优先级：P0 | 类别：重构**
+
+用途：基于 TypeScript LanguageService 做跨文件语义重命名。
+
+输入参数：
+
+- `symbol: string`：当前符号名
+- `newName: string`：目标符号名
+- `scope?: "all" | "value-only" | "type-only"`
+- `dryRun?: boolean`：只预览，不实际修改
+
+示例：
+
+```json
+{ "symbol": "ViewportController", "newName": "TimelineViewportController", "dryRun": true }
+```
+
+---
+
+### `timeline_impact_analysis`
+
+**优先级：P1 | 类别：影响分析**
+
+用途：评估修改某个函数/方法签名后的影响范围。
+
+输入参数：
+
+- `symbol: string`：函数或方法名
+- `changeType: "parameter-semantics" | "parameter-type" | "return-type" | "signature-shape" | "removal"`
+
+示例：
+
+```json
+{ "symbol": "getInteractionTarget", "changeType": "parameter-semantics" }
+```
+
+---
+
 ### `timeline_consistency_check`
 
 **优先级：P1 | 类别：一致性校验**
 
 用途：运行项目特定的一致性检查规则，检测结构性问题（grep 无法发现的）。
 
-检查项（5 类）：
+检查项包括：
 
 | 检查项 | 描述 |
 |---|---|
@@ -426,6 +468,9 @@ pnpm -C packages/mcp-service start
 | `state-fields` | TimelineState 字段是否全部在 StateManager 中初始化 |
 | `change-types` | ChangeType 枚举值是否都有对应的处理逻辑 |
 | `boundary-conditions` | 事件区间判断的 `>=` vs `>` 模式是否一致 |
+| `dirty-mapping` | ChangeScheduler 使用的脏层是否都映射到了 buffer |
+| `buffer-compose` | 所有 buffer layer 是否都参与 RenderManager 合成 |
+| `interaction-api` | 交互 handlers 是否已经改为依赖 `TimelineInteractionAPI` 而不是直接依赖 `Timeline` |
 
 输入参数：
 
@@ -458,7 +503,7 @@ pnpm -C packages/mcp-service start
 
 输入参数：
 
-- `target: "render" | "highlight" | "interaction" | "all"`：分析哪个子系统
+- `target: "render" | "highlight" | "interaction" | "worker" | "all"`：分析哪个子系统
 
 输出：按严重程度排序的热点列表（HIGH / MEDIUM / LOW），每项包含文件、行号、描述、建议。
 
@@ -481,13 +526,15 @@ pnpm -C packages/mcp-service start
 - 新增的导出但未在文档中提及
 - 文档中引用但已删除/重命名的 API
 - PluginType 枚举值与 scaffold 模板是否同步
+- MCP 包版本、工具注册清单与文档说明是否同步
 
 输入参数：
 
-- `scope: "api" | "types" | "plugins"`
+- `scope: "api" | "types" | "plugins" | "mcp"`
   - `"api"`：检查所有导出
   - `"types"`：只检查类型导出
   - `"plugins"`：检查插件导出 + PluginType 一致性
+  - `"mcp"`：检查 MCP 服务版本引用、工具覆盖和 README 漂移
 
 输出：差异列表 + 自动生成的更新建议。
 
@@ -495,4 +542,8 @@ pnpm -C packages/mcp-service start
 
 ```json
 { "scope": "api" }
+```
+
+```json
+{ "scope": "mcp" }
 ```

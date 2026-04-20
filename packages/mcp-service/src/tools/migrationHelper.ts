@@ -16,6 +16,17 @@ import type { MigrationHelperInput, MigrationDiff } from "../types.js";
 
 const TIMELINE_SRC = "packages/timeline/src";
 const DOCS_DIR = "docs";
+const MCP_SERVICE_DIR = "packages/mcp-service";
+const MCP_DOC_FILES = [
+  `${MCP_SERVICE_DIR}/README.md`,
+  `${MCP_SERVICE_DIR}/README_CN.md`,
+  `${DOCS_DIR}/en/guide/mcp.md`,
+  `${DOCS_DIR}/zh/guide/mcp.md`,
+];
+const MCP_README_FILES = [
+  `${MCP_SERVICE_DIR}/README.md`,
+  `${MCP_SERVICE_DIR}/README_CN.md`,
+];
 
 /**
  * Recursively find all .md/.mdx files in docs/
@@ -206,6 +217,121 @@ async function checkPluginsMigration(): Promise<MigrationDiff[]> {
   return diffs;
 }
 
+async function getMcpPackageVersion(): Promise<string | null> {
+  const packageJson = await readFile(`${MCP_SERVICE_DIR}/package.json`);
+  if (!packageJson) {
+    return null;
+  }
+
+  const parsed = JSON.parse(packageJson) as { version?: string };
+  return parsed.version ?? null;
+}
+
+async function getRegisteredMcpTools(): Promise<string[]> {
+  const serverText = await readFile(`${MCP_SERVICE_DIR}/src/server.ts`);
+  if (!serverText) {
+    return [];
+  }
+
+  return [...serverText.matchAll(/server\.registerTool\s*\(\s*"([^"]+)"/g)]
+    .map((match) => match[1])
+    .sort();
+}
+
+function extractMentionedMcpTools(content: string): Set<string> {
+  return new Set(
+    [...content.matchAll(/`(timeline_[a-z_]+)`/g)].map((match) => match[1])
+  );
+}
+
+async function checkMcpMigration(): Promise<MigrationDiff[]> {
+  const diffs: MigrationDiff[] = [];
+  const packageVersion = await getMcpPackageVersion();
+  const registeredTools = await getRegisteredMcpTools();
+  const serverText = await readFile(`${MCP_SERVICE_DIR}/src/server.ts`);
+
+  if (!packageVersion) {
+    diffs.push({
+      kind: "version-mismatch",
+      symbol: "package.json",
+      details: "Unable to resolve packages/mcp-service/package.json version",
+    });
+  }
+
+  if (!serverText) {
+    diffs.push({
+      kind: "documented-but-removed",
+      symbol: "src/server.ts",
+      details: "MCP server entry file not found",
+    });
+  } else if (packageVersion) {
+    const hardcodedVersion = serverText.match(/version:\s*"(\d+\.\d+\.\d+)"/)?.[1];
+    if (hardcodedVersion && hardcodedVersion !== packageVersion) {
+      diffs.push({
+        kind: "version-mismatch",
+        symbol: "src/server.ts",
+        details: `Server metadata version ${hardcodedVersion} does not match package.json ${packageVersion}`,
+      });
+    }
+  }
+
+  for (const docFile of MCP_DOC_FILES) {
+    const content = await readFile(docFile);
+    if (!content) {
+      diffs.push({
+        kind: "documented-but-removed",
+        symbol: docFile,
+        details: "Expected MCP documentation file is missing",
+      });
+      continue;
+    }
+
+    if (packageVersion) {
+      for (const match of content.matchAll(/timeline-canvas-mcp@(\d+\.\d+\.\d+)/g)) {
+        const referencedVersion = match[1];
+        if (referencedVersion !== packageVersion) {
+          diffs.push({
+            kind: "version-mismatch",
+            symbol: docFile,
+            details: `References timeline-canvas-mcp@${referencedVersion}, but package version is ${packageVersion}`,
+          });
+        }
+      }
+    }
+
+    if (!MCP_README_FILES.includes(docFile)) {
+      continue;
+    }
+
+    const mentionedTools = extractMentionedMcpTools(content);
+    for (const toolName of registeredTools) {
+      if (!mentionedTools.has(toolName)) {
+        diffs.push({
+          kind: "added-not-documented",
+          symbol: toolName,
+          details: `${docFile} does not mention registered tool '${toolName}'`,
+        });
+      }
+    }
+
+    const countMatch =
+      content.match(/Tools\s*\((\d+)\s+total\)/i) ??
+      content.match(/工具(?:（Tools）)?\s*[（(](\d+)\s*(?:total|个)?/i);
+    if (countMatch) {
+      const documentedCount = Number(countMatch[1]);
+      if (documentedCount !== registeredTools.length) {
+        diffs.push({
+          kind: "count-mismatch",
+          symbol: docFile,
+          details: `Documents ${documentedCount} tools, but ${registeredTools.length} tools are registered in src/server.ts`,
+        });
+      }
+    }
+  }
+
+  return diffs;
+}
+
 export async function migrationHelper(
   args: MigrationHelperInput
 ): Promise<string> {
@@ -221,6 +347,9 @@ export async function migrationHelper(
       break;
     case "plugins":
       diffs = await checkPluginsMigration();
+      break;
+    case "mcp":
+      diffs = await checkMcpMigration();
       break;
     default:
       return `Unknown scope: ${scope}`;
@@ -248,7 +377,11 @@ export async function migrationHelper(
         ? "New exports (not yet documented)"
         : kind === "documented-but-removed"
           ? "Documented but removed"
-          : "Renamed";
+          : kind === "version-mismatch"
+            ? "Version drift"
+            : kind === "count-mismatch"
+              ? "Count drift"
+              : "Renamed";
     lines.push(`── ${label} ──`);
     for (const item of items) {
       lines.push(`  ${item.symbol}: ${item.details}`);
@@ -267,6 +400,18 @@ export async function migrationHelper(
   if (removed.length > 0) {
     lines.push(
       `  - Update/remove documentation for: ${removed.map((d) => d.symbol).join(", ")}`
+    );
+  }
+  const versionMismatches = diffs.filter((d) => d.kind === "version-mismatch");
+  if (versionMismatches.length > 0) {
+    lines.push(
+      `  - Sync version references for: ${versionMismatches.map((d) => d.symbol).join(", ")}`
+    );
+  }
+  const countMismatches = diffs.filter((d) => d.kind === "count-mismatch");
+  if (countMismatches.length > 0) {
+    lines.push(
+      `  - Update tool counts in: ${countMismatches.map((d) => d.symbol).join(", ")}`
     );
   }
 

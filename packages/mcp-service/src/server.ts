@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -13,10 +15,19 @@ import { renameSymbol } from "./tools/renameSymbol.js";
 import { impactAnalysis } from "./tools/impactAnalysis.js";
 import { ok, fail } from "./types.js";
 
+async function getServerVersion(): Promise<string> {
+  const packageJsonUrl = new URL("../package.json", import.meta.url);
+  const packageJson = JSON.parse(await fs.readFile(packageJsonUrl, "utf8")) as {
+    version?: string;
+  };
+  return packageJson.version ?? "0.0.0";
+}
+
 async function main() {
+  const version = await getServerVersion();
   const server = new McpServer({
     name: "timeline-canvas-mcp",
-    version: "2.0.0",
+    version,
   });
 
   // ─── P0: Scaffold Plugin (rewrite) ───
@@ -213,7 +224,8 @@ async function main() {
       title: "Consistency Check",
       description:
         "Run project-specific consistency validations: " +
-        "plugin-exports, render-layers, state-fields, change-types, boundary-conditions. " +
+        "plugin-exports, render-layers, state-fields, change-types, boundary-conditions, " +
+        "dirty-mapping, buffer-compose, interaction-api. " +
         "Detects structural mismatches that grep cannot find.",
       inputSchema: {
         checks: z
@@ -226,6 +238,7 @@ async function main() {
               "boundary-conditions",
               "dirty-mapping",
               "buffer-compose",
+              "interaction-api",
             ])
           )
           .optional()
@@ -275,12 +288,12 @@ async function main() {
       description:
         "Compare current exports with documentation to detect sync issues: " +
         "new exports not yet documented, documented APIs that were removed, " +
-        "and PluginType enum vs scaffold template mismatches.",
+        "PluginType enum vs scaffold template mismatches, and MCP service doc/version drift.",
       inputSchema: {
         scope: z
-          .enum(["api", "types", "plugins"])
+          .enum(["api", "types", "plugins", "mcp"])
           .describe(
-            "'api' = all exports, 'types' = type exports, 'plugins' = plugin exports + PluginType check"
+            "'api' = all exports, 'types' = type exports, 'plugins' = plugin exports + PluginType check, 'mcp' = MCP service version/tool/docs sync"
           ),
       },
     },

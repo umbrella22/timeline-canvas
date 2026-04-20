@@ -1,5 +1,24 @@
 # timeline-canvas-mcp
 
+## 2.3.0
+
+### New Features
+
+- **新增**：`timeline_migration_helper` 新增 `mcp` scope，可检查 `mcp-service` 自身的版本引用、工具文档覆盖率与 README / guide 漂移
+- **新增**：`timeline_consistency_check` 新增 `interaction-api` 检查，验证交互层已通过 `TimelineInteractionAPI` 与 `InteractionManager` 解耦，不再直接依赖 `Timeline`
+
+### Enhancements
+
+- **增强**：`timeline_perf_annotate` 交互扫描目标补充 `InteractionManager`、`TimelineInteractionAPI`、`IdleMouseDownRouter`、`IdleHoverController`，覆盖新的交互拆分结构
+- **增强**：`src/server.ts` 运行时从 `package.json` 读取版本号，避免 server metadata 与包版本漂移
+- **增强**：`README.md`、`README_CN.md`、`docs/en/guide/mcp.md`、`docs/zh/guide/mcp.md` 同步更新当前工具集与 `@latest` 启动示例
+
+### Internal
+
+- `MigrationScope` 扩展 `mcp`
+- `ConsistencyCheckName` 扩展 `interaction-api`
+- MCP 文档示例改为 `timeline-canvas-mcp@latest`
+
 ## 2.2.0
 
 ### Bug Fixes

@@ -1,49 +1,46 @@
 # timeline-canvas MCP Server
 
-This MCP server exposes project-specific **semantic analysis** tools over stdio, designed for use with Copilot Chat and AI CLI agents.
+This MCP server exposes project-specific semantic analysis and refactor assistance tools over stdio, designed for Copilot Chat and AI CLI agents working inside this repo.
 
-## Tools (8 total)
+## Tools
 
-### P0 — Scaffolding & Validation
+### P0 — Scaffolding, Validation & Refactors
 
 | Tool | Description |
 |---|---|
-| `timeline_scaffold_plugin` | Template-based plugin scaffolding with feature selection and optional test generation |
-| `timeline_validate_plugin` | Deep plugin validation (metadata, activate/deactivate pairing, TODO scan, re-export consistency) |
+| `timeline_scaffold_plugin` | Template-based builtin plugin scaffolding with feature selection and optional test generation |
+| `timeline_validate_plugin` | Deep plugin validation including metadata, lifecycle cleanup, TODO scan, and behavioral warnings |
 | `timeline_list_builtin_plugins` | List all builtin plugin names |
+| `timeline_rename_symbol` | Cross-file semantic rename with TypeScript LanguageService, scope filtering, and dry-run support |
 
-### P1 — Semantic Analysis
+### P1 — Semantic Analysis & Impact
 
 | Tool | Description |
 |---|---|
-| `timeline_dependency_graph` | Symbol dependency graph via TS Compiler API (dependents / dependencies / both) |
-| `timeline_type_query` | Type definition inspection + member usage tracking |
-| `timeline_consistency_check` | 5 project-specific consistency rules (plugin-exports, render-layers, state-fields, change-types, boundary-conditions) |
+| `timeline_dependency_graph` | Symbol dependency graph via TS Compiler API (`dependents` / `dependencies` / `both`) |
+| `timeline_type_query` | Type definition inspection plus member read/write usage tracking |
+| `timeline_consistency_check` | Project-specific structural checks including plugin exports, render layers, change types, dirty mapping, buffer compose, and interaction API boundaries |
+| `timeline_impact_analysis` | Symbol-level impact analysis for contract/signature changes |
 
 ### P2 — Performance & Migration
 
 | Tool | Description |
 |---|---|
-| `timeline_perf_annotate` | Static analysis of rendering hot paths (O(N) in loops, GC pressure, missing visibility culling) |
-| `timeline_migration_helper` | API export vs documentation sync check |
+| `timeline_perf_annotate` | Static analysis of render and interaction hot paths, including the new interaction manager / idle controllers split |
+| `timeline_migration_helper` | Export/docs sync checks for timeline APIs, plugins, types, and MCP service docs/version drift |
 
-## Quick start (inside this repo)
+## Quick Start
 
-- Install: `pnpm install` (at repo root)
-- Start MCP server (stdio): `pnpm mcp`
+- Install dependencies at the repo root: `pnpm install`
+- Start the MCP server (stdio): `pnpm mcp`
 
-Equivalent: `pnpm -C packages/mcp-service start`.
+Equivalent local command: `pnpm -C packages/mcp-service start`
 
-## VS Code / Copilot Chat config (stdio)
+## VS Code / Copilot Chat Config
 
-This repo includes a sample config at .vscode/mcp.json.
+This repo includes a sample config at `.vscode/mcp.json`.
 
-Key points:
-
-- Start the server via **stdio** (no HTTP)
-- Make sure the server can resolve the repo root via `cwd` or `MCP_WORKSPACE_ROOT`
-
-### Option A (recommended for local dev)
+### Option A — Local Development
 
 ```json
 {
@@ -59,14 +56,14 @@ Key points:
 }
 ```
 
-### Option B (npx, published to npm)
+### Option B — npm / npx
 
 ```json
 {
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -77,6 +74,11 @@ Key points:
 
 ## Verify
 
-Ask Copilot Chat to run `timeline_list_builtin_plugins` or `timeline_validate_plugin` (no args = validate all).
+Ask Copilot Chat to run:
 
-See the full tool documentation in [README_CN.md](README_CN.md) or [docs/guide/mcp.md](../../docs/guide/mcp.md).
+- `timeline_list_builtin_plugins`
+- `timeline_validate_plugin` with no args
+- `timeline_consistency_check`
+- `timeline_migration_helper` with `{ "scope": "mcp" }`
+
+See the full guides in [README_CN.md](README_CN.md) and [docs/en/guide/mcp.md](../../docs/en/guide/mcp.md).

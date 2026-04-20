@@ -95,7 +95,8 @@ export type ConsistencyCheckName =
   | "change-types"
   | "boundary-conditions"
   | "dirty-mapping"
-  | "buffer-compose";
+  | "buffer-compose"
+  | "interaction-api";
 
 export interface ConsistencyCheckInput {
   checks?: ConsistencyCheckName[];
@@ -125,14 +126,19 @@ export interface PerfHotspot {
 
 // ─── Migration helper types ───
 
-export type MigrationScope = "api" | "types" | "plugins";
+export type MigrationScope = "api" | "types" | "plugins" | "mcp";
 
 export interface MigrationHelperInput {
   scope: MigrationScope;
 }
 
 export interface MigrationDiff {
-  kind: "added-not-documented" | "documented-but-removed" | "renamed";
+  kind:
+    | "added-not-documented"
+    | "documented-but-removed"
+    | "renamed"
+    | "version-mismatch"
+    | "count-mismatch";
   symbol: string;
   details: string;
 }

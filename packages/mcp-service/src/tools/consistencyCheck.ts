@@ -7,6 +7,9 @@
  *  3. state-fields: TimelineState fields all initialized in StateManager
  *  4. change-types: ChangeType enum ↔ handler coverage
  *  5. boundary-conditions: consistent >= vs > patterns in interval logic
+ *  6. dirty-mapping: ChangeScheduler dirty layers ↔ buffer layer mapping consistency
+ *  7. buffer-compose: Layer buffers ↔ RenderManager compose step consistency
+ *  8. interaction-api: interaction handlers depend on TimelineInteractionAPI, not Timeline
  */
 
 import {
@@ -27,6 +30,7 @@ const ALL_CHECKS: ConsistencyCheckName[] = [
   "boundary-conditions",
   "dirty-mapping",
   "buffer-compose",
+  "interaction-api",
 ];
 
 // ─── Check: plugin-exports ───
@@ -431,6 +435,98 @@ async function checkBufferCompose(): Promise<CheckResult> {
   };
 }
 
+// ─── Check: interaction-api ───
+
+async function checkInteractionApi(): Promise<CheckResult> {
+  const problems: string[] = [];
+
+  const handlerFiles = [
+    `${TIMELINE_SRC}/handlers/MouseHandler.ts`,
+    `${TIMELINE_SRC}/handlers/WheelHandler.ts`,
+    `${TIMELINE_SRC}/handlers/states/InteractionState.ts`,
+    `${TIMELINE_SRC}/handlers/states/IdleState.ts`,
+    `${TIMELINE_SRC}/handlers/states/DraggingState.ts`,
+    `${TIMELINE_SRC}/handlers/states/ResizingState.ts`,
+    `${TIMELINE_SRC}/handlers/states/ScrollingState.ts`,
+    `${TIMELINE_SRC}/handlers/states/TimeIndicatorDragState.ts`,
+    `${TIMELINE_SRC}/handlers/states/idle/IdleShared.ts`,
+  ];
+
+  for (const rel of handlerFiles) {
+    const content = await readFile(rel);
+    if (!content) {
+      problems.push(`Required interaction file missing: ${rel}`);
+      continue;
+    }
+
+    if (/from\s+["'][^"']*core\/Timeline["']/.test(content)) {
+      problems.push(
+        `Interaction file still imports Timeline directly: ${rel}`
+      );
+    }
+  }
+
+  const interactionApiFile = await readFile(
+    `${TIMELINE_SRC}/handlers/TimelineInteractionAPI.ts`
+  );
+  if (!interactionApiFile) {
+    problems.push("Missing handlers/TimelineInteractionAPI.ts");
+  }
+
+  const mouseHandlerFile = await readFile(`${TIMELINE_SRC}/handlers/MouseHandler.ts`);
+  if (mouseHandlerFile && !mouseHandlerFile.includes("TimelineInteractionAPI")) {
+    problems.push("MouseHandler is not typed against TimelineInteractionAPI");
+  }
+
+  const wheelHandlerFile = await readFile(`${TIMELINE_SRC}/handlers/WheelHandler.ts`);
+  if (wheelHandlerFile && !wheelHandlerFile.includes("TimelineInteractionAPI")) {
+    problems.push("WheelHandler is not typed against TimelineInteractionAPI");
+  }
+
+  const interactionManagerFile = await readFile(
+    `${TIMELINE_SRC}/core/managers/InteractionManager.ts`
+  );
+  if (!interactionManagerFile) {
+    problems.push("Missing core/managers/InteractionManager.ts");
+  } else {
+    if (!interactionManagerFile.includes("TimelineInteractionAPI")) {
+      problems.push("InteractionManager does not depend on TimelineInteractionAPI");
+    }
+    if (!interactionManagerFile.includes("new MouseHandler(options.timeline)")) {
+      problems.push("InteractionManager is not wiring MouseHandler from timeline API");
+    }
+    if (!interactionManagerFile.includes("new WheelHandler(options.timeline)")) {
+      problems.push("InteractionManager is not wiring WheelHandler from timeline API");
+    }
+  }
+
+  const timelineFile = await readFile(`${TIMELINE_SRC}/core/Timeline.ts`);
+  if (!timelineFile) {
+    problems.push("Missing core/Timeline.ts");
+  } else {
+    if (!timelineFile.includes("new InteractionManager({")) {
+      problems.push("Timeline does not instantiate InteractionManager");
+    }
+    if (/new\s+MouseHandler\s*\(/.test(timelineFile)) {
+      problems.push("Timeline still constructs MouseHandler directly");
+    }
+    if (/new\s+WheelHandler\s*\(/.test(timelineFile)) {
+      problems.push("Timeline still constructs WheelHandler directly");
+    }
+  }
+
+  return {
+    name: "interaction-api",
+    passed: problems.length === 0,
+    details:
+      problems.length > 0
+        ? problems
+        : [
+            "Interaction layer is routed through TimelineInteractionAPI and InteractionManager",
+          ],
+  };
+}
+
 // ─── Main entry ───
 
 const CHECK_MAP: Record<ConsistencyCheckName, () => Promise<CheckResult>> = {
@@ -441,6 +537,7 @@ const CHECK_MAP: Record<ConsistencyCheckName, () => Promise<CheckResult>> = {
   "boundary-conditions": checkBoundaryConditions,
   "dirty-mapping": checkDirtyMapping,
   "buffer-compose": checkBufferCompose,
+  "interaction-api": checkInteractionApi,
 };
 
 export async function consistencyCheck(

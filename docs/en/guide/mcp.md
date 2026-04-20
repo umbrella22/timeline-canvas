@@ -7,11 +7,12 @@ title: MCP Service (for Copilot Chat / AI CLI)
 This page covers how to start it, configuration examples, and recommended workflows.
 
 - **Scaffolding**: Generate built-in plugin skeletons from templates, with feature selection and optional test stubs
-- **Validation**: Deep plugin integrity checks (metadata fields, activate/deactivate pairing, TODO scan)
+- **Validation**: Deep plugin integrity checks (metadata fields, activate/deactivate pairing, TODO scan, cleanup warnings)
 - **Semantic queries**: Symbol dependency graphs, type definitions, and member reference tracking (via TypeScript Compiler API)
-- **Consistency checks**: 5 categories of project-specific rules (plugin exports, render layers, state fields, change types, boundary conditions)
-- **Performance analysis**: Static annotation of render hot paths (O(N) work in loops, GC pressure, missing visibility culling, etc.)
-- **Migration helper**: Cross-check API exports against docs
+- **Consistency checks**: Project-specific rules for plugin exports, render layers, state fields, change types, dirty mapping, buffer composition, and interaction API boundaries
+- **Performance analysis**: Static annotation of render and interaction hot paths (O(N) work in loops, GC pressure, missing visibility culling, etc.)
+- **Refactor help**: Semantic rename and symbol-level impact analysis
+- **Migration helper**: Cross-check API exports, docs, and MCP service drift
 
 ## Prerequisites
 
@@ -47,7 +48,7 @@ pnpm -C packages/mcp-service start
 
 ### Option B: npx (for a published version)
 
-This MCP server is published to npm (`timeline-canvas-mcp@2.0.0`). You can start it via `npx` (add `-y` to avoid interactive prompts).
+This MCP server is published to npm. You can start it via `npx` (add `-y` to avoid interactive prompts).
 
 ## VS Code / Copilot Chat Configuration (stdio)
 
@@ -83,7 +84,7 @@ Below are generic examples (the UI/keys may vary slightly by VS Code version):
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -97,7 +98,7 @@ Below are generic examples (the UI/keys may vary slightly by VS Code version):
 As long as your AI CLI **supports MCP and can start a stdio server** (i.e., communicate via a process’ stdin/stdout), you can typically reuse the same startup parameters:
 
 - `command`: `npx` (or `pnpm`)
-- `args`: `-y timeline-canvas-mcp@2.0.0` (or `-C packages/mcp-service start`)
+- `args`: `-y timeline-canvas-mcp@latest` (or `-C packages/mcp-service start`)
 - `env.MCP_WORKSPACE_ROOT`: points to the repo root (critical)
 
 > Tip: If you upgrade the npm package version later, also update `timeline-canvas-mcp@x.y.z` here and in the repo examples (e.g. `.vscode/mcp.json`).
@@ -111,7 +112,7 @@ Many clients use a structure like this (replace `${workspaceFolder}` with whatev
   "mcpServers": {
     "timeline-canvas": {
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
       }
@@ -130,7 +131,7 @@ Some clients use `servers` with `type: "stdio"`:
     "timeline-canvas": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "timeline-canvas-mcp@2.0.0"],
+      "args": ["-y", "timeline-canvas-mcp@latest"],
       "cwd": "${workspaceFolder}",
       "env": {
         "MCP_WORKSPACE_ROOT": "${workspaceFolder}"
@@ -161,6 +162,7 @@ After configuring, do a minimal verification in Copilot Chat:
 - Call `timeline_list_builtin_plugins`: it should list plugins under `packages/timeline/src/plugins/builtin`
 - Call `timeline_validate_plugin` (no args): it should return validation reports for all built-in plugins
 - Call `timeline_consistency_check`: it should return the project consistency check results
+- Call `timeline_migration_helper` with `{ "scope": "mcp" }`: it should report MCP service/doc drift if any
 
 ## Recommended Workflows
 
@@ -411,13 +413,53 @@ Example:
 
 ---
 
+### `timeline_rename_symbol`
+
+**Priority: P0 | Category: Refactor**
+
+Purpose: Perform a semantic rename across the repo using TypeScript LanguageService.
+
+Inputs:
+
+- `symbol: string`: current symbol name
+- `newName: string`: replacement symbol name
+- `scope?: "all" | "value-only" | "type-only"`
+- `dryRun?: boolean`: preview only, without modifying files
+
+Example:
+
+```json
+{ "symbol": "ViewportController", "newName": "TimelineViewportController", "dryRun": true }
+```
+
+---
+
+### `timeline_impact_analysis`
+
+**Priority: P1 | Category: Impact**
+
+Purpose: Estimate the blast radius of changing a function or method contract.
+
+Inputs:
+
+- `symbol: string`: function or method name
+- `changeType: "parameter-semantics" | "parameter-type" | "return-type" | "signature-shape" | "removal"`
+
+Example:
+
+```json
+{ "symbol": "getInteractionTarget", "changeType": "parameter-semantics" }
+```
+
+---
+
 ### `timeline_consistency_check`
 
 **Priority: P1 | Category: Consistency**
 
 Purpose: Run project-specific consistency rules to detect structural issues that grep can’t catch.
 
-Checks (5 categories):
+Checks include:
 
 | Check | Description |
 |---|---|
@@ -426,6 +468,9 @@ Checks (5 categories):
 | `state-fields` | whether all TimelineState fields are initialized in StateManager |
 | `change-types` | whether each ChangeType enum value has matching handling logic |
 | `boundary-conditions` | whether interval checks use consistent `>=` vs `>` rules |
+| `dirty-mapping` | whether dirty layers used by ChangeScheduler are mapped to buffers |
+| `buffer-compose` | whether all buffer layers participate in the RenderManager compose step |
+| `interaction-api` | whether handlers depend on `TimelineInteractionAPI` instead of `Timeline` directly |
 
 Inputs:
 
@@ -458,7 +503,7 @@ Rules:
 
 Inputs:
 
-- `target: "render" | "highlight" | "interaction" | "all"`: which subsystem to analyze
+- `target: "render" | "highlight" | "interaction" | "worker" | "all"`: which subsystem to analyze
 
 Output: hotspots sorted by severity (HIGH / MEDIUM / LOW), each with file, line number, description, and suggestion.
 
@@ -481,13 +526,15 @@ Detects:
 - newly exported items that are missing from the docs
 - APIs that are still documented even though they were removed or renamed
 - whether PluginType enum values are in sync with scaffold templates
+- whether MCP package version, tool registry, and MCP docs are in sync
 
 Inputs:
 
-- `scope: "api" | "types" | "plugins"`
+- `scope: "api" | "types" | "plugins" | "mcp"`
   - `"api"`: check all exports
   - `"types"`: check type exports only
   - `"plugins"`: check plugin exports + PluginType consistency
+  - `"mcp"`: check MCP service version references, tool coverage, and README drift
 
 Output: diff list + auto-generated update suggestions.
 
@@ -495,4 +542,8 @@ Example:
 
 ```json
 { "scope": "api" }
+```
+
+```json
+{ "scope": "mcp" }
 ```

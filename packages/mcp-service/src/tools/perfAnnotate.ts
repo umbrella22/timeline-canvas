@@ -45,11 +45,15 @@ const SCAN_TARGETS: FileTarget[] = [
   // Interaction (state machine)
   { rel: `${TIMELINE_SRC}/handlers/MouseHandler.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/WheelHandler.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/TimelineInteractionAPI.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/states/IdleState.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/states/DraggingState.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/states/ResizingState.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/states/ScrollingState.ts`, category: "interaction" },
   { rel: `${TIMELINE_SRC}/handlers/states/TimeIndicatorDragState.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/idle/IdleMouseDownRouter.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/handlers/states/idle/IdleHoverController.ts`, category: "interaction" },
+  { rel: `${TIMELINE_SRC}/core/managers/InteractionManager.ts`, category: "interaction" },
 ];
 
 interface PatternRule {
