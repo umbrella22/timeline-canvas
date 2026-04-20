@@ -1,11 +1,11 @@
-import type { Timeline } from "../../../core/Timeline";
+import type { TimelineInteractionAPI } from "../../TimelineInteractionAPI";
 import type {
   InteractionState,
   MouseEventContext,
 } from "../InteractionState";
 
 export interface IdleStateFactory {
-  getTimeline(): Timeline;
+  getTimeline(): TimelineInteractionAPI;
   createDraggingState(): InteractionState;
   createResizingState(): InteractionState;
   createScrollingState(): InteractionState;

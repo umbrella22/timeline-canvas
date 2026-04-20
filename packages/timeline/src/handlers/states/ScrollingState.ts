@@ -3,7 +3,7 @@ import {
   type InteractionState,
   type MouseEventContext,
 } from "./InteractionState";
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 import { IdleState } from "./IdleState";
 
 /**
@@ -13,7 +13,7 @@ import { IdleState } from "./IdleState";
 export class ScrollingState extends BaseState {
   readonly name = "Scrolling";
 
-  constructor(timeline: Timeline) {
+  constructor(timeline: TimelineInteractionAPI) {
     super(timeline);
   }
 

@@ -3,7 +3,7 @@ import {
   type InteractionState,
   type MouseEventContext,
 } from "./InteractionState";
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 import { getSnapInterval, snapToInterval } from "../../utils";
 import { IdleState } from "./IdleState";
 
@@ -14,7 +14,7 @@ import { IdleState } from "./IdleState";
 export class TimeIndicatorDragState extends BaseState {
   readonly name = "TimeIndicatorDrag";
 
-  constructor(timeline: Timeline) {
+  constructor(timeline: TimelineInteractionAPI) {
     super(timeline);
   }
 

@@ -3,7 +3,7 @@ import {
   type InteractionState,
   type MouseEventContext,
 } from "./InteractionState";
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 import { DraggingState } from "./DraggingState";
 import { ResizingState } from "./ResizingState";
 import { ScrollingState } from "./ScrollingState";
@@ -23,13 +23,13 @@ export class IdleState extends BaseState {
   private readonly hoverController: IdleHoverController;
   private readonly mouseDownRouter: IdleMouseDownRouter;
 
-  constructor(timeline: Timeline) {
+  constructor(timeline: TimelineInteractionAPI) {
     super(timeline);
     this.hoverController = new IdleHoverController(this);
     this.mouseDownRouter = new IdleMouseDownRouter(this);
   }
 
-  public getTimeline(): Timeline {
+  public getTimeline(): TimelineInteractionAPI {
     return this.timeline;
   }
 

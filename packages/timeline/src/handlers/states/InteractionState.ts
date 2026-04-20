@@ -1,4 +1,4 @@
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 
 /**
  * 鼠标事件的上下文信息
@@ -71,7 +71,7 @@ export interface InteractionState {
 export abstract class BaseState implements InteractionState {
   abstract readonly name: string;
 
-  constructor(protected timeline: Timeline) {}
+  constructor(protected timeline: TimelineInteractionAPI) {}
 
   /**
    * 创建鼠标事件上下文

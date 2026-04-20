@@ -1,5 +1,5 @@
-import type { Timeline } from "../core/Timeline";
 import { type InteractionState, IdleState } from "./states";
+import type { TimelineInteractionAPI } from "./TimelineInteractionAPI";
 import { LogColors, getLogger } from "../core/managers/Logger";
 
 const logger = getLogger("StateMachine");
@@ -28,7 +28,7 @@ export class MouseHandler {
   /** 待处理的鼠标移动事件 */
   private pendingMouseMove: MouseEvent | null = null;
 
-  constructor(private timeline: Timeline) {
+  constructor(private timeline: TimelineInteractionAPI) {
     // 初始状态为空闲状态
     this.currentState = new IdleState(timeline);
   }

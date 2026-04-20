@@ -3,7 +3,7 @@ import {
   type InteractionState,
   type MouseEventContext,
 } from "./InteractionState";
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 import type { Track, SelectedEvent } from "../../types";
 import {
   fixFloatPrecision,
@@ -29,7 +29,7 @@ export class DraggingState extends BaseState {
   /** 当前吸附位置的时间 */
   private snappedTime: number | null = null;
 
-  constructor(timeline: Timeline) {
+  constructor(timeline: TimelineInteractionAPI) {
     super(timeline);
   }
 

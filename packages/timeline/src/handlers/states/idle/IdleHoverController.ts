@@ -1,5 +1,5 @@
 import { getSnapInterval, getTimeX, snapToInterval } from "../../../utils";
-import type { Timeline } from "../../../core/Timeline";
+import type { InteractionTarget } from "../../../types";
 import type { InteractionState, MouseEventContext } from "../InteractionState";
 import type { IdleStateDelegate } from "./IdleShared";
 
@@ -105,7 +105,7 @@ export class IdleHoverController {
   }
 
   private handleContentHover(
-    hitResult: ReturnType<Timeline["getInteractionTarget"]>,
+    hitResult: InteractionTarget,
     logicalX: number,
     canvas: HTMLCanvasElement
   ): boolean {

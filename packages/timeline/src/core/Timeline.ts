@@ -24,8 +24,6 @@ import {
   type TimelineMessageKey,
 } from "../utils";
 import { RenderManager } from "./managers/RenderManager";
-import { MouseHandler } from "../handlers/MouseHandler";
-import { WheelHandler } from "../handlers/WheelHandler";
 import { PluginManager } from "./managers/PluginManager";
 import { Logger, configureGlobalLogger } from "./managers/Logger";
 import { ErrorHandler } from "./managers/ErrorHandler";
@@ -39,6 +37,7 @@ import { TrackManager } from "./managers/TrackManager";
 import { TimeIndicatorController } from "./managers/TimeIndicatorController";
 import { ViewportController } from "./managers/ViewportController";
 import { CanvasController } from "./managers/CanvasController";
+import { InteractionManager } from "./managers/InteractionManager";
 import { PluginController } from "./managers/PluginController";
 // Built-in plugins are now optional external imports for tree-shaking.
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
@@ -51,10 +50,9 @@ export class Timeline {
   public config: TimelineConfig;
   public callbacks: TimelineCallbacks;
   public state: TimelineState;
-  private mouseHandler: MouseHandler;
-  private wheelHandler: WheelHandler;
   private renderManager: RenderManager;
   private canvasController: CanvasController;
+  private interactionManager: InteractionManager;
 
   private pluginManager: PluginManager;
   private pluginController: PluginController;
@@ -172,8 +170,6 @@ export class Timeline {
       this.eventIndexManager
     );
 
-    this.mouseHandler = new MouseHandler(this);
-    this.wheelHandler = new WheelHandler(this);
     this.pluginManager = new PluginManager({
       timeline: this,
       config: this.config,
@@ -204,6 +200,10 @@ export class Timeline {
       renderManager: this.renderManager,
       onCanvasResize: () => this.notifyChange("canvas:resize"),
     });
+    this.interactionManager = new InteractionManager({
+      timeline: this,
+      canvasController: this.canvasController,
+    });
     if (options.theme) {
       this.pluginController.loadInitialTheme(options.theme);
     }
@@ -229,7 +229,7 @@ export class Timeline {
     this.changeScheduler.setDrawFunction(() => this.draw());
 
     this.init();
-    this.bindCanvasInteractions();
+    this.interactionManager.bind();
   }
 
   public getCanvas(): HTMLCanvasElement {
@@ -378,17 +378,6 @@ export class Timeline {
       default:
         break;
     }
-  }
-
-  private bindCanvasInteractions(): void {
-    this.canvasController.setupEventListeners({
-      mousedown: (e: MouseEvent) => this.mouseHandler.handleMouseDown(e),
-      mousemove: (e: MouseEvent) => this.mouseHandler.handleMouseMove(e),
-      mouseup: (e: MouseEvent) => this.mouseHandler.handleMouseUp(e),
-      mouseleave: () => this.mouseHandler.handleMouseUp(),
-      contextmenu: (e: MouseEvent) => this.mouseHandler.handleContextMenu(e),
-      wheel: (e: WheelEvent) => this.wheelHandler.handleWheel(e),
-    });
   }
 
   public setCanvasSize(width: number, height: number): void {
@@ -962,8 +951,7 @@ export class Timeline {
 
   public destroy(): void {
     this.clearGuideLineCache();
-    this.canvasController.destroy();
-    this.mouseHandler.destroy();
+    this.interactionManager.destroy();
     this.setStatus(this.t("statusTimelineDestroyed"));
   }
 

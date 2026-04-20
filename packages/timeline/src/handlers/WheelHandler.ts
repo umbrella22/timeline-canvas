@@ -1,7 +1,7 @@
-import type { Timeline } from "../core/Timeline";
+import type { TimelineInteractionAPI } from "./TimelineInteractionAPI";
 
 export class WheelHandler {
-  constructor(private timeline: Timeline) {}
+  constructor(private timeline: TimelineInteractionAPI) {}
   public handleWheel(e: WheelEvent): void {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {

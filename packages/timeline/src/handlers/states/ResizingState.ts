@@ -3,7 +3,7 @@ import {
   type InteractionState,
   type MouseEventContext,
 } from "./InteractionState";
-import type { Timeline } from "../../core/Timeline";
+import type { TimelineInteractionAPI } from "../TimelineInteractionAPI";
 import {
   fixFloatPrecision,
   getSnapInterval,
@@ -19,7 +19,7 @@ import { IdleState } from "./IdleState";
 export class ResizingState extends BaseState {
   readonly name = "Resizing";
 
-  constructor(timeline: Timeline) {
+  constructor(timeline: TimelineInteractionAPI) {
     super(timeline);
   }
 
