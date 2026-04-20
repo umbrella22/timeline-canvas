@@ -4,7 +4,6 @@ import type {
   TimelineOptions,
   TimelineCallbacks,
   TimelineMessageParams,
-  Track,
   TimelineEvent,
   LoadDataFormat,
   InteractionTarget,
@@ -17,10 +16,7 @@ import {
   DEFAULT_CONTEXT_MENU_STYLE,
   formatTime,
   fixFloatPrecision,
-  getSnapInterval,
-  snapToInterval,
   cloneEvent,
-  getTimeX,
   createDefaultContextMenuItems,
   createTimelineMessages,
   normalizeTimelineLocale,
@@ -39,10 +35,15 @@ import { ChangeScheduler, type ChangeType } from "./managers/ChangeScheduler";
 import { EventMutationService } from "./managers/EventMutationService";
 import { GuideLineService } from "./managers/GuideLineService";
 import { HitTestService } from "./managers/HitTestService";
+import { TrackManager } from "./managers/TrackManager";
+import { TimeIndicatorController } from "./managers/TimeIndicatorController";
+import { ViewportController } from "./managers/ViewportController";
+import { CanvasController } from "./managers/CanvasController";
+import { PluginController } from "./managers/PluginController";
 // Built-in plugins are now optional external imports for tree-shaking.
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
 import { DarkThemePlugin } from "../plugins/builtin/DarkThemePlugin";
-import { type TimelinePlugin, PluginType } from "../plugins/types";
+import { type TimelinePlugin } from "../plugins/types";
 
 export class Timeline {
   private canvas: HTMLCanvasElement;
@@ -53,26 +54,21 @@ export class Timeline {
   private mouseHandler: MouseHandler;
   private wheelHandler: WheelHandler;
   private renderManager: RenderManager;
-
-  private eventListeners: {
-    mousedown: (e: MouseEvent) => void;
-    mousemove: (e: MouseEvent) => void;
-    mouseup: (e: MouseEvent) => void;
-    mouseleave: () => void;
-    contextmenu: (e: MouseEvent) => void;
-    wheel: (e: WheelEvent) => void;
-  } | null = null;
+  private canvasController: CanvasController;
 
   private pluginManager: PluginManager;
+  private pluginController: PluginController;
   private logger: Logger;
   private errorHandler: ErrorHandler;
   private stateManager: StateManager;
   private eventIndexManager: EventIndexManager;
   private eventMutationService: EventMutationService;
+  private trackManager: TrackManager;
+  private timeIndicatorController: TimeIndicatorController;
+  private viewportController: ViewportController;
   private guideLineService: GuideLineService;
   private hitTestService: HitTestService;
   private changeScheduler: ChangeScheduler;
-  private currentThemePluginId: string | null = null;
 
   constructor(canvasId: string, options: TimelineOptions = {}) {
     const locale = normalizeTimelineLocale(options.locale);
@@ -160,6 +156,7 @@ export class Timeline {
 
     this.stateManager = new StateManager(this.config);
     this.state = this.stateManager.state;
+    this.trackManager = new TrackManager(this.state);
     this.eventIndexManager = new EventIndexManager(this.state);
     this.eventMutationService = new EventMutationService({
       config: this.config,
@@ -182,18 +179,6 @@ export class Timeline {
       config: this.config,
       state: this.state,
     });
-    if (options.theme) {
-      const id = `${options.theme.metadata.name}@${options.theme.metadata.version}`;
-      this.pluginManager.loadPlugin(options.theme).then((ok) => {
-        if (ok) {
-          this.currentThemePluginId = id;
-          // 主题插件异步激活后需触发重绘，确保所有缓冲层使用正确的主题色
-          this.notifyChange("theme:change");
-        }
-      });
-    }
-    // ContextMenuPlugin 需要通过 usePlugin() 显式加载
-    // 不再自动加载以支持完全的插件化架构
     this.renderManager = new RenderManager(
       this.canvas,
       this.ctx,
@@ -201,6 +186,37 @@ export class Timeline {
       this.state,
       this.pluginManager
     );
+    this.pluginController = new PluginController({
+      pluginManager: this.pluginManager,
+      builtinThemes: {
+        light: LightThemePlugin,
+        dark: DarkThemePlugin,
+      },
+      onThemeChanged: () => this.notifyChange("theme:change"),
+      onPluginVisualChange: () => this.redrawAfterPluginChange(),
+    });
+    // ContextMenuPlugin 需要通过 usePlugin() 显式加载
+    // 不再自动加载以支持完全的插件化架构
+    this.canvasController = new CanvasController({
+      canvas: this.canvas,
+      config: this.config,
+      state: this.state,
+      renderManager: this.renderManager,
+      onCanvasResize: () => this.notifyChange("canvas:resize"),
+    });
+    if (options.theme) {
+      this.pluginController.loadInitialTheme(options.theme);
+    }
+    this.timeIndicatorController = new TimeIndicatorController({
+      config: this.config,
+      state: this.state,
+      renderManager: this.renderManager,
+    });
+    this.viewportController = new ViewportController({
+      config: this.config,
+      state: this.state,
+      renderManager: this.renderManager,
+    });
 
     // 初始化变更调度器
     this.changeScheduler = new ChangeScheduler(
@@ -213,7 +229,7 @@ export class Timeline {
     this.changeScheduler.setDrawFunction(() => this.draw());
 
     this.init();
-    this.setupEventListeners();
+    this.bindCanvasInteractions();
   }
 
   public getCanvas(): HTMLCanvasElement {
@@ -221,76 +237,28 @@ export class Timeline {
   }
 
   public async usePlugin(plugin: TimelinePlugin): Promise<boolean> {
-    if (this.isThemePlugin(plugin)) {
-      return this.switchTheme(plugin);
-    }
-
-    const loaded = await this.pluginManager.loadPlugin(plugin);
-    if (!loaded) {
-      return false;
-    }
-
-    this.redrawAfterPluginChange();
-    return true;
+    return this.pluginController.usePlugin(plugin);
   }
 
   public getLoadedPlugins(): TimelinePlugin[] {
-    return this.pluginManager.getLoadedPlugins();
+    return this.pluginController.getLoadedPlugins();
   }
 
   public isPluginLoaded(pluginName: string): boolean {
-    return this.pluginManager.isPluginLoaded(pluginName);
+    return this.pluginController.isPluginLoaded(pluginName);
   }
 
   public async removePlugin(pluginId: string): Promise<boolean> {
-    const unloaded = await this.pluginManager.unloadPlugin(pluginId);
-    if (!unloaded) {
-      return false;
-    }
-
-    const removedTheme = this.currentThemePluginId === pluginId;
-    if (removedTheme) {
-      this.currentThemePluginId = null;
-      this.notifyChange("theme:change");
-      return true;
-    }
-
-    this.redrawAfterPluginChange();
-    return true;
+    return this.pluginController.removePlugin(pluginId);
   }
 
   public async setTheme(theme: "light" | "dark"): Promise<boolean> {
-    const plugin = theme === "dark" ? DarkThemePlugin : LightThemePlugin;
-    return this.switchTheme(plugin);
-  }
-
-  private async switchTheme(plugin: TimelinePlugin): Promise<boolean> {
-    const nextThemePluginId = this.getPluginId(plugin);
-    if (this.currentThemePluginId === nextThemePluginId) {
-      return true;
-    }
-
-    if (this.currentThemePluginId) {
-      const unloaded = await this.pluginManager.unloadPlugin(
-        this.currentThemePluginId
-      );
-      if (!unloaded) {
-        return false;
-      }
-      this.currentThemePluginId = null;
-    }
-
-    const ok = await this.pluginManager.loadPlugin(plugin);
-    if (ok) {
-      this.currentThemePluginId = nextThemePluginId;
-      this.notifyChange("theme:change");
-    }
-    return ok;
+    return this.pluginController.setTheme(theme);
   }
 
   private init(): void {
     if (this.config.autoFitOnInit) {
-      this.autoFitZoomToCanvas();
+      this.autoFitViewport();
     }
     this.notifyChange("data:load");
   }
@@ -381,130 +349,66 @@ export class Timeline {
     this.eventIndexManager.invalidateAll();
   }
 
-  private autoFitZoomToCanvas(): void {
+  private autoFitViewport(): void {
     this.adjustCanvasSize();
-    const canvasWidth = this.renderManager.getCanvasLogicalWidth();
-    let zoom = Math.max(this.config.minAutoFitZoom, this.state.zoomLevel, 1.0);
-    const maxZoom = Math.max(this.config.maxAutoFitZoom, zoom);
-    if (this.renderManager.getContentWidth(zoom) >= canvasWidth) {
-      this.state.zoomLevel = zoom;
-      return;
-    }
-    const step = 0.05;
-    while (
-      zoom <= maxZoom &&
-      this.renderManager.getContentWidth(zoom) < canvasWidth
-    ) {
-      zoom += step;
-    }
-    if (
-      zoom <= maxZoom &&
-      this.renderManager.getContentWidth(zoom) >= canvasWidth
-    ) {
-      this.state.zoomLevel = parseFloat(zoom.toFixed(3));
-      this.setStatus(
-        this.t("statusAutoFit", {
-          percentage: Math.round(this.state.zoomLevel * 100),
-        })
-      );
-      return;
-    }
-    if (this.config.endPaddingTime === 0) {
-      const needWidth = canvasWidth;
-      const currentWidth = this.renderManager.getContentWidth(maxZoom);
-      if (currentWidth < needWidth) {
-        const missingPixels = needWidth - currentWidth;
-        const secondsPerPixel = this.config.secondWidth * maxZoom;
-        const extraSeconds = missingPixels / secondsPerPixel;
-        this.config.endPaddingTime = Math.ceil(extraSeconds);
-        this.state.zoomLevel = maxZoom;
+    const result = this.viewportController.autoFitToCanvas();
+    switch (result.type) {
+      case "fit":
         this.setStatus(
-          this.t("statusAutoFitCappedWithPadding", {
-            percentage: Math.round(maxZoom * 100),
-            seconds: this.config.endPaddingTime,
+          this.t("statusAutoFit", {
+            percentage: result.percentage,
           })
         );
-        return;
-      }
+        break;
+      case "cappedWithPadding":
+        this.setStatus(
+          this.t("statusAutoFitCappedWithPadding", {
+            percentage: result.percentage,
+            seconds: result.seconds,
+          })
+        );
+        break;
+      case "cappedContentShort":
+        this.setStatus(
+          this.t("statusAutoFitCappedContentShort", {
+            percentage: result.percentage,
+          })
+        );
+        break;
+      default:
+        break;
     }
-    this.state.zoomLevel = maxZoom;
-    this.setStatus(
-      this.t("statusAutoFitCappedContentShort", {
-        percentage: Math.round(maxZoom * 100),
-      })
-    );
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
   }
 
-  private setupEventListeners(): void {
-    this.eventListeners = {
+  private bindCanvasInteractions(): void {
+    this.canvasController.setupEventListeners({
       mousedown: (e: MouseEvent) => this.mouseHandler.handleMouseDown(e),
       mousemove: (e: MouseEvent) => this.mouseHandler.handleMouseMove(e),
       mouseup: (e: MouseEvent) => this.mouseHandler.handleMouseUp(e),
       mouseleave: () => this.mouseHandler.handleMouseUp(),
       contextmenu: (e: MouseEvent) => this.mouseHandler.handleContextMenu(e),
       wheel: (e: WheelEvent) => this.wheelHandler.handleWheel(e),
-    };
-    this.canvas.addEventListener("mousedown", this.eventListeners.mousedown);
-    this.canvas.addEventListener("mousemove", this.eventListeners.mousemove);
-    this.canvas.addEventListener("mouseup", this.eventListeners.mouseup);
-    this.canvas.addEventListener("mouseleave", this.eventListeners.mouseleave);
-    this.canvas.addEventListener(
-      "contextmenu",
-      this.eventListeners.contextmenu
-    );
-    this.canvas.addEventListener("wheel", this.eventListeners.wheel, {
-      passive: false,
     });
-    this.setInitialCanvasSize();
-  }
-
-  private setInitialCanvasSize(): void {
-    const container = this.canvas.parentElement;
-    if (!container) {
-      this.setCanvasSize(
-        this.renderManager.getCanvasLogicalWidth(),
-        this.config.canvasHeight || 500
-      );
-      return;
-    }
-    const rect = container.getBoundingClientRect();
-    this.setCanvasSize(
-      rect.width,
-      rect.height || this.config.canvasHeight || 500
-    );
   }
 
   public setCanvasSize(width: number, height: number): void {
-    this.renderManager.setCanvasSize(width, height);
+    this.canvasController.setCanvasSize(width, height);
   }
 
   public getCanvasLogicalHeight(): number {
-    return this.renderManager.getCanvasLogicalHeight();
+    return this.canvasController.getCanvasLogicalHeight();
   }
 
   public getCachedLogicalHeight(): number {
-    return this.renderManager.getCachedLogicalHeight();
+    return this.canvasController.getCachedLogicalHeight();
   }
 
   public adjustCanvasSize(): void {
-    const maxScrollY = this.renderManager.computeMaxScrollY();
-    this.state.scrollY = Math.max(0, Math.min(maxScrollY, this.state.scrollY));
-    this.notifyChange("canvas:resize");
+    this.canvasController.adjustCanvasSize();
   }
 
   public addTrack(): void {
-    const track: Track = { id: this.state.tracks.length, events: [] };
-    this.state.tracks.push(track);
+    const track = this.trackManager.addTrack();
     this.clearGuideLineCache();
     this.adjustCanvasSize();
     this.setStatus(
@@ -514,17 +418,10 @@ export class Timeline {
   }
 
   public removeTrack(): void {
-    if (this.state.tracks.length <= 1) {
+    const removedTrack = this.trackManager.removeTrack();
+    if (!removedTrack) {
       this.setStatus(this.t("statusAtLeastOneTrackRequired"));
       return;
-    }
-    const removedTrack = this.state.tracks.pop()!;
-    if (
-      this.state.selectedTrack !== null &&
-      this.state.selectedTrack >= this.state.tracks.length
-    ) {
-      this.state.selectedTrack =
-        this.state.tracks.length > 0 ? this.state.tracks.length - 1 : null;
     }
     this.clearGuideLineCache();
     this.adjustCanvasSize();
@@ -537,17 +434,8 @@ export class Timeline {
 
   public autoRemoveEmptyLastTrack(): void {
     if (!this.config.autoRemoveEmptyLastTrack) return;
-    if (this.state.tracks.length <= 1) return;
-    const lastTrack = this.state.tracks[this.state.tracks.length - 1];
-    if (lastTrack.events.length === 0) {
-      const removedTrack = this.state.tracks.pop()!;
-      if (
-        this.state.selectedTrack !== null &&
-        this.state.selectedTrack >= this.state.tracks.length
-      ) {
-        this.state.selectedTrack =
-          this.state.tracks.length > 0 ? this.state.tracks.length - 1 : null;
-      }
+    let removedTrack = this.trackManager.removeEmptyLastTrack();
+    while (removedTrack) {
       this.clearGuideLineCache();
       this.setStatus(
         this.t("statusEmptyTrackRemoved", {
@@ -557,7 +445,7 @@ export class Timeline {
       if (this.callbacks.onTrackRemove)
         this.callbacks.onTrackRemove(removedTrack);
       this.adjustCanvasSize();
-      this.autoRemoveEmptyLastTrack();
+      removedTrack = this.trackManager.removeEmptyLastTrack();
     }
   }
 
@@ -680,36 +568,20 @@ export class Timeline {
       this.logger.error(this.t("errorTimeIndicatorInvalid"));
       return false;
     }
-    if (applySnap && this.state.snapEnabled) {
-      const snapIntervalSeconds = getSnapInterval(
-        this.state.zoomLevel,
-        this.config.snapInterval,
-        this.config.snapToSeconds,
-        this.config.secondPrecisionZoomThreshold,
-        this.config.scale,
-        this.config.scaleSplitCount
-      );
-      seconds = snapToInterval(seconds, snapIntervalSeconds);
-    }
-    seconds = Math.max(
-      this.config.startTime,
-      Math.min(this.config.endTime, seconds)
-    );
-    // 位置未变则跳过整条渲染链路
-    if (seconds === this.state.timeIndicatorPosition) return true;
-    this.state.timeIndicatorPosition = seconds;
-    this.scrollToTimeIndicator(seconds);
+    const result = this.timeIndicatorController.setPosition(seconds, applySnap);
+    if (!result.changed) return true;
     // 使用调度器处理高亮计算和回调触发
     this.notifyChange("timeIndicator:move");
+    const formattedTime = formatTime(result.position);
     this.setStatus(
       this.t("statusTimeIndicatorMoved", {
-        time: formatTime(seconds),
+        time: formattedTime,
       })
     );
     if (this.callbacks.onTimeIndicatorMove)
       this.callbacks.onTimeIndicatorMove({
-        position: seconds,
-        time: formatTime(seconds),
+        position: result.position,
+        time: formattedTime,
       });
     return true;
   }
@@ -723,169 +595,22 @@ export class Timeline {
    * - 使用节流的边界滚动而非每帧滚动
    */
   public setTimeIndicatorDuringDrag(seconds: number): void {
-    seconds = Math.max(
-      this.config.startTime,
-      Math.min(this.config.endTime, seconds)
-    );
-    this.state.timeIndicatorPosition = seconds;
-    // 仅在越界时节流滚动
-    this.scrollToTimeIndicatorThrottled(seconds);
+    this.timeIndicatorController.setPositionDuringDrag(seconds);
     this.notifyChange("timeIndicator:drag");
   }
 
-  private _lastEdgeScrollTime = 0;
-
-  private scrollToTimeIndicatorThrottled(seconds: number): void {
-    const now = performance.now();
-    if (now - this._lastEdgeScrollTime < this.getEdgeScrollThrottle()) return;
-
-    const timeIndicatorX = getTimeX(
-      seconds,
-      this.config.startTime,
-      this.config.startPaddingTime,
-      this.config.secondWidth,
-      this.state.zoomLevel,
-      this.state.scrollX
-    );
-    const canvasWidth = this.renderManager.getCanvasLogicalWidth();
-    const triggerMargin = this.getEdgeScrollTriggerMargin();
-
-    if (
-      timeIndicatorX >= triggerMargin &&
-      timeIndicatorX <= canvasWidth - triggerMargin
-    ) {
-      return;
-    }
-
-    this._lastEdgeScrollTime = now;
-    const viewportMargin = this.getEdgeScrollViewportMargin();
-    const timeAtZeroScroll = getTimeX(
-      seconds,
-      this.config.startTime,
-      this.config.startPaddingTime,
-      this.config.secondWidth,
-      this.state.zoomLevel,
-      0
-    );
-    const maxScrollX = this.renderManager.computeMaxScrollX(
-      this.state.zoomLevel
-    );
-
-    if (timeIndicatorX < triggerMargin) {
-      this.state.scrollX = Math.max(
-        0,
-        Math.min(maxScrollX, timeAtZeroScroll - viewportMargin)
-      );
-    } else {
-      this.state.scrollX = Math.max(
-        0,
-        Math.min(maxScrollX, timeAtZeroScroll - (canvasWidth - viewportMargin))
-      );
-    }
-
-    this.markDirty([
-      "background",
-      "tracks",
-      "timeline",
-      "guideLines",
-      "indicator",
-      "scrollbar",
-      "interaction",
-      "overlay",
-    ]);
-  }
-
-  private scrollToTimeIndicator(seconds: number): void {
-    const timeIndicatorX = getTimeX(
-      seconds,
-      this.config.startTime,
-      this.config.startPaddingTime,
-      this.config.secondWidth,
-      this.state.zoomLevel,
-      this.state.scrollX
-    );
-    const canvasWidth = this.renderManager.getCanvasLogicalWidth();
-    const margin = this.getEdgeScrollViewportMargin();
-    let needsScroll = false;
-    if (timeIndicatorX < margin) {
-      const targetScrollX =
-        getTimeX(
-          seconds,
-          this.config.startTime,
-          this.config.startPaddingTime,
-          this.config.secondWidth,
-          this.state.zoomLevel,
-          0
-        ) - margin;
-      const maxScrollX = this.renderManager.computeMaxScrollX(
-        this.state.zoomLevel
-      );
-      this.state.scrollX = Math.max(0, Math.min(maxScrollX, targetScrollX));
-      needsScroll = true;
-    } else if (timeIndicatorX > canvasWidth - margin) {
-      const targetScrollX =
-        getTimeX(
-          seconds,
-          this.config.startTime,
-          this.config.startPaddingTime,
-          this.config.secondWidth,
-          this.state.zoomLevel,
-          0
-        ) -
-        (canvasWidth - margin);
-      const maxScrollX = this.renderManager.computeMaxScrollX(
-        this.state.zoomLevel
-      );
-      this.state.scrollX = Math.max(0, Math.min(maxScrollX, targetScrollX));
-      needsScroll = true;
-    }
-    if (needsScroll) {
-      this.markDirty([
-        "background",
-        "tracks",
-        "timeline",
-        "guideLines",
-        "indicator",
-        "scrollbar",
-        "interaction",
-        "overlay",
-      ]);
-    }
-  }
-
   public zoom(factor: number): void {
-    const oldZoomLevel = this.state.zoomLevel;
-    const oldScrollX = this.state.scrollX;
-    const centerX = this.renderManager.getCachedLogicalWidth() / 2;
-    const centerTimeOffset =
-      (centerX + oldScrollX) / (this.config.secondWidth * oldZoomLevel);
-    this.state.zoomLevel *= factor;
-    this.state.zoomLevel = Math.max(
-      1.0,
-      Math.min(1000.0, this.state.zoomLevel)
-    );
-    if (oldZoomLevel !== this.state.zoomLevel) {
-      const newCenterX =
-        centerTimeOffset * this.config.secondWidth * this.state.zoomLevel;
-      this.state.scrollX = newCenterX - centerX;
-      const maxScrollX = this.renderManager.computeMaxScrollX(
-        this.state.zoomLevel
-      );
-      this.state.scrollX = Math.max(
-        0,
-        Math.min(maxScrollX, this.state.scrollX)
-      );
-    }
+    const result = this.viewportController.zoomByFactor(factor);
     this.notifyChange("zoom:change");
     this.setStatus(
       this.t("statusZoomChanged", {
-        percentage: Math.round(this.state.zoomLevel * 100),
+        percentage: result.percentage,
       })
     );
-    if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
+    if (this.callbacks.onZoom && result.changed) {
       this.callbacks.onZoom({
-        zoomLevel: this.state.zoomLevel,
-        percentage: Math.round(this.state.zoomLevel * 100),
+        zoomLevel: result.zoomLevel,
+        percentage: result.percentage,
       });
     }
   }
@@ -899,29 +624,17 @@ export class Timeline {
       this.logger.error(this.t("errorZoomLevelOutOfRange"));
       return false;
     }
-    const oldZoomLevel = this.state.zoomLevel;
-    const oldScrollX = this.state.scrollX;
-    const centerX = this.renderManager.getCachedLogicalWidth() / 2;
-    const centerTimeOffset =
-      (centerX + oldScrollX) / (this.config.secondWidth * oldZoomLevel);
-    this.state.zoomLevel = zoomLevel;
-    const newCenterX =
-      centerTimeOffset * this.config.secondWidth * this.state.zoomLevel;
-    this.state.scrollX = newCenterX - centerX;
-    const maxScrollX = this.renderManager.computeMaxScrollX(
-      this.state.zoomLevel
-    );
-    this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
+    const result = this.viewportController.setZoomLevel(zoomLevel);
     this.notifyChange("zoom:change");
     this.setStatus(
       this.t("statusZoomChanged", {
-        percentage: Math.round(this.state.zoomLevel * 100),
+        percentage: result.percentage,
       })
     );
-    if (this.callbacks.onZoom && oldZoomLevel !== this.state.zoomLevel) {
+    if (this.callbacks.onZoom && result.changed) {
       this.callbacks.onZoom({
-        zoomLevel: this.state.zoomLevel,
-        percentage: Math.round(this.state.zoomLevel * 100),
+        zoomLevel: result.zoomLevel,
+        percentage: result.percentage,
       });
     }
     return true;
@@ -940,32 +653,16 @@ export class Timeline {
       this.logger.error(this.t("errorEndTimeNotAfterStart"));
       return false;
     }
-    const hasOverflowEvents = this.state.tracks.some((track) =>
-      track.events.some((event) => event.endTime > endTime)
-    );
-    if (hasOverflowEvents) {
+    const result = this.viewportController.setEndTime(endTime);
+    if (result.hasOverflowEvents) {
       this.logger.warn(this.t("warningEventsExceedEndTime"));
     }
-    const oldEndTime = this.config.endTime;
-    this.config.endTime = endTime;
     this.clearGuideLineCache();
-    this.renderManager.invalidateLayoutCache();
-    if (this.state.timeIndicatorPosition > endTime) {
-      this.state.timeIndicatorPosition = endTime;
-    }
-    const contentWidth = this.renderManager.getContentWidth(
-      this.state.zoomLevel
-    );
-    const maxScrollX = Math.max(
-      0,
-      contentWidth - this.renderManager.getCachedLogicalWidth()
-    );
-    this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
     this.notifyChange("config:endTime");
     this.setStatus(
       this.t("statusEndTimeUpdated", {
-        from: formatTime(oldEndTime),
-        to: formatTime(endTime),
+        from: formatTime(result.oldEndTime),
+        to: formatTime(result.endTime),
       })
     );
     return true;
@@ -1019,34 +716,6 @@ export class Timeline {
     y: number
   ): { trackIndex: number; eventIndex: number; edge: "left" | "right" } | null {
     return this.hitTestService.getResizeHandle(x, y);
-  }
-
-  private getEdgeScrollThrottle(): number {
-    return this.resolveEdgeScrollValue(
-      this.config.edgeScrollThrottle,
-      DEFAULT_CONFIG.edgeScrollThrottle
-    );
-  }
-
-  private getEdgeScrollTriggerMargin(): number {
-    return this.resolveEdgeScrollValue(
-      this.config.edgeScrollTriggerMargin,
-      DEFAULT_CONFIG.edgeScrollTriggerMargin
-    );
-  }
-
-  private getEdgeScrollViewportMargin(): number {
-    return this.resolveEdgeScrollValue(
-      this.config.edgeScrollViewportMargin,
-      DEFAULT_CONFIG.edgeScrollViewportMargin
-    );
-  }
-
-  private resolveEdgeScrollValue(value: number, fallback: number): number {
-    if (!Number.isFinite(value) || value < 0) {
-      return fallback;
-    }
-    return value;
   }
 
   public calculateGuideLines(
@@ -1293,40 +962,13 @@ export class Timeline {
 
   public destroy(): void {
     this.clearGuideLineCache();
-    if (this.eventListeners) {
-      this.canvas.removeEventListener(
-        "mousedown",
-        this.eventListeners.mousedown
-      );
-      this.canvas.removeEventListener(
-        "mousemove",
-        this.eventListeners.mousemove
-      );
-      this.canvas.removeEventListener("mouseup", this.eventListeners.mouseup);
-      this.canvas.removeEventListener(
-        "mouseleave",
-        this.eventListeners.mouseleave
-      );
-      this.canvas.removeEventListener(
-        "contextmenu",
-        this.eventListeners.contextmenu
-      );
-      this.canvas.removeEventListener("wheel", this.eventListeners.wheel);
-      this.eventListeners = null;
-    }
+    this.canvasController.destroy();
+    this.mouseHandler.destroy();
     this.setStatus(this.t("statusTimelineDestroyed"));
   }
 
   private clearGuideLineCache(): void {
     this.guideLineService.clearCache();
-  }
-
-  private getPluginId(plugin: TimelinePlugin): string {
-    return `${plugin.metadata.name}@${plugin.metadata.version}`;
-  }
-
-  private isThemePlugin(plugin: TimelinePlugin): boolean {
-    return plugin.metadata.type === PluginType.THEME;
   }
 
   private redrawAfterPluginChange(): void {

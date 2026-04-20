@@ -126,6 +126,52 @@ describe("Timeline integration", () => {
     expect(timeline.state.scrollX).toBe(100);
   });
 
+  it("setTimeIndicator 保持状态文案、回调与滚动语义", () => {
+    const onTimeIndicatorMove = vi.fn();
+    const timeline = createTimeline({ onTimeIndicatorMove });
+
+    expect(timeline.setTimeIndicator(25)).toBe(true);
+
+    expect(timeline.state.timeIndicatorPosition).toBe(25);
+    expect(timeline.state.scrollX).toBe(100);
+    expect(timeline.getStatus()).toBe("Time indicator moved to: 00:00:25");
+    expect(onTimeIndicatorMove).toHaveBeenCalledWith({
+      position: 25,
+      time: "00:00:25",
+    });
+  });
+
+  it("setZoomLevel 保持状态文案、滚动与回调语义", () => {
+    const onZoom = vi.fn();
+    const timeline = createTimeline({ onZoom });
+
+    expect(timeline.setZoomLevel(2)).toBe(true);
+    expect(timeline.setZoomLevel(2)).toBe(true);
+
+    expect(timeline.getZoomLevel()).toBe(2);
+    expect(timeline.state.scrollX).toBe(100);
+    expect(timeline.getStatus()).toBe("Zoom: 200%");
+    expect(onZoom).toHaveBeenCalledTimes(1);
+    expect(onZoom).toHaveBeenCalledWith({
+      zoomLevel: 2,
+      percentage: 200,
+    });
+  });
+
+  it("setEndTime 保持裁剪与状态文案语义", () => {
+    const timeline = createTimeline();
+
+    timeline.state.timeIndicatorPosition = 90;
+    timeline.state.scrollX = 900;
+
+    expect(timeline.setEndTime(50)).toBe(true);
+
+    expect(timeline.getEndTime()).toBe(50);
+    expect(timeline.state.timeIndicatorPosition).toBe(50);
+    expect(timeline.state.scrollX).toBe(300);
+    expect(timeline.getStatus()).toBe("End time updated: 00:01:40 -> 00:00:50");
+  });
+
   it("公开插件 API 保持失败返回语义", async () => {
     const timeline = createTimeline({ debug: true });
     const plugin: TimelinePlugin = {

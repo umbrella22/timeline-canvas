@@ -47,6 +47,12 @@ export type {
 } from "./types";
 export {
   formatTime,
+  formatTimeRange,
+  formatDuration,
   getCurrentTime,
   createTimelineMessages,
+  createDefaultContextMenuItems,
+  normalizeTimelineLocale,
+  translateTimelineMessage,
+  translateTimelineConfig,
 } from "./utils";

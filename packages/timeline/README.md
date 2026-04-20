@@ -150,7 +150,7 @@ Usage:
 import { Timeline, PerformanceOverlayPlugin } from "timeline-canvas";
 
 const timeline = new Timeline("canvas-id");
-timeline.usePlugin(new PerformanceOverlayPlugin());
+timeline.usePlugin(PerformanceOverlayPlugin);
 ```
 
 ## Development
