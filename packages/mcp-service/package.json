@@ -1,29 +1,32 @@
 {
   "name": "timeline-canvas-mcp",
   "type": "module",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "MCP server for timeline-canvas repo — semantic analysis and engineering quality tools",
   "bin": {
     "timeline-canvas-mcp": "./bin/timeline-canvas-mcp.js"
   },
   "scripts": {
     "start": "tsx src/server.ts",
-    "build": "tsdown",
+    "build": "vp pack",
     "start:prod": "node dist/server.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:run": "vp test run",
+    "test:package": "pnpm build && tsx tests/package-artifact.ts"
   },
   "files": [
     "dist",
     "bin",
+    "templates",
     "README.md",
     "README_CN.md"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.3",
-    "zod": "^4.2.0"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
   },
   "peerDependencies": {
-    "typescript": ">=5.0.0"
+    "typescript": ">=5.0.0 <7"
   },
   "peerDependenciesMeta": {
     "typescript": {
@@ -31,6 +34,9 @@
     }
   },
   "devDependencies": {
-    "tsx": "^4.21.0"
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
+    "vite-plus": "0.3.0"
   }
 }

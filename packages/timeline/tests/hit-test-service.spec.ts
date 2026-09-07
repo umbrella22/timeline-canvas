@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { EventIndexManager } from "../src/core/managers/EventIndexManager";
 import { HitTestService } from "../src/core/managers/HitTestService";

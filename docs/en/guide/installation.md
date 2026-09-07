@@ -2,107 +2,78 @@
 title: Installation & Build
 ---
 
-This page covers development/build commands for this repository (which is different from installing the `timeline-canvas` npm package).
+This page covers development of this repository. To use the published library, install `timeline-canvas` in your application.
 
 ## Requirements
 
-- Node.js >= 20.17.0
-- npm >= 9.0.0 or pnpm >= 10.0.0
+- Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`; CI uses 24.20.0. The jsdom 30 test environment requires these minimum versions.
+- pnpm 10.34.5, as pinned in `package.json`.
 
-## Install Dependencies
+## Install and Develop
 
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
+pnpm dev       # Watch and rebuild the timeline library
+pnpm docs:dev  # Start the documentation and playground server
 ```
 
-## Development
+Installation builds the timeline library, maintainer MCP, and user MCP. Run the two development commands in separate terminals when working on the library and playground together.
+
+## Build and Verify
 
 ```bash
-# Start dev server
-npm run dev
-
-# pnpm
-pnpm dev
+pnpm build          # Build the library and both MCP services
+pnpm docs:build     # Build documentation into doc_build/
+pnpm lint
+pnpm typecheck
+pnpm test:run       # Run library, playground and MCP regression tests
+pnpm test:watch
+pnpm test:coverage
+pnpm -C packages/mcp-service test:package
+pnpm -C packages/user-mcp-service test:package
 ```
 
-## Build
+`@vitest/coverage-v8` must match the Vitest version bundled with Vite+, currently 4.1.11. MCP semantic analysis requires the TypeScript 5/6 Compiler API, so the development dependency remains at 6.0.3; the TypeScript 7 native compiler is incompatible with that API.
 
-### Core Library
+## Vite+ Configuration
 
-```bash
-# Build the core library
-npm run build
-
-# Output goes to dist/
-# - timeline-core.js - core (includes the plugin system)
-# - timeline-core.min.js - minified build
-```
-
-### Docs
-
-```bash
-# Build docs
-npm run docs:build
-
-# Output goes to doc_build/
-```
-
-## Build Configuration
-
-### tsdown.config.ts
-
-The project uses tsdown for builds. Example config:
+Each package uses `vite.config.ts` with `defineConfig` from `vite-plus`. The `pack` block configures library builds; the `test` block configures tests. The root config combines the workspace test projects.
 
 ```typescript
+import { defineConfig } from "vite-plus";
+
 export default defineConfig({
-  entry: [
-    "src/index.ts", // main entry
-    "src/plugins/builtin/*.ts", // plugin entries
-  ],
-  format: ["esm", "cjs", "umd"],
-  dts: true,
-  clean: true,
-  minify: true,
-  external: ["three"], // externals
+  pack: {
+    entry: ["src/index.ts"],
+    outDir: "dist",
+    format: ["esm"],
+    target: "node20",
+    dts: true,
+    clean: true,
+    minify: true,
+  },
+  test: {
+    include: ["tests/**/*.spec.ts"],
+  },
 });
 ```
 
-### Standalone Plugin Entries
+Build, test and lint commands use `vp pack`, `vp test` and `vp lint`. Test APIs are imported from `vite-plus/test`. Vite+ supplies the build, test, lint and formatting tools, so standalone tsdown, Vitest and Oxlint dependencies are unnecessary. The direct `vite` dependency is an alias to the matching Vite+ core package. The V8 coverage provider remains a separate dependency matching the bundled Vitest version.
 
-Each plugin has its own entry so you can load it on demand:
+## Package Outputs
 
-```typescript
-// standalone plugin build entries
-export const pluginEntries = {
-  ContextMenuPlugin: "src/plugins/builtin/ContextMenuPlugin.ts",
-  PerformanceOverlayPlugin: "src/plugins/builtin/PerformanceOverlayPlugin.ts",
-  LightThemePlugin: "src/plugins/builtin/LightThemePlugin.ts",
-  DarkThemePlugin: "src/plugins/builtin/DarkThemePlugin.ts",
-  EventMediaPlugin: "src/plugins/builtin/EventMediaPlugin.ts",
-  MutexGuardPlugin: "src/plugins/builtin/MutexGuardPlugin.ts",
-};
+The timeline package emits ESM and declarations in `packages/timeline/dist/`:
+
+```text
+dist/
+  index.mjs
+  index.d.mts
+  builtin-plugin/
+    LightThemePlugin.mjs
+    LightThemePlugin.d.mts
+    ...
 ```
 
-## npm Package Layout
+Plugin entries are discovered from `src/builtin-plugin/*.ts` and imported using `timeline-canvas/builtin-plugin/LightThemePlugin`. Shared chunks also live in `dist/`. Library builds copy their output to `docs/public/dist/` for documentation examples.
 
-```
-timeline-canvas/
-├── dist/
-│   ├── timeline-core.js
-│   ├── timeline-core.min.js
-│   ├── timeline-core.d.ts
-│   └── plugins/
-│       ├── ContextMenuPlugin.js
-│       ├── PerformanceOverlayPlugin.js
-│       ├── LightThemePlugin.js
-│       ├── DarkThemePlugin.js
-│       ├── EventMediaPlugin.js
-│       ├── MutexGuardPlugin.js
-│       └── *.d.ts
-├── package.json
-└── README.md
-```
+Both MCP packages emit their own `dist/server.mjs`. The maintainer MCP includes its runtime `templates/` directory; the user MCP embeds its guides and templates in the program. Each package's `test:package` command verifies its tools from an unpacked npm tarball outside the source tree.

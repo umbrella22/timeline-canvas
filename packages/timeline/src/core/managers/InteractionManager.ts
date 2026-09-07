@@ -16,6 +16,7 @@ type InteractionMouseHandler = Pick<
   | "handleMouseDown"
   | "handleMouseMove"
   | "handleMouseUp"
+  | "handleCancel"
   | "handleContextMenu"
   | "destroy"
 >;
@@ -54,7 +55,18 @@ export class InteractionManager {
       mousedown: (event: MouseEvent) => this.mouseHandler.handleMouseDown(event),
       mousemove: (event: MouseEvent) => this.mouseHandler.handleMouseMove(event),
       mouseup: (event: MouseEvent) => this.mouseHandler.handleMouseUp(event),
-      mouseleave: () => this.mouseHandler.handleMouseUp(),
+      mouseleave: (event: MouseEvent) =>
+        this.mouseHandler.handleMouseUp(event),
+      pointerdown: (event: PointerEvent) =>
+        this.mouseHandler.handleMouseDown(event),
+      pointermove: (event: PointerEvent) =>
+        this.mouseHandler.handleMouseMove(event),
+      pointerup: (event: PointerEvent) =>
+        this.mouseHandler.handleMouseUp(event),
+      pointercancel: (event: PointerEvent) =>
+        this.mouseHandler.handleCancel(event),
+      lostpointercapture: (event: PointerEvent) =>
+        this.mouseHandler.handleCancel(event),
       contextmenu: (event: MouseEvent) =>
         this.mouseHandler.handleContextMenu(event),
       wheel: (event: WheelEvent) => this.wheelHandler.handleWheel(event),

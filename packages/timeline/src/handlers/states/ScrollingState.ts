@@ -95,6 +95,14 @@ export class ScrollingState extends BaseState {
     return this.createIdleState();
   }
 
+  handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    const state = this.timeline.state;
+    state.draggingScrollbar = false;
+    state.draggingHorizontalScrollbar = false;
+    this.timeline.setStatus(this.timeline.t("statusReady"));
+    return this.createIdleState();
+  }
+
   private createIdleState(): InteractionState {
     return new IdleState(this.timeline);
   }

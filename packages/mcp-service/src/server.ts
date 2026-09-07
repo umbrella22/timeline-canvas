@@ -28,6 +28,8 @@ async function main() {
   const server = new McpServer({
     name: "timeline-canvas-mcp",
     version,
+  }, {
+    instructions: "Repository maintenance for the timeline-canvas source workspace: builtin plugins, internal consistency, semantic queries, and refactors. Application integration and external plugin development are provided by the separate timeline-canvas-user-mcp server.",
   });
 
   // ─── P0: Scaffold Plugin (rewrite) ───

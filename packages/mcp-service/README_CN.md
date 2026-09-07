@@ -2,6 +2,13 @@
 
 这个 MCP server 通过 stdio 暴露一组面向本仓库的语义分析与重构辅助工具，适合配合 Copilot Chat 或 AI CLI 在 `timeline-canvas` 仓库内使用。
 
+| 使用场景 | npm 包 | 工作区 | 能力 |
+|---|---|---|---|
+| 维护或重构本仓库 | `timeline-canvas-mcp` | `timeline-canvas` 源码仓库 | 下文列出的内置插件、语义分析、一致性、性能、重构和迁移工具 |
+| 应用接入或外部插件开发 | `timeline-canvas-user-mcp` | 用户应用仓库 | 只读接入指南、返回给 agent 的插件模板、基于已安装公开 API 的校验 |
+
+默认只为当前工作区启用需要的一个 server；两个 server 不会自动注册彼此。应用团队请使用[用户 MCP README](../user-mcp-service/README_CN.md)或[完整用户指南](../../docs/zh/guide/user-mcp.md)。
+
 ## 工具
 
 ### P0 — 脚手架、校验与重构

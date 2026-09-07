@@ -52,8 +52,68 @@ function selectTemplate(pluginType: PluginTypeKey, features?: PluginFeature[]): 
 }
 
 const engine = new TemplateEngine();
+let scaffoldQueue: Promise<void> = Promise.resolve();
 
-export async function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
+function encodeStringLiteral(value: string): string {
+  return JSON.stringify(value);
+}
+
+async function readTemplate(fileName: string): Promise<string> {
+  try {
+    return await fs.readFile(path.join(TEMPLATES_DIR, fileName), "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
+  }
+
+  throw new Error(`Missing scaffold template: ${fileName} (searched ${TEMPLATES_DIR})`);
+}
+
+async function writeNewFile(filePath: string, content: string): Promise<void> {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, content, { encoding: "utf8", flag: "wx" });
+}
+
+async function replaceFileAtomically(filePath: string, content: string): Promise<void> {
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await fs.writeFile(temporaryPath, content, { encoding: "utf8", flag: "wx" });
+    await fs.rename(temporaryPath, filePath);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
+function addIndexExport(indexText: string, exportName: string): string | null {
+  const exportLine = `export { ${exportName} } from "./plugins/builtin/${exportName}";`;
+  if (indexText.includes(exportLine)) return null;
+
+  const lines = indexText.split(/\r?\n/);
+  let insertAt = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^export \{\s*\w+\s*\} from "\.\/plugins\/builtin\//.test(lines[i])) {
+      insertAt = i;
+    }
+  }
+  if (insertAt === -1) {
+    insertAt = lines.findIndex((line) => line.includes("export { Timeline }"));
+  }
+  if (insertAt === -1) insertAt = 0;
+  lines.splice(insertAt + 1, 0, exportLine);
+  return lines.join("\n");
+}
+
+export function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
+  const operation = scaffoldQueue.then(() => scaffoldPluginTransaction(args));
+  scaffoldQueue = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return operation;
+}
+
+async function scaffoldPluginTransaction(args: ScaffoldInput): Promise<string> {
   const {
     exportName,
     pluginType,
@@ -65,51 +125,33 @@ export async function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
   } = args;
 
   const metadataName = args.metadataName ?? kebabCase(exportName);
-  const description =
-    args.description ??
-    `Builtin plugin: ${exportName} (${pluginType})`;
+  const description = args.description ?? `Builtin plugin: ${exportName} (${pluginType})`;
 
-  // Paths
   const implRel = `packages/timeline/src/plugins/builtin/${exportName}.ts`;
   const reexportRel = `packages/timeline/src/builtin-plugin/${exportName}.ts`;
   const indexRel = `packages/timeline/src/index.ts`;
-  const testRel = `packages/timeline/tests/${exportName}.test.ts`;
+  const testRel = `packages/timeline/tests/${exportName}.spec.ts`;
 
   const implPath = resolveInWorkspace(implRel);
   const reexportPath = resolveInWorkspace(reexportRel);
   const indexPath = resolveInWorkspace(indexRel);
   const testPath = resolveInWorkspace(testRel);
 
-  // Guard: already exists
-  if (await pathExists(implPath)) {
-    throw new Error(`Already exists: ${implRel}`);
-  }
-  if (withReexport && (await pathExists(reexportPath))) {
-    throw new Error(`Already exists: ${reexportRel}`);
-  }
-
-  const createdFiles: string[] = [];
-
-  // 1. Generate plugin implementation from template
   const templateFile = selectTemplate(pluginType, features);
-  let templateContent: string;
-  try {
-    templateContent = await fs.readFile(
-      path.join(TEMPLATES_DIR, templateFile),
-      "utf8"
-    );
-  } catch {
-    // Fallback: if running from dist, templates might be in a different location
-    // Use the basic inline template as fallback
-    templateContent = generateFallbackTemplate(pluginType);
-  }
+  const templateContent = await readTemplate(templateFile);
+  const testTemplate = withTest ? await readTemplate("test.template") : null;
 
   const vars: Record<string, string | boolean> = {
     EXPORT_NAME: exportName,
-    METADATA_NAME: metadataName,
-    VERSION: version,
-    DESCRIPTION: description.replace(/"/g, '\\"'),
+    EXPORT_NAME_LITERAL: encodeStringLiteral(exportName),
+    METADATA_NAME_LITERAL: encodeStringLiteral(metadataName),
+    VERSION_LITERAL: encodeStringLiteral(version),
+    DESCRIPTION_LITERAL: encodeStringLiteral(description),
+    RENDER_LAYER_NAME_LITERAL: encodeStringLiteral(`${metadataName}-layer`),
+    MEDIA_CACHE_KEY_LITERAL: encodeStringLiteral(`${metadataName}_cache`),
+    MEDIA_HANDLER_KEY_LITERAL: encodeStringLiteral(`${metadataName}_handler`),
     PLUGIN_TYPE_KEY: enumKeyFromPluginType(pluginType),
+    factoryPlugin: templateFile === "plugin-media.template",
     hasInit: features.includes("init"),
     renderLayer: features.includes("renderLayer"),
     eventHandler: features.includes("eventHandler"),
@@ -118,69 +160,69 @@ export async function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
   };
 
   const implContent = engine.render(templateContent, vars);
-  await fs.mkdir(path.dirname(implPath), { recursive: true });
-  await fs.writeFile(implPath, implContent, "utf8");
-  createdFiles.push(implRel);
+  const filesToCreate = [
+    { relativePath: implRel, filePath: implPath, content: implContent },
+    ...(withReexport
+      ? [
+          {
+            relativePath: reexportRel,
+            filePath: reexportPath,
+            content: `export { ${exportName} } from "../plugins/builtin/${exportName}";\n`,
+          },
+        ]
+      : []),
+    ...(withTest && testTemplate
+      ? [
+          {
+            relativePath: testRel,
+            filePath: testPath,
+            content: engine.render(testTemplate, vars),
+          },
+        ]
+      : []),
+  ];
 
-  // 2. Generate re-export
-  if (withReexport) {
-    const reexportContent = `export { ${exportName} } from "../plugins/builtin/${exportName}";\n`;
-    await fs.mkdir(path.dirname(reexportPath), { recursive: true });
-    await fs.writeFile(reexportPath, reexportContent, "utf8");
-    createdFiles.push(reexportRel);
-  }
+  const indexText = withIndexExport
+    ? await fs.readFile(indexPath, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") throw new Error(`Missing: ${indexRel}`);
+        throw error;
+      })
+    : null;
+  const updatedIndexText = indexText === null ? null : addIndexExport(indexText, exportName);
 
-  // 3. Update src/index.ts
-  let indexUpdated = false;
-  if (withIndexExport) {
-    if (!(await pathExists(indexPath))) {
-      throw new Error(`Missing: ${indexRel}`);
-    }
-    const indexText = await fs.readFile(indexPath, "utf8");
-    const exportLine = `export { ${exportName} } from "./plugins/builtin/${exportName}";`;
-    if (!indexText.includes(exportLine)) {
-      const lines = indexText.split(/\r?\n/);
-      let insertAt = -1;
-      // Find last builtin plugin export line
-      for (let i = 0; i < lines.length; i++) {
-        if (
-          /^export \{\s*\w+\s*\} from "\.\/plugins\/builtin\//.test(lines[i])
-        ) {
-          insertAt = i;
+  const existing = await Promise.all(
+    filesToCreate.map(async (file) =>
+      (await pathExists(file.filePath)) ? file.relativePath : null,
+    ),
+  );
+  const existingPath = existing.find((file): file is string => file !== null);
+  if (existingPath) throw new Error(`Already exists: ${existingPath}`);
+
+  const createdFiles: string[] = [];
+  try {
+    for (const file of filesToCreate) {
+      try {
+        await writeNewFile(file.filePath, file.content);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+          throw new Error(`Already exists: ${file.relativePath}`);
         }
+        throw error;
       }
-      if (insertAt === -1) {
-        // Fallback: after Timeline export
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes('export { Timeline }')) {
-            insertAt = i;
-            break;
-          }
-        }
-      }
-      if (insertAt === -1) insertAt = 0;
-      lines.splice(insertAt + 1, 0, exportLine);
-      await fs.writeFile(indexPath, lines.join("\n"), "utf8");
-      indexUpdated = true;
+      createdFiles.push(file.relativePath);
     }
+
+    if (updatedIndexText !== null) {
+      await replaceFileAtomically(indexPath, updatedIndexText);
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      createdFiles.map((relativePath) => fs.rm(resolveInWorkspace(relativePath))),
+    );
+    throw error;
   }
 
-  // 4. Generate test file (optional)
-  if (withTest) {
-    let testTemplate: string;
-    try {
-      testTemplate = await fs.readFile(
-        path.join(TEMPLATES_DIR, "test.template"),
-        "utf8"
-      );
-    } catch {
-      testTemplate = generateFallbackTestTemplate();
-    }
-    const testContent = engine.render(testTemplate, vars);
-    await fs.mkdir(path.dirname(testPath), { recursive: true });
-    await fs.writeFile(testPath, testContent, "utf8");
-    createdFiles.push(testRel);
-  }
+  const indexUpdated = updatedIndexText !== null;
 
   // Build result message
   const lines: string[] = [
@@ -199,7 +241,7 @@ export async function scaffoldPlugin(args: ScaffoldInput): Promise<string> {
     lines.push(`  2. Write tests in ${testRel}`);
   }
   lines.push(
-    `  ${withTest ? "3" : "2"}. Run typecheck to verify: pnpm --filter timeline typecheck`
+    `  ${withTest ? "3" : "2"}. Run typecheck to verify: pnpm --filter timeline-canvas typecheck`,
   );
 
   return lines.join("\n");
@@ -212,88 +254,4 @@ export async function listBuiltinPlugins(): Promise<string> {
   const names = await getBuiltinPluginNames();
   if (names.length === 0) return "No builtin plugins found.";
   return names.join("\n");
-}
-
-// ─── Fallback templates (when file templates are not available) ───
-
-function generateFallbackTemplate(pluginType: PluginTypeKey): string {
-  if (pluginType === "theme") {
-    return [
-      'import type { TimelinePlugin } from "../../plugins/types";',
-      'import { PluginType } from "../../plugins/types";',
-      "",
-      "export const {{EXPORT_NAME}}: TimelinePlugin = {",
-      "  metadata: {",
-      '    name: "{{METADATA_NAME}}",',
-      '    version: "{{VERSION}}",',
-      '    description: "{{DESCRIPTION}}",',
-      "    type: PluginType.THEME,",
-      "  },",
-      "  activate(_context) {",
-      "    // TODO: apply theme colors",
-      "  },",
-      "  deactivate(_context) {",
-      "    // Theme cleanup",
-      "  },",
-      "};",
-      "",
-    ].join("\n");
-  }
-
-  return [
-    'import type { TimelinePlugin } from "../../plugins/types";',
-    'import { PluginType } from "../../plugins/types";',
-    "",
-    "export const {{EXPORT_NAME}}: TimelinePlugin = {",
-    "  metadata: {",
-    '    name: "{{METADATA_NAME}}",',
-    '    version: "{{VERSION}}",',
-    '    description: "{{DESCRIPTION}}",',
-    "    type: PluginType.{{PLUGIN_TYPE_KEY}},",
-    "  },",
-    "{{#IF hasInit}}",
-    "  async init(_context) {",
-    "    // TODO: initialization logic",
-    "  },",
-    "{{/IF}}",
-    "  activate(_context) {",
-    "{{#IF renderLayer}}",
-    '    _context.api.registerRenderLayer({',
-    '      name: "{{METADATA_NAME}}-layer",',
-    '      position: "overlay",',
-    "      render: (_ctx, _canvas, _config, _state) => {",
-    "        // TODO: implement render",
-    "      },",
-    "    });",
-    "{{/IF}}",
-    "{{#IF eventHandler}}",
-    "    // TODO: register event handlers",
-    "{{/IF}}",
-    "  },",
-    "  deactivate(_context) {",
-    "{{#IF renderLayer}}",
-    '    _context.api.unregisterRenderLayer("{{METADATA_NAME}}-layer");',
-    "{{/IF}}",
-    "  },",
-    "{{#IF lifecycle}}",
-    "  destroy(_context) {",
-    "    // TODO: cleanup resources",
-    "  },",
-    "{{/IF}}",
-    "};",
-    "",
-  ].join("\n");
-}
-
-function generateFallbackTestTemplate(): string {
-  return [
-    'import { describe, it, expect } from "vitest";',
-    "",
-    'describe("{{EXPORT_NAME}}", () => {',
-    '  it("should have correct metadata", () => {',
-    "    expect(true).toBe(true);",
-    "  });",
-    "});",
-    "",
-  ].join("\n");
 }

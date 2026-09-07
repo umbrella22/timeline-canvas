@@ -150,11 +150,12 @@ pnpm docs:dev
 
 ## MCP (for VS Code Copilot Chat)
 
-This repo includes a minimal MCP server (stdio) so an AI agent can scaffold builtin plugins, wire exports, run basic validation, and trigger a small allowlisted set of pnpm scripts.
+Two independent stdio servers serve different development tasks:
 
-- Install & start (recommended): `pnpm install` then `pnpm mcp`
-- VS Code sample config: see .vscode/mcp.json
-- Docs: see packages/mcp-service/README.md (or README_CN.md)
+- [Maintainer MCP](packages/mcp-service/README.md): `timeline-canvas-mcp` provides 10 tools for repository checks, builtin plugin scaffolding, and refactoring. Start a source checkout with `pnpm mcp`.
+- [User MCP](packages/user-mcp-service/README.md): `timeline-canvas-user-mcp` provides exactly three read-only tools for integration guides, external plugin generation, and validation against installed public types. Start the npm package with `MCP_WORKSPACE_ROOT=/path/to/application npx -y timeline-canvas-user-mcp@latest`; use `pnpm mcp:user` when developing from source.
+
+Enable the server appropriate to the target project. See each README for client configuration.
 
 ## License
 

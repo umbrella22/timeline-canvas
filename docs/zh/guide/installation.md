@@ -2,107 +2,78 @@
 title: 安装与构建
 ---
 
-本页介绍本仓库的开发/构建命令（与 NPM 包 `timeline-canvas` 的安装是两回事）。
+本页介绍本仓库的开发流程。在应用中使用发布后的库，请安装 `timeline-canvas`。
 
 ## 开发环境要求
 
-- Node.js >= 20.17.0
-- npm >= 9.0.0 或 pnpm >= 10.0.0
+- Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`；CI 使用 24.20.0。测试环境 jsdom 30 要求这些最低版本。
+- pnpm 10.34.5，与 `package.json` 中声明的版本一致。
 
-## 安装依赖
+## 安装与开发
 
 ```bash
-# 使用 npm
-npm install
-
-# 使用 pnpm
 pnpm install
+pnpm dev       # 监听并重新构建时间轴库
+pnpm docs:dev  # 启动文档和演练场服务器
 ```
 
-## 开发模式
+安装过程会构建时间轴库、维护者 MCP 和使用者 MCP。需要同时开发库与演练场时，在不同终端运行两个开发命令。
+
+## 构建与检查
 
 ```bash
-# 启动开发服务器
-npm run dev
-
-# 使用 pnpm
-pnpm dev
+pnpm build          # 构建时间轴库和两个 MCP 服务
+pnpm docs:build     # 将文档构建到 doc_build/
+pnpm lint
+pnpm typecheck
+pnpm test:run       # 运行库、演练场和 MCP 回归测试
+pnpm test:watch
+pnpm test:coverage
+pnpm -C packages/mcp-service test:package
+pnpm -C packages/user-mcp-service test:package
 ```
 
-## 构建项目
+覆盖率插件 `@vitest/coverage-v8` 必须与 Vite+ 内置的 Vitest 版本一致，目前均为 4.1.11。MCP 语义分析依赖 TypeScript 5/6 的 Compiler API，开发依赖保留在 6.0.3；TypeScript 7 的原生编译器与旧 API 不兼容。
 
-### 核心库构建
+## Vite+ 配置
 
-```bash
-# 构建核心库
-npm run build
-
-# 构建结果输出到 dist/ 目录
-# - timeline-core.js - 核心库（包含插件系统）
-# - timeline-core.min.js - 压缩版本
-```
-
-### 文档构建
-
-```bash
-# 构建文档
-npm run docs:build
-
-# 文档输出到 doc_build/ 目录
-```
-
-## 构建配置
-
-### tsdown.config.ts
-
-项目使用 tsdown 进行构建，支持以下配置：
+每个包使用 `vite.config.ts`，从 `vite-plus` 导入 `defineConfig`。`pack` 配置库构建，`test` 配置测试；根配置汇总工作区中的测试项目。
 
 ```typescript
+import { defineConfig } from "vite-plus";
+
 export default defineConfig({
-  entry: [
-    "src/index.ts", // 主入口
-    "src/plugins/builtin/*.ts", // 插件入口
-  ],
-  format: ["esm", "cjs", "umd"],
-  dts: true,
-  clean: true,
-  minify: true,
-  external: ["three"], // 外部依赖
+  pack: {
+    entry: ["src/index.ts"],
+    outDir: "dist",
+    format: ["esm"],
+    target: "node20",
+    dts: true,
+    clean: true,
+    minify: true,
+  },
+  test: {
+    include: ["tests/**/*.spec.ts"],
+  },
 });
 ```
 
-### 独立插件入口
+构建、测试和检查分别使用 `vp pack`、`vp test`、`vp lint`，测试 API 从 `vite-plus/test` 导入。Vite+ 已提供构建、测试、检查和格式化工具，因此不再独立依赖 tsdown、Vitest、Oxlint。直接声明的 `vite` 是对应版本 Vite+ 核心包的别名。V8 覆盖率插件仍需单独安装，并与内置 Vitest 保持版本一致。
 
-每个插件都有独立的构建入口，支持按需加载：
+## 包输出
 
-```typescript
-// 插件独立构建配置
-export const pluginEntries = {
-  ContextMenuPlugin: "src/plugins/builtin/ContextMenuPlugin.ts",
-  PerformanceOverlayPlugin: "src/plugins/builtin/PerformanceOverlayPlugin.ts",
-  LightThemePlugin: "src/plugins/builtin/LightThemePlugin.ts",
-  DarkThemePlugin: "src/plugins/builtin/DarkThemePlugin.ts",
-  EventMediaPlugin: "src/plugins/builtin/EventMediaPlugin.ts",
-  MutexGuardPlugin: "src/plugins/builtin/MutexGuardPlugin.ts",
-};
+时间轴包在 `packages/timeline/dist/` 中输出 ESM 和类型声明：
+
+```text
+dist/
+  index.mjs
+  index.d.mts
+  builtin-plugin/
+    LightThemePlugin.mjs
+    LightThemePlugin.d.mts
+    ...
 ```
 
-## NPM 包结构
+插件入口从 `src/builtin-plugin/*.ts` 自动发现，通过 `timeline-canvas/builtin-plugin/LightThemePlugin` 等路径导入。公共代码块也位于 `dist/`。库构建会将产物复制到 `docs/public/dist/`，供文档示例使用。
 
-```
-timeline-canvas/
-├── dist/
-│   ├── timeline-core.js
-│   ├── timeline-core.min.js
-│   ├── timeline-core.d.ts
-│   └── plugins/
-│       ├── ContextMenuPlugin.js
-│       ├── PerformanceOverlayPlugin.js
-│       ├── LightThemePlugin.js
-│       ├── DarkThemePlugin.js
-│       ├── EventMediaPlugin.js
-│       ├── MutexGuardPlugin.js
-│       └── *.d.ts
-├── package.json
-└── README.md
-```
+两个 MCP 包分别输出自己的 `dist/server.mjs`。维护者 MCP 携带运行时需要的 `templates/` 目录；使用者 MCP 将指南和模板内置在程序中。各包的 `test:package` 命令在源码目录之外解包 npm tarball，验证对应工具。

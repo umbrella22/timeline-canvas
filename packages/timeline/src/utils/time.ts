@@ -23,7 +23,12 @@ export function getSnapInterval(
   scale?: number | null,
   scaleSplitCount?: number
 ): number {
-  // 如果设置了自定义刻度，优先使用刻度细分间隔
+  // 秒级编辑精度独立于可视刻度和缩放级别。
+  if (snapToSeconds) {
+    return 1;
+  }
+
+  // 关闭秒级吸附后，保留自定义刻度的吸附规则。
   if (scale != null && scale > 0) {
     const splitCount = Math.max(1, Math.floor(scaleSplitCount ?? 10));
     const subInterval = scale / splitCount;
@@ -34,20 +39,7 @@ export function getSnapInterval(
     return scale; // 低缩放：吸附到主刻度
   }
 
-  if (!snapToSeconds || zoomLevel < secondPrecisionThreshold) {
-    return snapInterval * 60;
-  }
-  const snapConfigs = [
-    { threshold: 10, seconds: 0.5 },
-    { threshold: 8, seconds: 1 },
-    { threshold: 5, seconds: 2 },
-    { threshold: 3, seconds: 5 },
-    { threshold: 2, seconds: 10 },
-    { threshold: 1.5, seconds: 15 },
-    { threshold: 0, seconds: 30 },
-  ];
-  const config = snapConfigs.find((c) => zoomLevel >= c.threshold);
-  return (config?.seconds ?? 30);
+  return snapInterval * 60;
 }
 
 export function snapToInterval(seconds: number, snapInterval: number): number {

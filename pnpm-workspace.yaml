@@ -1,2 +1,12 @@
 packages:
   - 'packages/*'
+
+overrides:
+  'vite@*': npm:@voidzero-dev/vite-plus-core@0.3.0
+  'vitest@*': 4.1.11
+
+# The Vite+ alias is versioned independently from its bundled Vite 8 runtime.
+peerDependencyRules:
+  allowedVersions:
+    'vitest>vite': '0.3.0'
+    '@vitest/mocker>vite': '0.3.0'

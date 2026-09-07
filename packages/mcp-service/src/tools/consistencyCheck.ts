@@ -247,7 +247,7 @@ async function checkChangeTypes(): Promise<CheckResult> {
   // Check each ChangeType value has a corresponding handler .set("xxx", {...})
   for (const v of values) {
     const handlerPattern = new RegExp(
-      `\.set\\s*\\(\\s*["']${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`
+      `.set\\s*\\(\\s*["']${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`
     );
     const casePattern = new RegExp(`["']${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
     if (!handlerPattern.test(schedulerFile) && !casePattern.test(schedulerFile)) {

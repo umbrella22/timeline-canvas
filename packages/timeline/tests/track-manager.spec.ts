@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { TrackManager } from "../src/core/managers/TrackManager";
 import { StateManager } from "../src/core/managers/StateManager";

@@ -8,6 +8,13 @@ on:
       - "pnpm-workspace.yaml"
       - ".github/workflows/timeline-ci.yml"
       - "packages/timeline/**"
+      - "packages/mcp-service/**"
+      - "packages/user-mcp-service/**"
+      - "docs/**"
+      - "scripts/**"
+      - "rspress.config.ts"
+      - "vite.config.ts"
+      - "tsconfig.docs.json"
   push:
     branches:
       - main
@@ -18,6 +25,13 @@ on:
       - "pnpm-workspace.yaml"
       - ".github/workflows/timeline-ci.yml"
       - "packages/timeline/**"
+      - "packages/mcp-service/**"
+      - "packages/user-mcp-service/**"
+      - "docs/**"
+      - "scripts/**"
+      - "rspress.config.ts"
+      - "vite.config.ts"
+      - "tsconfig.docs.json"
 
 jobs:
   verify:
@@ -32,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version: "24.20.0"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -49,3 +63,12 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Build docs
+        run: pnpm docs:build
+
+      - name: Verify MCP package
+        run: pnpm -C packages/mcp-service test:package
+
+      - name: Verify user MCP package
+        run: pnpm -C packages/user-mcp-service test:package

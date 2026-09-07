@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 
 type PropertyStore = Record<PropertyKey, unknown>;
 

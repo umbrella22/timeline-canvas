@@ -1,10 +1,17 @@
 ---
-title: MCP 服务（面向 Copilot Chat / AI CLI）
+title: 维护者 MCP 服务
 ---
 
 > 本仓库提供一个 stdio MCP server，让 Copilot Chat / AI CLI 以“工具调用”的方式与仓库交互。
 
 本页给出启动方式、配置示例与推荐工作流。
+
+| 使用场景 | npm 包 | 工作区 | 能力 |
+|---|---|---|---|
+| 维护或重构本仓库 | `timeline-canvas-mcp` | `timeline-canvas` 源码仓库 | 内置插件工具、语义分析、一致性检查、重构、性能标注和迁移检查 |
+| 应用接入或外部插件开发 | `timeline-canvas-user-mcp` | 用户应用仓库 | 只读接入指南、返回给 agent 的插件模板、基于已安装公开 API 的校验 |
+
+默认只为当前工作区启用需要的一个 server。两个 server 绝不会自动注册彼此。应用接入和外部插件开发请使用[用户 MCP 指南](./user-mcp.md)。
 
 - **脚手架**：基于模板生成内置插件骨架，支持特性选择和测试文件生成
 - **校验**：深度检查插件完整性（metadata 字段、activate/deactivate 配对、TODO 扫描、清理告警）

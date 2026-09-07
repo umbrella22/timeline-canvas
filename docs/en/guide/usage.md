@@ -118,7 +118,7 @@ timeline.deleteEvent(0, 0);
 import { PerformanceOverlayPlugin } from "timeline-canvas";
 
 // Basic usage
-timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(PerformanceOverlayPlugin);
 
 // The performance overlay and debug mode are controlled by TimelineConfig:
 // enablePerformanceMonitor: true
@@ -256,7 +256,7 @@ interface ContextMenuData {
 
 ```javascript
 // Initialize with light theme
-timeline.usePlugin(LightThemePlugin);
+await timeline.usePlugin(LightThemePlugin);
 
 // Switch to dark theme at runtime
 timeline.setTheme("dark");
@@ -276,4 +276,3 @@ window.addEventListener("resize", () => {
   }
 });
 ```
-

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { StateManager } from "../src/core/managers/StateManager";
 import { TimeIndicatorController } from "../src/core/managers/TimeIndicatorController";
@@ -81,12 +81,23 @@ describe("TimeIndicatorController", () => {
 
     expect(result).toEqual({
       changed: true,
-      position: 30,
+      position: 25,
     });
-    expect(state.timeIndicatorPosition).toBe(30);
-    expect(state.scrollX).toBe(450);
+    expect(state.timeIndicatorPosition).toBe(25);
+    expect(state.scrollX).toBe(350);
     expect(renderManager.computeMaxScrollX).toHaveBeenCalledWith(2);
     expect(renderManager.markDirty).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0.5, 1, 2, 10])("缩放 %s 下按秒定位并支持跳过吸附", (zoomLevel) => {
+    const { controller } = createController({
+      config: { scale: 60, scaleSplitCount: 4 },
+      zoomLevel,
+      snapEnabled: true,
+    });
+
+    expect(controller.setPosition(37.6, true).position).toBe(38);
+    expect(controller.setPosition(37.6, false).position).toBe(37.6);
   });
 
   it("位置未变化时跳过滚动和脏层标记", () => {

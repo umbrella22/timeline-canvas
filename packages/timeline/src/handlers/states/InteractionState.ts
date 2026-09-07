@@ -59,6 +59,11 @@ export interface InteractionState {
   handleMouseUp(ctx: MouseEventContext): InteractionState | null;
 
   /**
+   * 处理被浏览器取消的指针交互
+   */
+  handleCancel(ctx: MouseEventContext): InteractionState | null;
+
+  /**
    * 处理右键菜单事件
    * @returns 可能返回新的状态,如果返回 null 则保持当前状态
    */
@@ -104,6 +109,10 @@ export abstract class BaseState implements InteractionState {
   }
 
   handleMouseUp(_ctx: MouseEventContext): InteractionState | null {
+    return null;
+  }
+
+  handleCancel(_ctx: MouseEventContext): InteractionState | null {
     return null;
   }
 

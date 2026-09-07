@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { Timeline } from "../src";
 import { IdleState } from "../src/handlers/states/IdleState";
@@ -128,6 +128,64 @@ describe("IdleState", () => {
     expect(timeline.state.draggingEvent).toBeNull();
     expect(timeline.state.selectedEvent).toEqual({ trackIndex: 0, eventIndex: 0 });
     expect(onEventClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("全局只读在 UI 边界阻止双击切割但保留程序化切割 API", () => {
+    const timeline = createTimeline({ readOnly: true, enableEventSplit: true });
+    const idleState = new IdleState(timeline);
+
+    timeline.loadData({
+      tracks: [
+        {
+          events: [{ startTime: 10, endTime: 20, title: "普通事件" }],
+        },
+      ],
+    });
+
+    idleState.handleMouseDown(createMouseContext(150, 30));
+    idleState.handleMouseDown(createMouseContext(150, 30));
+
+    expect(timeline.state.tracks[0].events).toHaveLength(1);
+    expect(timeline.splitEvent(0, 0, 15)).toBe(true);
+    expect(timeline.state.tracks[0].events).toHaveLength(2);
+  });
+
+  it("事件只读阻止双击切割", () => {
+    const timeline = createTimeline({ enableEventSplit: true });
+    const idleState = new IdleState(timeline);
+
+    timeline.loadData({
+      tracks: [
+        {
+          events: [
+            { startTime: 10, endTime: 20, title: "只读事件", readonly: true },
+          ],
+        },
+      ],
+    });
+
+    idleState.handleMouseDown(createMouseContext(150, 30));
+    idleState.handleMouseDown(createMouseContext(150, 30));
+
+    expect(timeline.state.tracks[0].events).toHaveLength(1);
+  });
+
+  it("可编辑事件仍可通过双击切割", () => {
+    const timeline = createTimeline({ enableEventSplit: true });
+    const idleState = new IdleState(timeline);
+
+    timeline.loadData({
+      tracks: [
+        {
+          events: [{ startTime: 10, endTime: 20, title: "可编辑事件" }],
+        },
+      ],
+    });
+
+    idleState.handleMouseDown(createMouseContext(150, 30));
+    idleState.handleMouseDown(createMouseContext(150, 30));
+
+    expect(timeline.state.tracks[0].events).toHaveLength(2);
   });
 
   it("点击菜单外部时关闭上下文菜单", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { ChangeScheduler } from "../src/core/managers/ChangeScheduler";
 import { StateManager } from "../src/core/managers/StateManager";

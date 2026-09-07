@@ -1,5 +1,15 @@
 # timeline-canvas
 
+## 1.5.0
+
+### Minor Changes
+
+- Improve Canvas clarity across device pixel ratios and container resizes.
+- Keep dragging, resizing, and time-indicator snapping accurate to one second at every zoom level, with configurable snap intervals.
+- Return a Promise from `Timeline.destroy()` so callers can await plugin cleanup. Use `await timeline.destroy()` when subsequent work depends on teardown completing.
+- Fix plugin resource ownership, media rendering, event indexing, and pointer handling regressions.
+- Migrate build and test tooling to Vite+ and update dependencies.
+
 ## 1.4.1
 
 ### New Features

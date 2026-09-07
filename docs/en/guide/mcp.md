@@ -1,10 +1,17 @@
 ---
-title: MCP Service (for Copilot Chat / AI CLI)
+title: Maintainer MCP Service
 ---
 
 > This repository provides a stdio MCP server so Copilot Chat / AI CLI can interact with the repo via tool calls.
 
 This page covers how to start it, configuration examples, and recommended workflows.
+
+| Choose | Package | Workspace | Purpose |
+|---|---|---|---|
+| Maintain or refactor this repository | `timeline-canvas-mcp` | The `timeline-canvas` source repository | Built-in plugin tooling, semantic analysis, consistency checks, refactors, performance annotations, and migrations |
+| Integrate the library or develop an external plugin | `timeline-canvas-user-mcp` | Your application repository | Read-only guides, returned plugin templates, and validation against the installed public API |
+
+Enable only the server needed for the current workspace by default. The servers never register each other automatically. For application integration and external plugins, use the [user MCP guide](./user-mcp.md).
 
 - **Scaffolding**: Generate built-in plugin skeletons from templates, with feature selection and optional test stubs
 - **Validation**: Deep plugin integrity checks (metadata fields, activate/deactivate pairing, TODO scan, cleanup warnings)

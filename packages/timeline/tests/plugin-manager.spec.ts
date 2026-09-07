@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { PluginManager } from "../src/core/managers/PluginManager";
 import { StateManager } from "../src/core/managers/StateManager";
@@ -43,9 +43,7 @@ function createBaseContext(debug = false): Omit<PluginContext, "api"> {
   };
 }
 
-function createPlugin(
-  overrides: Partial<TimelinePlugin> = {}
-): TimelinePlugin {
+function createPlugin(overrides: Partial<TimelinePlugin> = {}): TimelinePlugin {
   return {
     metadata: {
       name: "test-plugin",
@@ -62,18 +60,127 @@ function getPluginId(plugin: TimelinePlugin): string {
 }
 
 describe("PluginManager", () => {
+  it.each(["init", "activate"] as const)(
+    "waits for pending %s and rolls back resources on destroy",
+    async (phase) => {
+      const manager = new PluginManager(createBaseContext());
+      let release!: () => void;
+      let entered!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const handler = vi.fn();
+      const deactivate = vi.fn();
+      const destroy = vi.fn();
+      const plugin = createPlugin({
+        [phase]: (context: PluginContext) => {
+          context.api.registerEventHandler("pending:event", handler);
+          entered();
+          return gate;
+        },
+        deactivate,
+        destroy,
+      });
+      const loading = manager.loadPlugin(plugin);
+      await started;
+      const disposal = manager.destroy();
+      expect(manager.destroy()).toBe(disposal);
+      await expect(manager.loadPlugin(plugin)).resolves.toBe(false);
+      release();
+      await disposal;
+      await expect(loading).resolves.toBe(false);
+      manager.emitEvent("pending:event");
+      expect(handler).not.toHaveBeenCalled();
+      expect(manager.getLoadedPlugins()).toEqual([]);
+      expect(deactivate).toHaveBeenCalledTimes(phase === "activate" ? 1 : 0);
+      expect(destroy).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("cleans all plugins in reverse order even when a lifecycle hook fails", async () => {
+    const manager = new PluginManager(createBaseContext());
+    const calls: string[] = [];
+    const handler = vi.fn();
+    await manager.loadPlugin(
+      createPlugin({
+        activate(context) {
+          context.api.registerEventHandler("disposed", handler);
+        },
+        deactivate() {
+          calls.push("base:deactivate");
+        },
+        destroy() {
+          calls.push("base:destroy");
+        },
+      }),
+    );
+    await manager.loadPlugin(
+      createPlugin({
+        metadata: { ...createPlugin().metadata, name: "dependent", dependencies: ["test-plugin"] },
+        deactivate() {
+          calls.push("dependent:deactivate");
+          throw new Error("cleanup error");
+        },
+        destroy() {
+          calls.push("dependent:destroy");
+        },
+      }),
+    );
+    await manager.destroy();
+    await manager.destroy();
+    manager.emitEvent("disposed");
+    expect(handler).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      "dependent:deactivate",
+      "dependent:destroy",
+      "base:deactivate",
+      "base:destroy",
+    ]);
+    expect(manager.getLoadedPlugins()).toEqual([]);
+  });
+
+  it("reserves plugin IDs while asynchronous activation is pending", async () => {
+    const manager = new PluginManager(createBaseContext());
+    const activate = vi.fn();
+    const plugin = createPlugin({ activate });
+    const first = manager.loadPlugin(plugin);
+    await expect(manager.loadPlugin(plugin)).resolves.toBe(false);
+    await expect(first).resolves.toBe(true);
+    expect(activate).toHaveBeenCalledTimes(1);
+    await manager.destroy();
+  });
+
+  it("keeps a plugin ID reserved during reentrant deactivation", async () => {
+    const manager = new PluginManager(createBaseContext());
+    let reloaded: boolean | undefined;
+    const plugin = createPlugin({
+      async deactivate() {
+        reloaded = await manager.loadPlugin(createPlugin());
+      },
+    });
+    await manager.loadPlugin(plugin);
+    const unloading = manager.unloadPlugin(getPluginId(plugin));
+    expect(manager.unloadPlugin(getPluginId(plugin))).toBe(unloading);
+    await expect(unloading).resolves.toBe(true);
+    expect(reloaded).toBe(false);
+    expect(manager.getLoadedPlugins()).toEqual([]);
+    await expect(manager.loadPlugin(createPlugin())).resolves.toBe(true);
+    await manager.destroy();
+  });
+
   it("在非 debug 模式下对加载失败保持安全失败", async () => {
     const manager = new PluginManager(createBaseContext(false));
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const result = await manager.loadPlugin(
       createPlugin({
         init() {
           throw new Error("boom");
         },
-      })
+      }),
     );
 
     expect(result).toBe(false);
@@ -83,16 +190,14 @@ describe("PluginManager", () => {
 
   it("在 debug 模式下记录插件加载错误上下文", async () => {
     const manager = new PluginManager(createBaseContext(true));
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const result = await manager.loadPlugin(
       createPlugin({
         activate() {
           throw new Error("boom");
         },
-      })
+      }),
     );
 
     expect(result).toBe(false);
@@ -102,9 +207,7 @@ describe("PluginManager", () => {
 
   it("在卸载失败后返回 false 并完成资源清理", async () => {
     const manager = new PluginManager(createBaseContext(true));
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const plugin = createPlugin({
       deactivate() {
         throw new Error("boom");
@@ -131,7 +234,7 @@ describe("PluginManager", () => {
           });
           storedValue = context.api.getData("value");
         },
-      })
+      }),
     );
 
     expect(result).toBe(true);
@@ -140,9 +243,7 @@ describe("PluginManager", () => {
 
   it("在事件处理器抛错时保持安全失败语义", async () => {
     const manager = new PluginManager(createBaseContext(true));
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await manager.loadPlugin(
       createPlugin({
@@ -151,7 +252,7 @@ describe("PluginManager", () => {
             throw new Error("boom");
           });
         },
-      })
+      }),
     );
 
     expect(() => manager.emitEvent("test:event", { id: 1 })).not.toThrow();
@@ -338,19 +439,12 @@ describe("PluginManager", () => {
 
     expect(calls.slice(0, 2)).toEqual(["high:event", "low:event"]);
     expect(calls.slice(2, 4)).toEqual(["high:layer", "low:layer"]);
-    expect(calls.slice(4)).toEqual([
-      "high:hook",
-      "default:hook",
-      "low:hook",
-      "default:hook",
-    ]);
+    expect(calls.slice(4)).toEqual(["high:hook", "default:hook", "low:hook", "default:hook"]);
   });
 
   it("在依赖插件未加载时拒绝加载并在依赖满足后允许加载", async () => {
     const manager = new PluginManager(createBaseContext(true));
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const dependencyPlugin = createPlugin({
       metadata: {
         name: "base-plugin",

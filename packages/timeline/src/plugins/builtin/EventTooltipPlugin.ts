@@ -35,16 +35,11 @@ interface TooltipState {
   eventIndex: number;
 }
 
-function getPluginData<T>(
-  getData: (key: string) => unknown,
-  key: string
-): T | undefined {
+function getPluginData<T>(getData: (key: string) => unknown, key: string): T | undefined {
   return getData(key) as T | undefined;
 }
 
-export function EventTooltipPlugin(
-  options: EventTooltipPluginOptions = {}
-): TimelinePlugin {
+export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): TimelinePlugin {
   const {
     htmlTemplate,
     showDelay = 300,
@@ -68,14 +63,28 @@ export function EventTooltipPlugin(
   };
 
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastHoveredEvent: { trackIndex: number; eventIndex: number } | null =
-    null;
+  let animationFrameId: number | null = null;
+  let pendingMouseEvent: MouseEvent | null = null;
+  let lastHoveredEvent: { trackIndex: number; eventIndex: number } | null = null;
+
+  const cancelPendingWork = () => {
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+    pendingMouseEvent = null;
+    lastHoveredEvent = null;
+  };
 
   // 用于检测文本是否被截断的辅助函数
   function isTextTruncated(
     ctx: CanvasRenderingContext2D,
     text: string,
-    maxTextWidth: number
+    maxTextWidth: number,
   ): boolean {
     const textWidth = ctx.measureText(text).width;
     return textWidth > maxTextWidth;
@@ -85,8 +94,7 @@ export function EventTooltipPlugin(
     metadata: {
       name: "event-tooltip",
       version: "1.0.0",
-      description:
-        "Tooltip plugin for displaying full event title when text is truncated",
+      description: "Tooltip plugin for displaying full event title when text is truncated",
       descriptionI18n: {
         "zh-CN": "当事件标题被截断时显示完整标题的提示插件",
       },
@@ -97,9 +105,6 @@ export function EventTooltipPlugin(
       const canvas = context.timeline.getCanvas();
 
       // RAF 节流：避免高刷新率显示器下每帧触发多次 hit-test
-      let rafPending = false;
-      let pendingMouseEvent: MouseEvent | null = null;
-
       // 鼠标移动事件处理（实际逻辑）
       const processMouseMove = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
@@ -109,10 +114,7 @@ export function EventTooltipPlugin(
         const state = context.state;
 
         // 检测是否悬停在事件块上
-        const hoveredEvent = context.timeline.getEventAtPosition(
-          canvasX,
-          canvasY
-        );
+        const hoveredEvent = context.timeline.getEventAtPosition(canvasX, canvasY);
 
         if (hoveredEvent) {
           const { trackIndex, eventIndex } = hoveredEvent;
@@ -147,8 +149,7 @@ export function EventTooltipPlugin(
           }
 
           // 计算事件块宽度和文本是否截断
-          const eventWidth =
-            event.duration * config.secondWidth * state.zoomLevel;
+          const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
           const textPadding = 10;
           const maxTextWidth = eventWidth - textPadding * 2;
 
@@ -188,10 +189,9 @@ export function EventTooltipPlugin(
       // RAF 节流的 mousemove handler
       const handleMouseMove = (e: MouseEvent) => {
         pendingMouseEvent = e;
-        if (!rafPending) {
-          rafPending = true;
-          requestAnimationFrame(() => {
-            rafPending = false;
+        if (animationFrameId === null) {
+          animationFrameId = requestAnimationFrame(() => {
+            animationFrameId = null;
             if (pendingMouseEvent) {
               processMouseMove(pendingMouseEvent);
               pendingMouseEvent = null;
@@ -213,7 +213,11 @@ export function EventTooltipPlugin(
       };
 
       const handleMouseLeave = () => {
-        clearTooltip();
+        cancelPendingWork();
+        if (tooltipState.visible) {
+          tooltipState.visible = false;
+          context.timeline.draw();
+        }
       };
 
       // 注册事件监听
@@ -232,19 +236,14 @@ export function EventTooltipPlugin(
           if (!tooltipState.visible || !tooltipState.title) {
             // 隐藏 HTML 容器（如果存在）
             const container =
-              getPluginData<HTMLElement>(
-                context.api.getData,
-                "tooltipContainer"
-              ) || null;
+              getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
             if (container) {
               container.style.display = "none";
             }
             return;
           }
 
-          const canvasRect = context.timeline
-            .getCanvas()
-            .getBoundingClientRect();
+          const canvasRect = context.timeline.getCanvas().getBoundingClientRect();
 
           // 计算 tooltip 位置（在鼠标上方）
           let tooltipX = tooltipState.x;
@@ -308,15 +307,10 @@ export function EventTooltipPlugin(
             // 验证 htmlTemplate 返回有效内容
             const testContent = htmlTemplate(tooltipState.title);
             if (!testContent || testContent.trim() === "") {
-              logger.warn(
-                context.timeline.t("warningEmptyTooltipTemplateFallback")
-              );
+              logger.warn(context.timeline.t("warningEmptyTooltipTemplateFallback"));
             } else {
               let container =
-                getPluginData<HTMLElement>(
-                  context.api.getData,
-                  "tooltipContainer"
-                ) || null;
+                getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
 
               if (!container) {
                 container = document.createElement("div");
@@ -335,8 +329,7 @@ export function EventTooltipPlugin(
                 container.style.wordWrap = "break-word";
                 container.style.whiteSpace = "pre-wrap";
 
-                const parent =
-                  context.timeline.getCanvas().parentElement || document.body;
+                const parent = context.timeline.getCanvas().parentElement || document.body;
                 parent.style.position = parent.style.position || "relative";
                 parent.appendChild(container);
                 context.api.setData("tooltipContainer", container);
@@ -364,13 +357,7 @@ export function EventTooltipPlugin(
           ctx.fillStyle = backgroundColor;
           ctx.beginPath();
           if (ctx.roundRect) {
-            ctx.roundRect(
-              tooltipX,
-              tooltipY,
-              tooltipWidth,
-              tooltipHeight,
-              borderRadius
-            );
+            ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, borderRadius);
           } else {
             // 兼容不支持 roundRect 的浏览器
             const x = tooltipX;
@@ -406,11 +393,7 @@ export function EventTooltipPlugin(
           ctx.textBaseline = "top";
 
           for (let i = 0; i < lines.length; i++) {
-            ctx.fillText(
-              lines[i],
-              tooltipX + padding,
-              tooltipY + padding + i * lineHeight
-            );
+            ctx.fillText(lines[i], tooltipX + padding, tooltipY + padding + i * lineHeight);
           }
 
           ctx.restore();
@@ -423,12 +406,13 @@ export function EventTooltipPlugin(
     deactivate(context) {
       // 清理事件监听
       const canvas = context.timeline.getCanvas();
-      const handleMouseMove = getPluginData<
-        (event: MouseEvent) => void
-      >(context.api.getData, "tooltipMouseMoveHandler");
+      const handleMouseMove = getPluginData<(event: MouseEvent) => void>(
+        context.api.getData,
+        "tooltipMouseMoveHandler",
+      );
       const handleMouseLeave = getPluginData<() => void>(
         context.api.getData,
-        "tooltipMouseLeaveHandler"
+        "tooltipMouseLeaveHandler",
       );
 
       if (handleMouseMove) {
@@ -438,19 +422,14 @@ export function EventTooltipPlugin(
         canvas.removeEventListener("mouseleave", handleMouseLeave);
       }
 
-      // 清理定时器
-      if (hoverTimer) {
-        clearTimeout(hoverTimer);
-        hoverTimer = null;
-      }
+      cancelPendingWork();
+      tooltipState.visible = false;
 
       // 注销渲染层
       context.api.unregisterRenderLayer("event-tooltip-overlay");
 
       // 清理 HTML 容器
-      const container =
-        getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") ||
-        null;
+      const container = getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
       if (container && container.parentElement) {
         container.parentElement.removeChild(container);
       }
@@ -458,18 +437,13 @@ export function EventTooltipPlugin(
 
     destroy(context) {
       // 清理 HTML 容器
-      const container =
-        getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") ||
-        null;
+      const container = getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
       if (container && container.parentElement) {
         container.parentElement.removeChild(container);
       }
 
-      // 清理定时器
-      if (hoverTimer) {
-        clearTimeout(hoverTimer);
-        hoverTimer = null;
-      }
+      cancelPendingWork();
+      tooltipState.visible = false;
     },
   };
 }

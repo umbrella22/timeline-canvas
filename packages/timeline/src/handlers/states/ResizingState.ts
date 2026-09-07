@@ -269,6 +269,13 @@ export class ResizingState extends BaseState {
     return this.createIdleState();
   }
 
+  handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    this.timeline.state.resizingEvent = null;
+    this.timeline.getCanvas().style.cursor = "default";
+    this.timeline.notifyChange("events:update");
+    return this.createIdleState();
+  }
+
   private createIdleState(): InteractionState {
     return new IdleState(this.timeline);
   }

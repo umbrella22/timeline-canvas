@@ -280,7 +280,7 @@ export class IdleMouseDownRouter {
       now - state.lastClickTime < 300;
 
     if (isDoubleClick && config.enableEventSplit) {
-      if (event.readonly) {
+      if (config.readOnly || event.readonly) {
         timeline.setStatus(timeline.t("statusReadOnlySplitBlocked"));
         state.lastClickTime = 0;
         state.lastClickEvent = null;

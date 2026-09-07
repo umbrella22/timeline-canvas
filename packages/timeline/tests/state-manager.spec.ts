@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { StateManager } from "../src/core/managers/StateManager";
 import type { TimelineConfig } from "../src/types";

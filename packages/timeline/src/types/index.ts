@@ -178,8 +178,11 @@ export interface TimelineConfig {
   maxAutoFitZoom: number;
   timeUnit: string;
   timeFormat: string;
+  /** 分钟吸附间隔；仅在关闭秒级吸附且未设置自定义刻度时使用 */
   snapInterval: number;
+  /** 开启后在任意缩放级别按 1 秒吸附，优先于自定义刻度 */
   snapToSeconds: boolean;
+  /** 仅在关闭秒级吸附时控制自定义刻度从主刻度切换为细分刻度 */
   secondPrecisionZoomThreshold: number;
   timeIndicatorWidth: number;
   timeIndicatorSnapThreshold: number;
@@ -502,8 +505,11 @@ export interface TimelineOptions {
   trackMargin?: number;
   firstTrackTopMargin?: number;
   timelineHeight?: number;
+  /** 分钟吸附间隔；仅在关闭秒级吸附且未设置自定义刻度时使用 */
   snapInterval?: number;
+  /** 开启后在任意缩放级别按 1 秒吸附，优先于自定义刻度 */
   snapToSeconds?: boolean;
+  /** 仅在关闭秒级吸附时控制自定义刻度从主刻度切换为细分刻度 */
   secondPrecisionZoomThreshold?: number;
   enableTimeIndicator?: boolean;
   edgeScrollThrottle?: number;

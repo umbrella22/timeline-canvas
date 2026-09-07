@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   InteractionManager,
@@ -19,6 +19,7 @@ function createManager() {
     handleMouseDown: vi.fn(),
     handleMouseMove: vi.fn(),
     handleMouseUp: vi.fn(),
+    handleCancel: vi.fn(),
     handleContextMenu: vi.fn(),
     destroy: vi.fn(),
   };
@@ -48,6 +49,14 @@ describe("InteractionManager", () => {
     const mousedown = new MouseEvent("mousedown");
     const mousemove = new MouseEvent("mousemove");
     const mouseup = new MouseEvent("mouseup");
+    const mouseleave = new MouseEvent("mouseleave");
+    const pointerdown = new MouseEvent("pointerdown") as PointerEvent;
+    const pointermove = new MouseEvent("pointermove") as PointerEvent;
+    const pointerup = new MouseEvent("pointerup") as PointerEvent;
+    const pointercancel = new MouseEvent("pointercancel") as PointerEvent;
+    const lostpointercapture = new MouseEvent(
+      "lostpointercapture"
+    ) as PointerEvent;
     const contextmenu = new MouseEvent("contextmenu");
     const wheel = new WheelEvent("wheel");
 
@@ -60,14 +69,27 @@ describe("InteractionManager", () => {
     listeners?.mousedown(mousedown);
     listeners?.mousemove(mousemove);
     listeners?.mouseup(mouseup);
-    listeners?.mouseleave();
+    listeners?.mouseleave(mouseleave);
+    listeners?.pointerdown(pointerdown);
+    listeners?.pointermove(pointermove);
+    listeners?.pointerup(pointerup);
+    listeners?.pointercancel(pointercancel);
+    listeners?.lostpointercapture(lostpointercapture);
     listeners?.contextmenu(contextmenu);
     listeners?.wheel(wheel);
 
     expect(mouseHandler.handleMouseDown).toHaveBeenCalledWith(mousedown);
     expect(mouseHandler.handleMouseMove).toHaveBeenCalledWith(mousemove);
     expect(mouseHandler.handleMouseUp).toHaveBeenNthCalledWith(1, mouseup);
-    expect(mouseHandler.handleMouseUp).toHaveBeenNthCalledWith(2);
+    expect(mouseHandler.handleMouseUp).toHaveBeenNthCalledWith(2, mouseleave);
+    expect(mouseHandler.handleMouseDown).toHaveBeenNthCalledWith(2, pointerdown);
+    expect(mouseHandler.handleMouseMove).toHaveBeenNthCalledWith(2, pointermove);
+    expect(mouseHandler.handleMouseUp).toHaveBeenNthCalledWith(3, pointerup);
+    expect(mouseHandler.handleCancel).toHaveBeenNthCalledWith(1, pointercancel);
+    expect(mouseHandler.handleCancel).toHaveBeenNthCalledWith(
+      2,
+      lostpointercapture
+    );
     expect(mouseHandler.handleContextMenu).toHaveBeenCalledWith(contextmenu);
     expect(wheelHandler.handleWheel).toHaveBeenCalledWith(wheel);
   });

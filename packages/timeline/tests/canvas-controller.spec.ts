@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   CanvasController,
@@ -74,6 +74,11 @@ function createListeners(): CanvasEventListeners {
     mousemove: vi.fn(),
     mouseup: vi.fn(),
     mouseleave: vi.fn(),
+    pointerdown: vi.fn(),
+    pointermove: vi.fn(),
+    pointerup: vi.fn(),
+    pointercancel: vi.fn(),
+    lostpointercapture: vi.fn(),
     contextmenu: vi.fn(),
     wheel: vi.fn(),
   };
@@ -146,5 +151,58 @@ describe("CanvasController", () => {
 
     expect(state.scrollY).toBe(80);
     expect(onCanvasResize).toHaveBeenCalledTimes(1);
+  });
+
+  it("父容器尺寸变化时更新 canvas 并在 destroy 时断开观察", () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      observe = observe;
+      unobserve = vi.fn();
+      disconnect = disconnect;
+    }
+
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+
+    const { controller, canvas, renderManager, onCanvasResize } =
+      createController();
+    const container = canvas.parentElement!;
+    let width = 240;
+    let height = 160;
+    vi.spyOn(container, "getBoundingClientRect").mockImplementation(
+      () =>
+        ({
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: width,
+          bottom: height,
+          width,
+          height,
+          toJSON: () => null,
+        }) as DOMRect
+    );
+
+    controller.setupEventListeners(createListeners());
+    expect(observe).toHaveBeenCalledWith(container);
+    vi.mocked(renderManager.setCanvasSize).mockClear();
+
+    width = 360;
+    height = 190;
+    resizeCallback?.([], {} as ResizeObserver);
+
+    expect(renderManager.setCanvasSize).toHaveBeenCalledWith(360, 190);
+    expect(onCanvasResize).toHaveBeenCalledTimes(1);
+
+    controller.destroy();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 });

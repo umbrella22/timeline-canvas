@@ -1,4 +1,5 @@
 import { drawRoundedRect } from "../../utils";
+import { MediaLRUCache } from "../../utils/MediaLRUCache";
 import type { TimelineConfig, TimelineState } from "../../types";
 import { PluginType, type PluginEventHandler, type TimelinePlugin } from "../types";
 
@@ -19,10 +20,28 @@ type EventMediaCacheKey =
   | "eventMediaIdentityStore"
   | "eventMediaImageCache"
   | "eventMediaImageLoading"
-  | "eventMediaWaveCache";
+  | "eventMediaImageControllers"
+  | "eventMediaLifecycle"
+  | "eventMediaWaveCache"
+  | "eventMediaWaveStateCache"
+  | "eventMediaWaveformBitmapCache"
+  | "eventMediaWaveformPathCache";
+type EventMediaIdentity = {
+  cacheId: number;
+  key: string;
+};
 type EventMediaIdentityStore = {
-  ids: WeakMap<object, string>;
+  ids: WeakMap<object, EventMediaIdentity>;
   nextId: number;
+};
+type EventMediaLifecycle = {
+  active: boolean;
+};
+type WaveformState = {
+  cacheId: number;
+  source: WaveformDefinition["data"];
+  revision: number;
+  renderKey?: string;
 };
 type RenderEventMediaHandler = (
   ctx: CanvasRenderingContext2D,
@@ -38,32 +57,25 @@ type RenderEventMediaHandler = (
   eventHeight: number
 ) => void;
 
-/**
- * 波形 Path2D 缓存：避免每帧 per-pixel beginPath + moveTo + lineTo 循环
- * key 格式: eventId_pixelWidth_pixelHeight
- */
-const waveformPathCache = new Map<string, Path2D>();
-
-/**
- * 波形 ImageBitmap 缓存：预渲染为位图，渲染时只做 drawImage 搬运
- * key 格式: eventId_pixelWidth_pixelHeight_color_bgColor
- */
-const waveformBitmapCache = new Map<
-  string,
-  { bitmap: ImageBitmap; width: number; height: number }
->();
+const MAX_WAVEFORM_EVENTS = 1024;
+const MAX_WAVEFORM_PATHS = 1024;
 
 /**
  * 构建 Path2D 缓存（级别 1 优化）
  */
 function getWaveformPath(
+  cache: Map<string, Path2D>,
   key: string,
   arr: Float32Array,
   width: number,
   height: number
 ): Path2D {
-  const cached = waveformPathCache.get(key);
-  if (cached) return cached;
+  const cached = cache.get(key);
+  if (cached) {
+    cache.delete(key);
+    cache.set(key, cached);
+    return cached;
+  }
 
   const path = new Path2D();
   const centerY = height / 2;
@@ -77,8 +89,25 @@ function getWaveformPath(
     path.moveTo(px, centerY - dy);
     path.lineTo(px, centerY + dy);
   }
-  waveformPathCache.set(key, path);
+  cache.set(key, path);
+  while (cache.size > MAX_WAVEFORM_PATHS) {
+    const oldest = cache.keys().next();
+    if (oldest.done) break;
+    cache.delete(oldest.value);
+  }
   return path;
+}
+
+function invalidateWaveformPaths(
+  cache: Map<string, Path2D>,
+  eventCacheId: number
+): void {
+  const prefix = `${eventCacheId}_`;
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
 }
 
 /**
@@ -86,49 +115,47 @@ function getWaveformPath(
  * 使用 OffscreenCanvas 生成位图，渲染时只需 drawImage
  */
 function getOrCreateWaveformBitmap(
+  bitmapCache: MediaLRUCache,
+  pathCache: Map<string, Path2D>,
   key: string,
   arr: Float32Array,
   width: number,
   height: number,
+  resolutionX: number,
+  resolutionY: number,
   color: string,
   backgroundColor?: string
 ): ImageBitmap | null {
-  const cached = waveformBitmapCache.get(key);
-  if (cached && cached.width === width && cached.height === height) {
-    return cached.bitmap;
-  }
+  const cached = bitmapCache.get(key);
+  if (cached) return cached;
 
   // 需要 OffscreenCanvas 支持
   if (typeof OffscreenCanvas === "undefined") return null;
   if (width <= 0 || height <= 0) return null;
 
   try {
-    const w = Math.max(1, Math.ceil(width));
-    const h = Math.max(1, Math.ceil(height));
+    const w = Math.max(1, Math.ceil(width * resolutionX));
+    const h = Math.max(1, Math.ceil(height * resolutionY));
     const offscreen = new OffscreenCanvas(w, h);
     const ctx = offscreen.getContext("2d");
     if (!ctx) return null;
+    ctx.scale(resolutionX, resolutionY);
 
     // 背景
     if (backgroundColor) {
       ctx.fillStyle = backgroundColor;
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, 0, width, height);
     }
 
     // 使用 Path2D 绘制波形
     const pathKey = `${key}_path`;
-    const path = getWaveformPath(pathKey, arr, w, h);
+    const path = getWaveformPath(pathCache, pathKey, arr, width, height);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.stroke(path);
 
     const bitmap = offscreen.transferToImageBitmap();
-
-    // 淘汰旧缓存（如果有）
-    const old = waveformBitmapCache.get(key);
-    if (old) old.bitmap.close();
-
-    waveformBitmapCache.set(key, { bitmap, width: w, height: h });
+    bitmapCache.set(key, bitmap);
     return bitmap;
   } catch (error) {
     console.debug("[EventMediaPlugin] Failed to create waveform bitmap", error);
@@ -148,16 +175,50 @@ function getEventMediaIdentity(
   event: TimelineState["tracks"][number]["events"][number],
   trackIndex: number,
   eventIndex: number
-): string {
+): EventMediaIdentity {
   const existingId = store.ids.get(event);
   if (existingId) {
     return existingId;
   }
 
-  const nextId = `event_media_${store.nextId}_${trackIndex}_${eventIndex}`;
+  const cacheId = store.nextId;
+  const nextId = {
+    cacheId,
+    key: `event_media_${cacheId}_${trackIndex}_${eventIndex}`,
+  };
   store.nextId += 1;
   store.ids.set(event, nextId);
   return nextId;
+}
+
+function touchWaveformCache(
+  key: string,
+  state: WaveformState,
+  samples: Float32Array,
+  stateCache: Map<string, WaveformState>,
+  sampleCache: Map<string, Float32Array>
+): void {
+  stateCache.delete(key);
+  stateCache.set(key, state);
+  sampleCache.delete(key);
+  sampleCache.set(key, samples);
+}
+
+function pruneWaveformCache(
+  stateCache: Map<string, WaveformState>,
+  sampleCache: Map<string, Float32Array>,
+  bitmapCache: MediaLRUCache,
+  pathCache: Map<string, Path2D>
+): void {
+  while (stateCache.size > MAX_WAVEFORM_EVENTS) {
+    const oldest = stateCache.entries().next();
+    if (oldest.done) break;
+    const [key, state] = oldest.value;
+    stateCache.delete(key);
+    sampleCache.delete(key);
+    bitmapCache.invalidateEvent(state.cacheId);
+    invalidateWaveformPaths(pathCache, state.cacheId);
+  }
 }
 
 export function EventMediaPlugin(): TimelinePlugin {
@@ -173,16 +234,26 @@ export function EventMediaPlugin(): TimelinePlugin {
     },
     async activate(context) {
       const identityStore: EventMediaIdentityStore = {
-        ids: new WeakMap<object, string>(),
+        ids: new WeakMap<object, EventMediaIdentity>(),
         nextId: 0,
       };
       const imageCache = new Map<string, ImageBitmap>();
       const loadingMap = new Map<string, Promise<ImageBitmap | undefined>>();
+      const imageControllers = new Map<string, AbortController>();
+      const lifecycle: EventMediaLifecycle = { active: true };
       const waveCache = new Map<string, Float32Array>();
+      const waveStateCache = new Map<string, WaveformState>();
+      const waveformBitmapCache = new MediaLRUCache();
+      const waveformPathCache = new Map<string, Path2D>();
       context.api.setData("eventMediaIdentityStore", identityStore);
       context.api.setData("eventMediaImageCache", imageCache);
       context.api.setData("eventMediaImageLoading", loadingMap);
+      context.api.setData("eventMediaImageControllers", imageControllers);
+      context.api.setData("eventMediaLifecycle", lifecycle);
       context.api.setData("eventMediaWaveCache", waveCache);
+      context.api.setData("eventMediaWaveStateCache", waveStateCache);
+      context.api.setData("eventMediaWaveformBitmapCache", waveformBitmapCache);
+      context.api.setData("eventMediaWaveformPathCache", waveformPathCache);
 
       const handler: RenderEventMediaHandler = (
         ctx: CanvasRenderingContext2D,
@@ -197,6 +268,9 @@ export function EventMediaPlugin(): TimelinePlugin {
         eventVerticalPadding: number,
         eventHeight: number
       ) => {
+        if (!lifecycle.active) {
+          return;
+        }
         const imageCache = getPluginData<Map<string, ImageBitmap>>(
           context.api.getData,
           "eventMediaImageCache"
@@ -210,6 +284,10 @@ export function EventMediaPlugin(): TimelinePlugin {
         const waveCache = getPluginData<Map<string, Float32Array>>(
           context.api.getData,
           "eventMediaWaveCache"
+        );
+        const waveStateCache = getPluginData<Map<string, WaveformState>>(
+          context.api.getData,
+          "eventMediaWaveStateCache"
         );
         const identityStore = getPluginData<EventMediaIdentityStore>(
           context.api.getData,
@@ -250,23 +328,38 @@ export function EventMediaPlugin(): TimelinePlugin {
           const evImages: ImageRenderDefinition[] = ev.media.images || [];
           if (evImages.length > 0 && imageCache && loadingMap) {
             for (const s of evImages) {
-              const key = `${eventIdentity}_${s.src}`;
+              const key = `${eventIdentity.key}_${s.src}`;
               let bmp = imageCache.get(key);
               if (!bmp && !loadingMap.get(key)) {
-                const p = fetch(s.src)
-                  .then((r) => r.blob())
-                  .then((b) => createImageBitmap(b))
+                const controller = new AbortController();
+                imageControllers.set(key, controller);
+                let p: Promise<ImageBitmap | undefined>;
+                p = fetch(s.src, { signal: controller.signal })
+                  .then((response) => response.blob())
+                  .then((blob) => createImageBitmap(blob))
                   .then((ib) => {
+                    if (!lifecycle.active || loadingMap.get(key) !== p) {
+                      ib.close();
+                      return undefined;
+                    }
                     imageCache.set(key, ib);
                     loadingMap.delete(key);
+                    imageControllers.delete(key);
+                    context.timeline.markDirty(["tracks"]);
+                    context.timeline.draw();
                     return ib;
                   })
                   .catch((error) => {
-                    console.debug(
-                      "[EventMediaPlugin] Failed to load event image",
-                      error
-                    );
-                    loadingMap.delete(key);
+                    if (!controller.signal.aborted) {
+                      console.debug(
+                        "[EventMediaPlugin] Failed to load event image",
+                        error
+                      );
+                    }
+                    if (loadingMap.get(key) === p) {
+                      loadingMap.delete(key);
+                      imageControllers.delete(key);
+                    }
                     return undefined;
                   });
                 loadingMap.set(key, p);
@@ -298,29 +391,70 @@ export function EventMediaPlugin(): TimelinePlugin {
           }
 
           const wfDef: WaveformDefinition | undefined = ev.media.waveform;
-          if (wfDef) {
-            const wfKey = `${eventIdentity}_wf`;
-            let arr = waveCache ? waveCache.get(wfKey) : undefined;
-            if (!arr) {
+          if (wfDef && waveCache && waveStateCache) {
+            const wfKey = `${eventIdentity.key}_wf`;
+            let waveState = waveStateCache.get(wfKey);
+            let arr = waveCache.get(wfKey);
+            if (!waveState || !arr || waveState.source !== wfDef.data) {
+              waveformBitmapCache.invalidateEvent(eventIdentity.cacheId);
+              invalidateWaveformPaths(
+                waveformPathCache,
+                eventIdentity.cacheId
+              );
               arr = Array.isArray(wfDef.data)
                 ? new Float32Array(wfDef.data)
                 : wfDef.data;
-              if (waveCache) waveCache.set(wfKey, arr);
+              waveState = {
+                cacheId: eventIdentity.cacheId,
+                source: wfDef.data,
+                revision: (waveState?.revision ?? 0) + 1,
+              };
             }
+            touchWaveformCache(
+              wfKey,
+              waveState,
+              arr,
+              waveStateCache,
+              waveCache
+            );
+            pruneWaveformCache(
+              waveStateCache,
+              waveCache,
+              waveformBitmapCache,
+              waveformPathCache
+            );
             const opacity = wfDef.opacity !== undefined ? wfDef.opacity : 0.5;
             const prev = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
 
             const color = wfDef.color || "#00A0FF";
-            const pixelW = Math.max(1, Math.ceil(eventWidth));
-            const pixelH = Math.max(1, Math.ceil(eventHeight));
-            const bitmapKey = `${wfKey}_${pixelW}_${pixelH}_${color}_${wfDef.backgroundColor || ""}`;
+            const transform = ctx.getTransform();
+            const resolutionX = Math.max(1, Math.hypot(transform.a, transform.b));
+            const resolutionY = Math.max(1, Math.hypot(transform.c, transform.d));
+            const logicalW = Math.max(1, Math.ceil(eventWidth));
+            const logicalH = Math.max(1, Math.ceil(eventHeight));
+            const rasterW = Math.max(1, Math.ceil(logicalW * resolutionX));
+            const rasterH = Math.max(1, Math.ceil(logicalH * resolutionY));
+            const renderKey = `${logicalW}_${logicalH}_${rasterW}_${rasterH}_${resolutionX}_${resolutionY}_${color}_${wfDef.backgroundColor || ""}`;
+            if (waveState.renderKey !== renderKey) {
+              waveformBitmapCache.invalidateEvent(eventIdentity.cacheId);
+              invalidateWaveformPaths(
+                waveformPathCache,
+                eventIdentity.cacheId
+              );
+              waveState.renderKey = renderKey;
+            }
+            const bitmapKey = `${eventIdentity.cacheId}_waveform_${waveState.revision}_${renderKey}`;
 
             const cachedBitmap = getOrCreateWaveformBitmap(
+              waveformBitmapCache,
+              waveformPathCache,
               bitmapKey,
               arr,
-              pixelW,
-              pixelH,
+              logicalW,
+              logicalH,
+              resolutionX,
+              resolutionY,
               color,
               wfDef.backgroundColor
             );
@@ -332,8 +466,14 @@ export function EventMediaPlugin(): TimelinePlugin {
                 ctx.fillStyle = wfDef.backgroundColor;
                 ctx.fillRect(eventX, eventY, eventWidth, eventHeight);
               }
-              const pathKey = `${wfKey}_${pixelW}_${pixelH}`;
-              const path = getWaveformPath(pathKey, arr, pixelW, pixelH);
+              const pathKey = `${eventIdentity.cacheId}_${waveState.revision}_${renderKey}`;
+              const path = getWaveformPath(
+                waveformPathCache,
+                pathKey,
+                arr,
+                logicalW,
+                logicalH
+              );
               ctx.save();
               ctx.translate(eventX, eventY);
               ctx.strokeStyle = color;
@@ -355,6 +495,12 @@ export function EventMediaPlugin(): TimelinePlugin {
       context.api.setData("eventMediaHandler", handler);
     },
     deactivate(context) {
+      const lifecycle = getPluginData<EventMediaLifecycle>(
+        context.api.getData,
+        "eventMediaLifecycle"
+      );
+      if (lifecycle) lifecycle.active = false;
+
       const handler = getPluginData<PluginEventHandler>(
         context.api.getData,
         "eventMediaHandler"
@@ -366,7 +512,22 @@ export function EventMediaPlugin(): TimelinePlugin {
         context.api.getData,
         "eventMediaImageCache"
       );
-      if (imgCache) imgCache.clear();
+      if (imgCache) {
+        for (const bitmap of new Set(imgCache.values())) {
+          bitmap.close();
+        }
+        imgCache.clear();
+      }
+      const imageControllers = getPluginData<Map<string, AbortController>>(
+        context.api.getData,
+        "eventMediaImageControllers"
+      );
+      if (imageControllers) {
+        for (const controller of imageControllers.values()) {
+          controller.abort();
+        }
+        imageControllers.clear();
+      }
       const loadMap = getPluginData<
         Map<string, Promise<ImageBitmap | undefined>>
       >(
@@ -379,13 +540,22 @@ export function EventMediaPlugin(): TimelinePlugin {
         "eventMediaWaveCache"
       );
       if (waveCache) waveCache.clear();
+      const waveStateCache = getPluginData<Map<string, WaveformState>>(
+        context.api.getData,
+        "eventMediaWaveStateCache"
+      );
+      if (waveStateCache) waveStateCache.clear();
 
-      // 清理波形缓存
-      for (const entry of waveformBitmapCache.values()) {
-        entry.bitmap.close();
-      }
-      waveformBitmapCache.clear();
-      waveformPathCache.clear();
+      const waveformBitmapCache = getPluginData<MediaLRUCache>(
+        context.api.getData,
+        "eventMediaWaveformBitmapCache"
+      );
+      waveformBitmapCache?.clear();
+      const waveformPathCache = getPluginData<Map<string, Path2D>>(
+        context.api.getData,
+        "eventMediaWaveformPathCache"
+      );
+      waveformPathCache?.clear();
     },
   };
 }

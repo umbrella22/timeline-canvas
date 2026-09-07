@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   fixFloatPrecision,
@@ -24,13 +24,19 @@ describe("time utils", () => {
     expect(formatDuration(65.4321, "持续")).toBe("持续 00:01:05");
   });
 
-  it("根据缩放级别选择秒级与自定义刻度吸附间隔", () => {
-    expect(getSnapInterval(10, 15, true, 1.5)).toBe(0.5);
-    expect(getSnapInterval(4, 15, true, 1.5)).toBe(5);
-    expect(getSnapInterval(1, 15, true, 1.5)).toBe(900);
+  it.each([0.1, 0.5, 1, 1.5, 2, 3, 4, 5, 8, 10, 20])(
+    "秒级吸附在缩放 %s 下始终使用 1 秒步长",
+    (zoomLevel) => {
+      expect(getSnapInterval(zoomLevel, 15, true, 1.5)).toBe(1);
+      expect(getSnapInterval(zoomLevel, 15, true, 1.5, 60, 4)).toBe(1);
+      expect(getSnapInterval(zoomLevel, 15, true, 100, 0.5, 10)).toBe(1);
+    }
+  );
+
+  it("关闭秒级吸附时保留分钟间隔与自定义刻度吸附", () => {
     expect(getSnapInterval(2, 15, false, 1.5)).toBe(900);
-    expect(getSnapInterval(2, 15, true, 1.5, 60, 4)).toBe(15);
-    expect(getSnapInterval(1, 15, true, 1.5, 60, 4)).toBe(60);
+    expect(getSnapInterval(2, 15, false, 1.5, 60, 4)).toBe(15);
+    expect(getSnapInterval(1, 15, false, 1.5, 60, 4)).toBe(60);
   });
 
   it("返回当前时间秒数并执行区间吸附", () => {

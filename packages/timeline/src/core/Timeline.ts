@@ -67,6 +67,8 @@ export class Timeline {
   private guideLineService: GuideLineService;
   private hitTestService: HitTestService;
   private changeScheduler: ChangeScheduler;
+  private destroyed = false;
+  private destroyPromise: Promise<void> | undefined;
 
   constructor(canvasId: string, options: TimelineOptions = {}) {
     const locale = normalizeTimelineLocale(options.locale);
@@ -279,6 +281,7 @@ export class Timeline {
    * 通知状态变更，由调度器自动处理脏层标记、派生状态计算和回调触发
    */
   public notifyChange(change: ChangeType): void {
+    if (this.destroyed) return;
     this.changeScheduler.notify(change);
   }
 
@@ -880,6 +883,7 @@ export class Timeline {
   }
 
   public draw(): void {
+    if (this.destroyed) return;
     this.renderManager.draw();
   }
 
@@ -949,10 +953,15 @@ export class Timeline {
     return this.config.readOnly;
   }
 
-  public destroy(): void {
+  public destroy(): Promise<void> {
+    if (this.destroyPromise) return this.destroyPromise;
+    this.destroyed = true;
     this.clearGuideLineCache();
     this.interactionManager.destroy();
+    this.renderManager.dispose();
+    this.destroyPromise = this.pluginManager.destroy();
     this.setStatus(this.t("statusTimelineDestroyed"));
+    return this.destroyPromise;
   }
 
   private clearGuideLineCache(): void {

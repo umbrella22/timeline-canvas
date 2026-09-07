@@ -150,13 +150,12 @@ pnpm docs:dev
 
 ## MCP（面向 VS Code Copilot Chat）
 
-本仓库提供一个最小可用的 MCP server（stdio），用于让 AI 以“工具调用”的方式完成：生成内置插件骨架、自动挂到导出、做基础校验、以及触发 allowlist 内的仓库脚本。
+两个独立的 stdio server 分别服务不同任务：
 
-- 安装与启动（推荐）：在仓库根目录执行 `pnpm install`，然后 `pnpm mcp`
-- VS Code 配置示例：见 .vscode/mcp.json
-- 说明与工具列表：见 packages/mcp-service/README_CN.md
+- [维护者 MCP](packages/mcp-service/README_CN.md)：`timeline-canvas-mcp` 提供 10 个仓库检查、内置插件脚手架和重构工具，源码仓库中使用 `pnpm mcp` 启动。
+- [使用者 MCP](packages/user-mcp-service/README_CN.md)：`timeline-canvas-user-mcp` 严格提供接入指南、外部插件生成、基于已安装公开类型的校验三个只读工具。npm 包使用 `MCP_WORKSPACE_ROOT=/path/to/application npx -y timeline-canvas-user-mcp@latest` 启动；从源码开发时使用 `pnpm mcp:user`。
 
-> VS Code / Copilot Chat 的 MCP 配置入口可能随版本变化。核心是把一个 **stdio server** 配置为在 `packages/mcp-service` 目录启动（`pnpm start`），并将工作目录/环境变量指向仓库根目录（见 packages/mcp-service/README_CN.md）。
+按目标项目启用对应的 server，客户端配置见各自 README。
 
 ## 许可证
 

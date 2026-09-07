@@ -31,29 +31,44 @@ export class PluginManager {
   private performanceProvider: PerformanceProvider | undefined;
   private performanceProviderOwner: string | undefined;
   private registrationOrder = 0;
+  private destroyed = false;
+  private destroyPromise: Promise<void> | undefined;
+  private pendingLoads = new Map<string, Promise<boolean>>();
+  private pendingUnloads = new Map<string, Promise<boolean>>();
 
   constructor(
     private baseContext: Omit<PluginContext, "api">,
-    private errorHandler: ErrorHandler = new ErrorHandler(
-      getLogger("PluginManager")
-    )
+    private errorHandler: ErrorHandler = new ErrorHandler(getLogger("PluginManager")),
   ) {}
 
-  async loadPlugin(plugin: TimelinePlugin): Promise<boolean> {
+  loadPlugin(plugin: TimelinePlugin): Promise<boolean> {
     const { name, version } = plugin.metadata;
     const pluginId = `${name}@${version}`;
-    if (this.plugins.has(pluginId)) return false;
+    if (
+      this.destroyed ||
+      this.plugins.has(pluginId) ||
+      this.pendingLoads.has(pluginId) ||
+      this.pendingUnloads.has(pluginId)
+    )
+      return Promise.resolve(false);
+
+    // Reserve the ID before invoking user lifecycle code, including reentrant calls.
+    const task = Promise.resolve()
+      .then(() => this.performLoad(pluginId, plugin))
+      .finally(() => this.pendingLoads.delete(pluginId));
+    this.pendingLoads.set(pluginId, task);
+    return task;
+  }
+
+  private async performLoad(pluginId: string, plugin: TimelinePlugin): Promise<boolean> {
+    if (this.destroyed) return false;
     if (!this.areDependenciesLoaded(plugin.metadata.dependencies)) {
       return this.errorHandler.fail(
         this.baseContext.config.debug,
-        translateTimelineConfig(
-          this.baseContext.config,
-          "errorPluginDependenciesMissing",
-          { pluginId }
-        ),
-        new Error(
-          `Missing dependencies: ${plugin.metadata.dependencies?.join(", ")}`
-        )
+        translateTimelineConfig(this.baseContext.config, "errorPluginDependenciesMissing", {
+          pluginId,
+        }),
+        new Error(`Missing dependencies: ${plugin.metadata.dependencies?.join(", ")}`),
       );
     }
 
@@ -61,64 +76,92 @@ export class PluginManager {
     const ctx = this.createPluginContext(pluginId);
     let initStarted = false;
     let activateStarted = false;
+    let loaded = false;
 
     try {
       if (plugin.init) {
         initStarted = true;
         await plugin.init(ctx);
       }
+      if (this.destroyed) return false;
       if (plugin.activate) {
         activateStarted = true;
         await plugin.activate(ctx);
       }
+      if (this.destroyed) return false;
       this.plugins.set(pluginId, { plugin, context: ctx, active: true });
+      loaded = true;
       return true;
     } catch (error) {
-      await this.rollbackFailedLoad(
-        pluginId,
-        plugin,
-        ctx,
-        initStarted,
-        activateStarted
-      );
-      this.cleanupPluginResources(pluginId);
       return this.errorHandler.fail(
         this.baseContext.config.debug,
         translateTimelineConfig(this.baseContext.config, "errorPluginLoadFailed", {
           pluginId,
         }),
-        error
+        error,
       );
+    } finally {
+      if (!loaded) {
+        await this.rollbackFailedLoad(pluginId, plugin, ctx, initStarted, activateStarted);
+        this.cleanupPluginResources(pluginId);
+      }
     }
   }
 
-  async unloadPlugin(pluginId: string): Promise<boolean> {
+  unloadPlugin(pluginId: string): Promise<boolean> {
+    const pending = this.pendingUnloads.get(pluginId);
+    if (pending) return pending;
     const entry = this.plugins.get(pluginId);
-    if (!entry) return false;
+    if (!entry) return Promise.resolve(false);
+    this.plugins.delete(pluginId);
+    const task = Promise.resolve()
+      .then(() => this.performUnload(pluginId, entry))
+      .finally(() => {
+        this.cleanupPluginResources(pluginId);
+        this.pendingUnloads.delete(pluginId);
+      });
+    this.pendingUnloads.set(pluginId, task);
+    return task;
+  }
+
+  private async performUnload(
+    pluginId: string,
+    entry: { plugin: TimelinePlugin; context: PluginContext },
+  ): Promise<boolean> {
     let success = await this.runLifecycleStep(
       pluginId,
       "deactivate",
       entry.plugin.deactivate,
-      entry.context
+      entry.context,
     );
 
     const destroySucceeded = await this.runLifecycleStep(
       pluginId,
       "destroy",
       entry.plugin.destroy,
-      entry.context
+      entry.context,
     );
 
     if (!destroySucceeded) {
       success = false;
     }
 
-    try {
-      return success;
-    } finally {
-      this.cleanupPluginResources(pluginId);
-      this.plugins.delete(pluginId);
+    return success;
+  }
+
+  destroy(): Promise<void> {
+    if (this.destroyPromise) return this.destroyPromise;
+    this.destroyed = true;
+    this.destroyPromise = Promise.resolve().then(() => this.disposePlugins());
+    return this.destroyPromise;
+  }
+
+  private async disposePlugins(): Promise<void> {
+    // Dependencies are loaded first, so unload dependents before their providers.
+    for (const pluginId of [...this.plugins.keys()].reverse()) {
+      await this.unloadPlugin(pluginId);
     }
+    await Promise.allSettled([...this.pendingLoads.values(), ...this.pendingUnloads.values()]);
   }
 
   private async rollbackFailedLoad(
@@ -126,34 +169,22 @@ export class PluginManager {
     plugin: TimelinePlugin,
     context: PluginContext,
     initStarted: boolean,
-    activateStarted: boolean
+    activateStarted: boolean,
   ): Promise<void> {
     if (activateStarted) {
-      await this.runLifecycleStep(
-        pluginId,
-        "rollback deactivate",
-        plugin.deactivate,
-        context
-      );
+      await this.runLifecycleStep(pluginId, "rollback deactivate", plugin.deactivate, context);
     }
 
     if (initStarted || activateStarted) {
-      await this.runLifecycleStep(
-        pluginId,
-        "rollback destroy",
-        plugin.destroy,
-        context
-      );
+      await this.runLifecycleStep(pluginId, "rollback destroy", plugin.destroy, context);
     }
   }
 
   private async runLifecycleStep(
     pluginId: string,
     step: string,
-    lifecycle:
-      | ((context: PluginContext) => Promise<void> | void)
-      | undefined,
-    context: PluginContext
+    lifecycle: ((context: PluginContext) => Promise<void> | void) | undefined,
+    context: PluginContext,
   ): Promise<boolean> {
     if (!lifecycle) {
       return true;
@@ -165,12 +196,11 @@ export class PluginManager {
     } catch (error) {
       return this.errorHandler.fail(
         this.baseContext.config.debug,
-        translateTimelineConfig(
-          this.baseContext.config,
-          "errorPluginLifecycleFailed",
-          { step, pluginId }
-        ),
-        error
+        translateTimelineConfig(this.baseContext.config, "errorPluginLifecycleFailed", {
+          step,
+          pluginId,
+        }),
+        error,
       );
     }
   }
@@ -181,22 +211,15 @@ export class PluginManager {
     this.pluginResources.set(pluginId, this.createPluginResources());
 
     const api: PluginAPI = {
-      registerRenderLayer: (layer: RenderLayer) =>
-        this.registerRenderLayer(pluginId, layer),
-      unregisterRenderLayer: (name: string) =>
-        this.unregisterRenderLayer(pluginId, name),
-      registerCoreLayerHook: (hook: CoreLayerHook) =>
-        this.registerCoreLayerHook(pluginId, hook),
-      unregisterCoreLayerHook: (name: string) =>
-        this.unregisterCoreLayerHook(pluginId, name),
+      registerRenderLayer: (layer: RenderLayer) => this.registerRenderLayer(pluginId, layer),
+      unregisterRenderLayer: (name: string) => this.unregisterRenderLayer(pluginId, name),
+      registerCoreLayerHook: (hook: CoreLayerHook) => this.registerCoreLayerHook(pluginId, hook),
+      unregisterCoreLayerHook: (name: string) => this.unregisterCoreLayerHook(pluginId, name),
       registerEventHandler: (event: string, handler: PluginEventHandler) =>
         this.registerEventHandler(pluginId, event, handler),
       unregisterEventHandler: (event: string, handler: PluginEventHandler) =>
         this.unregisterEventHandler(pluginId, event, handler),
-      showNotification: (
-        message: string,
-        type: "info" | "warning" | "error" = "info"
-      ) => {
+      showNotification: (message: string, type: "info" | "warning" | "error" = "info") => {
         const pluginLogger = getLogger(`plugin:${pluginId}`);
         switch (type) {
           case "error":
@@ -216,9 +239,7 @@ export class PluginManager {
         this.performanceProviderOwner = pluginId;
       },
       getPerformanceStats: () => {
-        return this.performanceProvider
-          ? this.performanceProvider.getAllStats()
-          : new Map();
+        return this.performanceProvider ? this.performanceProvider.getAllStats() : new Map();
       },
       getFPS: () => {
         return this.performanceProvider ? this.performanceProvider.getFPS() : 0;
@@ -228,11 +249,7 @@ export class PluginManager {
     return { ...this.baseContext, api };
   }
 
-  private registerEventHandler(
-    pluginId: string,
-    event: string,
-    handler: PluginEventHandler
-  ): void {
+  private registerEventHandler(pluginId: string, event: string, handler: PluginEventHandler): void {
     const list = this.eventHandlers.get(event) || [];
     list.push({
       pluginId,
@@ -257,7 +274,7 @@ export class PluginManager {
   private unregisterEventHandler(
     pluginId: string,
     event: string,
-    handler: PluginEventHandler
+    handler: PluginEventHandler,
   ): void {
     const list = this.eventHandlers.get(event);
     if (!list) return;
@@ -299,10 +316,7 @@ export class PluginManager {
     this.pluginResources.get(pluginId)?.renderLayers.delete(name);
   }
 
-  private registerCoreLayerHook(
-    pluginId: string,
-    hook: CoreLayerHook
-  ): void {
+  private registerCoreLayerHook(pluginId: string, hook: CoreLayerHook): void {
     this.reassignCoreLayerHookOwner(hook.name, pluginId);
     this.coreLayerHooks.set(hook.name, hook);
     this.coreLayerHookOwners.set(hook.name, pluginId);
@@ -379,6 +393,7 @@ export class PluginManager {
       this.performanceProviderOwner = undefined;
     }
 
+    this.pluginData.get(pluginId)?.clear();
     this.pluginData.delete(pluginId);
     this.pluginMetadata.delete(pluginId);
     this.pluginResources.delete(pluginId);
@@ -396,7 +411,7 @@ export class PluginManager {
           translateTimelineConfig(this.baseContext.config, "errorPluginEventFailed", {
             event,
           }),
-          error
+          error,
         );
       }
     }
@@ -412,12 +427,10 @@ export class PluginManager {
       } catch (error) {
         this.errorHandler.debugIf(
           this.baseContext.config.debug,
-          translateTimelineConfig(
-            this.baseContext.config,
-            "errorPluginValidationFailed",
-            { event }
-          ),
-          error
+          translateTimelineConfig(this.baseContext.config, "errorPluginValidationFailed", {
+            event,
+          }),
+          error,
         );
         return false;
       }
@@ -429,7 +442,7 @@ export class PluginManager {
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     config: TimelineConfig,
-    state: TimelineState
+    state: TimelineState,
   ): void {
     for (const layer of this.layersByPosition("background")) {
       layer.render(ctx, canvas, config, state);
@@ -440,7 +453,7 @@ export class PluginManager {
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     config: TimelineConfig,
-    state: TimelineState
+    state: TimelineState,
   ): void {
     for (const layer of this.layersByPosition("overlay")) {
       layer.render(ctx, canvas, config, state);
@@ -468,8 +481,7 @@ export class PluginManager {
   }
 
   measureStart(name: string): void {
-    if (this.performanceProvider)
-      this.performanceProvider.startMeasurement(name);
+    if (this.performanceProvider) this.performanceProvider.startMeasurement(name);
   }
 
   measureEnd(name: string): void {
@@ -537,20 +549,16 @@ export class PluginManager {
   }
 
   private compareOwnedResources(nameA: string, nameB: string): number {
-    const ownerA =
-      this.renderLayerOwners.get(nameA) ?? this.coreLayerHookOwners.get(nameA);
-    const ownerB =
-      this.renderLayerOwners.get(nameB) ?? this.coreLayerHookOwners.get(nameB);
+    const ownerA = this.renderLayerOwners.get(nameA) ?? this.coreLayerHookOwners.get(nameA);
+    const ownerB = this.renderLayerOwners.get(nameB) ?? this.coreLayerHookOwners.get(nameB);
     const priorityA = ownerA ? this.getPluginPriority(ownerA) : 0;
     const priorityB = ownerB ? this.getPluginPriority(ownerB) : 0;
     if (priorityB !== priorityA) {
       return priorityB - priorityA;
     }
 
-    const orderA =
-      this.renderLayerOrder.get(nameA) ?? this.coreLayerHookOrder.get(nameA) ?? 0;
-    const orderB =
-      this.renderLayerOrder.get(nameB) ?? this.coreLayerHookOrder.get(nameB) ?? 0;
+    const orderA = this.renderLayerOrder.get(nameA) ?? this.coreLayerHookOrder.get(nameA) ?? 0;
+    const orderB = this.renderLayerOrder.get(nameB) ?? this.coreLayerHookOrder.get(nameB) ?? 0;
     return orderA - orderB;
   }
 }

@@ -1,19 +1,20 @@
 {
   "name": "timeline-canvas",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "A powerful timeline component built with Canvas and TypeScript",
   "main": "dist/index.mjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.mts",
   "type": "module",
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
+    "build": "vp pack",
+    "dev": "vp pack --watch --sourcemap --no-minify",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "oxlint src tests vitest.config.ts",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "lint": "vp lint src tests vite.config.ts",
+    "test": "vp test",
+    "test:watch": "vp test watch",
+    "test:run": "vp test run",
+    "test:coverage": "vp test run --coverage"
   },
   "keywords": [
     "timeline",
@@ -24,16 +25,16 @@
   ],
   "author": "sky <https://github.com/umbrella22>",
   "license": "MIT",
-  "packageManager": "pnpm@10.18.1",
+  "packageManager": "pnpm@10.34.5",
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@vitest/coverage-v8": "^4.1.2",
-    "jsdom": "^29.0.1",
-    "oxlint": "^1.43.0",
-    "vitest": "^4.1.2"
+    "@types/node": "^26.4.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "jsdom": "^30.0.1",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
+    "vite-plus": "0.3.0"
   },
   "dependencies": {
-    "immer": "^10.1.1"
+    "immer": "^11.1.18"
   },
   "files": [
     "dist",

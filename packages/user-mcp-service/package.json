@@ -1,0 +1,38 @@
+{
+  "name": "timeline-canvas-user-mcp",
+  "version": "0.1.0",
+  "description": "MCP tools for integrating timeline-canvas and developing external plugins",
+  "license": "MIT",
+  "bin": {
+    "timeline-canvas-user-mcp": "./bin/timeline-canvas-user-mcp.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "README_CN.md"
+  ],
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "start:prod": "node dist/server.mjs",
+    "build": "vp pack",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:run": "vp test run",
+    "test:package": "pnpm build && tsx tests/package-artifact.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "typescript": "^6.0.3",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
+    "vite-plus": "0.3.0"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  }
+}

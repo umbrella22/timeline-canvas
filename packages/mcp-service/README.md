@@ -2,6 +2,13 @@
 
 This MCP server exposes project-specific semantic analysis and refactor assistance tools over stdio, designed for Copilot Chat and AI CLI agents working inside this repo.
 
+| Choose | Package | Workspace | Purpose |
+|---|---|---|---|
+| Maintain or refactor this repository | `timeline-canvas-mcp` | The `timeline-canvas` source repository | The tools listed below for built-in plugins, semantic analysis, consistency, performance, refactors, and migrations |
+| Integrate the library or develop an external plugin | `timeline-canvas-user-mcp` | Your application repository | Read-only guides, returned plugin templates, and validation against the installed public API |
+
+Enable only the server needed for the current workspace by default; neither server registers the other automatically. Application teams should use the [user MCP README](../user-mcp-service/README.md) or the [full user guide](../../docs/en/guide/user-mcp.md).
+
 ## Tools
 
 ### P0 — Scaffolding, Validation & Refactors

@@ -53,6 +53,7 @@ export class RenderManager {
   private isFirstRender = true;
   private renderPipeline: RenderPipeline;
   private layerBufferManager: LayerBufferManager;
+  private disposed = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -94,14 +95,20 @@ export class RenderManager {
   }
 
   public setCanvasSize(width: number, height: number): void {
-    const actualWidth = Math.floor(width * this.dpr);
-    const actualHeight = Math.floor(height * this.dpr);
+    if (this.disposed) return;
+    const nextDpr = window.devicePixelRatio || 1;
+    const actualWidth = Math.floor(width * nextDpr);
+    const actualHeight = Math.floor(height * nextDpr);
     if (
+      this.dpr === nextDpr &&
       Math.abs(this.canvas.width - actualWidth) < 1 &&
-      Math.abs(this.canvas.height - actualHeight) < 1
+      Math.abs(this.canvas.height - actualHeight) < 1 &&
+      this.canvas.style.width === `${width}px` &&
+      this.canvas.style.height === `${height}px`
     ) {
       return;
     }
+    this.dpr = nextDpr;
     this.canvas.width = actualWidth;
     this.canvas.height = actualHeight;
     this.canvas.style.width = `${width}px`;
@@ -153,6 +160,7 @@ export class RenderManager {
   }
 
   public draw(): void {
+    if (this.disposed) return;
     // 如果没有脏层，跳过绘制
     if (this.dirtyLayers.size === 0 && !this.isFirstRender) {
       return;
@@ -384,5 +392,12 @@ export class RenderManager {
 
   public getLastLayerTimes(): Record<string, number> {
     return { ...this.lastLayerTimes };
+  }
+
+  public dispose(): void {
+    this.disposed = true;
+    this.layerBufferManager.dispose();
+    this.dirtyLayers.clear();
+    this.lastLayerTimes = {};
   }
 }

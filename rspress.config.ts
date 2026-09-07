@@ -56,7 +56,8 @@ export default defineConfig({
             { text: "安装与构建", link: "/guide/installation" },
             { text: "使用与示例", link: "/guide/usage" },
             { text: "配置项", link: "/guide/configuration" },
-            { text: "MCP 服务", link: "/guide/mcp" },
+            { text: "维护者 MCP", link: "/guide/mcp" },
+            { text: "使用者 MCP", link: "/guide/user-mcp" },
           ],
           "/plugins/": [
             {
@@ -124,7 +125,8 @@ export default defineConfig({
             { text: "Installation & Build", link: "/en/guide/installation" },
             { text: "Usage & Examples", link: "/en/guide/usage" },
             { text: "Configuration", link: "/en/guide/configuration" },
-            { text: "MCP Service", link: "/en/guide/mcp" },
+            { text: "Maintainer MCP", link: "/en/guide/mcp" },
+            { text: "User MCP", link: "/en/guide/user-mcp" },
           ],
           "/en/plugins/": [
             {

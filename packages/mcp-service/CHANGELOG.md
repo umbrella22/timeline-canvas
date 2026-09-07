@@ -1,5 +1,14 @@
 # timeline-canvas-mcp
 
+## 2.3.1
+
+### Patch Changes
+
+- Fix template packaging so scaffolding works from an installed npm package outside the source repository.
+- Correct generated plugin imports, media and theme templates, and test validation.
+- Keep the existing ten tools focused on repository maintenance; direct application integration and external plugin development to the separate `timeline-canvas-user-mcp` package.
+- Migrate build and test tooling to Vite+, update dependencies, and constrain the optional TypeScript peer to supported Compiler API versions.
+
 ## 2.3.0
 
 ### New Features

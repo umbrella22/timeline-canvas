@@ -160,7 +160,7 @@ function isInsideLoop(lines: string[], lineIndex: number): boolean {
   const lookback = Math.max(0, lineIndex - 20);
   for (let i = lineIndex; i >= lookback; i--) {
     const ln = lines[i];
-    if (/\b(for|while|do)\s*[\(\{]/.test(ln)) return true;
+    if (/\b(for|while|do)\s*[({]/.test(ln)) return true;
     if (/\.(forEach|map|filter|reduce|some|every)\s*\(/.test(ln)) return true;
   }
   return false;

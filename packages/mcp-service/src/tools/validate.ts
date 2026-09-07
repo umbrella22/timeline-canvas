@@ -75,8 +75,8 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
     }
 
     // 4. activate/deactivate pair check
-    const hasActivate = /\bactivate\s*[\(:]/.test(text);
-    const hasDeactivate = /\bdeactivate\s*[\(:]/.test(text);
+    const hasActivate = /\bactivate\s*[(:]/.test(text);
+    const hasDeactivate = /\bdeactivate\s*[(:]/.test(text);
     if (hasActivate && !hasDeactivate) {
       problems.push(
         `'activate' defined without 'deactivate' in ${implRel} — consider adding deactivate for cleanup`
@@ -122,7 +122,7 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
       "getInteractionTarget",
     ];
     const activateBlockMatch = text.match(
-      /activate\s*[\(:][\s\S]*?(?=deactivate|$)/
+      /activate\s*[(:][\s\S]*?(?=deactivate|$)/
     );
     if (activateBlockMatch) {
       const activateBlock = activateBlockMatch[0];
@@ -150,7 +150,7 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
     ];
     if (addListenerCalls.length > 0 && hasDeactivate) {
       const deactivateMatch = text.match(
-        /deactivate\s*[\(:][\s\S]*$/
+        /deactivate\s*[(:][\s\S]*$/
       );
       const deactivateBlock = deactivateMatch?.[0] ?? "";
       for (const match of addListenerCalls) {
@@ -193,7 +193,7 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
     // 6d. Worker creation but not terminated in deactivate
     const workerCreation = /new\s+Worker\s*\(/.test(text);
     if (workerCreation && hasDeactivate) {
-      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateMatch2 = text.match(/deactivate\s*[(:][\s\S]*$/);
       const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
       const hasTerminate = /\.terminate\s*\(\s*\)/.test(deactivateBlock2);
       if (!hasTerminate) {
@@ -207,7 +207,7 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
     const offscreenCreation = /new\s+OffscreenCanvas\s*\(/.test(text);
     const transferToImageBitmap = /transferToImageBitmap\s*\(/.test(text);
     if ((offscreenCreation || transferToImageBitmap) && hasDeactivate) {
-      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateMatch2 = text.match(/deactivate\s*[(:][\s\S]*$/);
       const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
       const hasClose = /\.close\s*\(\s*\)/.test(deactivateBlock2);
       if (!hasClose && transferToImageBitmap) {
@@ -221,7 +221,7 @@ async function validateSinglePlugin(name: string): Promise<CheckResult> {
     const cacheCreation = /new\s+MediaLRUCache\s*\(/.test(text) ||
       /MediaLRUCache/.test(text);
     if (cacheCreation && hasDeactivate) {
-      const deactivateMatch2 = text.match(/deactivate\s*[\(:][\s\S]*$/);
+      const deactivateMatch2 = text.match(/deactivate\s*[(:][\s\S]*$/);
       const deactivateBlock2 = deactivateMatch2?.[0] ?? "";
       const hasCacheClear = /\.clear\s*\(\s*\)/.test(deactivateBlock2);
       if (!hasCacheClear) {

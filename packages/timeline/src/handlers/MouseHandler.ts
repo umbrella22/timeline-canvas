@@ -28,6 +28,9 @@ export class MouseHandler {
   /** 待处理的鼠标移动事件 */
   private pendingMouseMove: MouseEvent | null = null;
 
+  /** 最近一次真实输入事件,用于无坐标的清理路径 */
+  private lastInputEvent: MouseEvent | null = null;
+
   constructor(private timeline: TimelineInteractionAPI) {
     // 初始状态为空闲状态
     this.currentState = new IdleState(timeline);
@@ -95,6 +98,7 @@ export class MouseHandler {
    * 处理鼠标按下事件
    */
   public handleMouseDown(e: MouseEvent): void {
+    this.lastInputEvent = e;
     const ctx = this.createContext(e);
     const newState = this.currentState.handleMouseDown(ctx);
     this.transitionTo(newState);
@@ -125,6 +129,7 @@ export class MouseHandler {
    * 实际处理鼠标移动的逻辑
    */
   private handleMouseMoveImpl(e: MouseEvent): void {
+    this.lastInputEvent = e;
     const ctx = this.createContext(e);
     const newState = this.currentState.handleMouseMove(ctx);
     this.transitionTo(newState);
@@ -134,17 +139,35 @@ export class MouseHandler {
    * 处理鼠标抬起事件
    */
   public handleMouseUp(e?: MouseEvent): void {
-    // 取消pending的RAF
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-      this.pendingMouseMove = null;
+    const pendingMouseMove = this.takePendingMouseMove();
+    if (pendingMouseMove) {
+      this.handleMouseMoveImpl(pendingMouseMove);
     }
 
-    // 如果没有事件对象,创建一个虚拟的
-    const event = e || new MouseEvent("mouseup");
+    const event = e ?? pendingMouseMove ?? this.lastInputEvent;
+    if (!event) {
+      return;
+    }
+
+    this.lastInputEvent = event;
     const ctx = this.createContext(event);
     const newState = this.currentState.handleMouseUp(ctx);
+    this.transitionTo(newState);
+  }
+
+  /**
+   * 取消当前指针交互,丢弃尚未绘制的移动并释放状态资源
+   */
+  public handleCancel(e?: MouseEvent): void {
+    this.takePendingMouseMove();
+    const event = e ?? this.lastInputEvent;
+    if (!event) {
+      return;
+    }
+
+    this.lastInputEvent = event;
+    const ctx = this.createContext(event);
+    const newState = this.currentState.handleCancel(ctx);
     this.transitionTo(newState);
   }
 
@@ -152,6 +175,7 @@ export class MouseHandler {
    * 处理右键菜单事件
    */
   public handleContextMenu(e: MouseEvent): void {
+    this.lastInputEvent = e;
     const ctx = this.createContext(e);
     const newState = this.currentState.handleContextMenu(ctx);
     this.transitionTo(newState);
@@ -161,10 +185,18 @@ export class MouseHandler {
    * 清理资源
    */
   public destroy(): void {
+    this.handleCancel();
+    this.lastInputEvent = null;
+  }
+
+  private takePendingMouseMove(): MouseEvent | null {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+
+    const pendingMouseMove = this.pendingMouseMove;
     this.pendingMouseMove = null;
+    return pendingMouseMove;
   }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import type { TimelineEvent } from "../src/types";
 import { cloneEvent } from "../src/utils/object";

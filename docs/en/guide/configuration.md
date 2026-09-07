@@ -59,6 +59,10 @@ const options = {
 };
 ```
 
+With `snapToSeconds: true`, event dragging, resizing either edge, split previews, and snapped time-indicator positioning use a 1-second interval at every zoom level, regardless of the displayed scale. Event guide snapping retains priority so event boundaries can still align exactly.
+
+When second snapping is disabled, `snapInterval` is measured in minutes. If `scale` is configured, snapping uses its main ticks and switches to subdivisions at `secondPrecisionZoomThreshold`. This threshold no longer limits second-level editing precision.
+
 ### Interaction behavior
 
 ```ts

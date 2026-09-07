@@ -68,6 +68,12 @@ export class TimeIndicatorDragState extends BaseState {
     return this.createIdleState();
   }
 
+  handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    this.timeline.state.draggingTimeIndicator = false;
+    this.timeline.getCanvas().style.cursor = "default";
+    return this.createIdleState();
+  }
+
   private createIdleState(): InteractionState {
     return new IdleState(this.timeline);
   }

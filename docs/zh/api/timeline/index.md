@@ -93,7 +93,7 @@ const timeline = new Timeline("timelineCanvas", {
 ## 销毁实例
 
 ```ts
-timeline.destroy();
+await timeline.destroy();
 ```
 
-`destroy()` 会移除画布监听器并清理交互态。页面卸载或组件销毁时应调用它。
+`destroy()` 会立即停止输入和绘制、释放画布缓冲，并返回一个等待插件清理完成的 Promise，包括尚未结束的初始化。重复调用返回相同的 Promise。在同步组件清理函数中，可以使用 `void timeline.destroy()` 发起清理。

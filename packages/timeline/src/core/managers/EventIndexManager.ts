@@ -1,8 +1,13 @@
 import type { TimelineState } from "../../types";
 
+interface TrackIntervalIndex {
+  indices: number[];
+  maxEnds: Float64Array;
+}
+
 export class EventIndexManager {
   private state: TimelineState;
-  private sortedIndices: Map<number, number[]> = new Map();
+  private trackIndices = new Map<number, TrackIntervalIndex>();
   private dirtyTracks: Set<number> = new Set();
   private batching = false;
 
@@ -15,7 +20,7 @@ export class EventIndexManager {
   }
 
   public invalidateAll(): void {
-    this.sortedIndices.clear();
+    this.trackIndices.clear();
     this.dirtyTracks.clear();
   }
 
@@ -25,48 +30,39 @@ export class EventIndexManager {
 
   public endBatch(): void {
     if (!this.batching) return;
-    // Apply pending sorts once
-    for (const trackIndex of Array.from(this.dirtyTracks)) {
-      const track = this.state.tracks[trackIndex];
-      const indices = track.events.map((_, i) => i);
-      indices.sort(
-        (a, b) => track.events[a].startTime - track.events[b].startTime
-      );
-      this.sortedIndices.set(trackIndex, indices);
+    for (const trackIndex of this.dirtyTracks) {
+      if (this.state.tracks[trackIndex]) this.ensureIndex(trackIndex);
+      else this.trackIndices.delete(trackIndex);
     }
     this.dirtyTracks.clear();
     this.batching = false;
   }
 
-  private ensureSorted(trackIndex: number): number[] {
-    if (
-      this.batching &&
-      this.sortedIndices.has(trackIndex) &&
-      !this.dirtyTracks.has(trackIndex)
-    ) {
-      return this.sortedIndices.get(trackIndex)!;
-    }
-    if (
-      this.dirtyTracks.has(trackIndex) ||
-      !this.sortedIndices.has(trackIndex)
-    ) {
-      const track = this.state.tracks[trackIndex];
-      const indices = track.events.map((_, i) => i);
-      indices.sort(
-        (a, b) => track.events[a].startTime - track.events[b].startTime
-      );
-      this.sortedIndices.set(trackIndex, indices);
-      this.dirtyTracks.delete(trackIndex);
-    }
-    return this.sortedIndices.get(trackIndex)!;
+  private ensureIndex(trackIndex: number): TrackIntervalIndex {
+    const cached = this.trackIndices.get(trackIndex);
+    if (cached && !this.dirtyTracks.has(trackIndex)) return cached;
+
+    const events = this.state.tracks[trackIndex].events;
+    const indices = events.map((_, i) => i);
+    indices.sort((a, b) => events[a].startTime - events[b].startTime);
+    const maxEnds = new Float64Array(indices.length * 4).fill(-Infinity);
+    const build = (node: number, left: number, right: number): number => {
+      if (left === right) return (maxEnds[node] = events[indices[left]].endTime);
+      const mid = (left + right) >>> 1;
+      return (maxEnds[node] = Math.max(
+        build(node * 2, left, mid),
+        build(node * 2 + 1, mid + 1, right),
+      ));
+    };
+    if (indices.length) build(1, 0, indices.length - 1);
+    const index = { indices, maxEnds };
+    this.trackIndices.set(trackIndex, index);
+    this.dirtyTracks.delete(trackIndex);
+    return index;
   }
 
-  public getCandidatesByTime(
-    trackIndex: number,
-    time: number,
-    margin = 0
-  ): number[] {
-    const sorted = this.ensureSorted(trackIndex);
+  public getCandidatesByTime(trackIndex: number, time: number, margin = 0): number[] {
+    const { indices: sorted, maxEnds } = this.ensureIndex(trackIndex);
     const track = this.state.tracks[trackIndex];
     let lo = 0,
       hi = sorted.length - 1,
@@ -85,22 +81,18 @@ export class EventIndexManager {
     }
     if (pos === -1) return [];
     const candidates: number[] = [];
-    for (let i = pos; i >= 0; i--) {
-      const idx = sorted[i];
-      const ev = track.events[idx];
-      if (ev.startTime > time + margin) continue;
-      // 不能用 break：按 startTime 排序时 endTime 不单调，
-      // break 会跳过 startTime 更小但 endTime 覆盖 time 的长事件
-      if (ev.endTime < time - margin) continue;
-      candidates.push(idx);
-    }
-    // Also check right side in case of future-start events still within margin
-    for (let i = pos + 1; i < sorted.length; i++) {
-      const idx = sorted[i];
-      const ev = track.events[idx];
-      if (ev.startTime > time + margin) break;
-      candidates.push(idx);
-    }
+    // Prune completed subtrees without discarding earlier, enclosing intervals.
+    const visit = (node: number, left: number, right: number): void => {
+      if (left > pos || maxEnds[node] < time - margin) return;
+      if (left === right) {
+        candidates.push(sorted[left]);
+        return;
+      }
+      const mid = (left + right) >>> 1;
+      visit(node * 2 + 1, mid + 1, right);
+      visit(node * 2, left, mid);
+    };
+    visit(1, 0, sorted.length - 1);
     return candidates;
   }
 }

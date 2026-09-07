@@ -209,6 +209,10 @@ export class LayerBufferManager {
    * 释放所有缓冲区
    */
   dispose(): void {
+    for (const buffer of this.buffers.values()) {
+      buffer.canvas.width = 0;
+      buffer.canvas.height = 0;
+    }
     this.buffers.clear();
     this.width = 0;
     this.height = 0;

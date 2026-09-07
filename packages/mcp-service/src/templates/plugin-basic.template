@@ -3,9 +3,9 @@ import { PluginType } from "../../plugins/types";
 
 export const {{EXPORT_NAME}}: TimelinePlugin = {
   metadata: {
-    name: "{{METADATA_NAME}}",
-    version: "{{VERSION}}",
-    description: "{{DESCRIPTION}}",
+    name: {{METADATA_NAME_LITERAL}},
+    version: {{VERSION_LITERAL}},
+    description: {{DESCRIPTION_LITERAL}},
     type: PluginType.{{PLUGIN_TYPE_KEY}},
   },
 {{#IF hasInit}}
@@ -16,7 +16,7 @@ export const {{EXPORT_NAME}}: TimelinePlugin = {
   activate(_context) {
 {{#IF renderLayer}}
     _context.api.registerRenderLayer({
-      name: "{{METADATA_NAME}}-layer",
+      name: {{RENDER_LAYER_NAME_LITERAL}},
       position: "overlay",
       render: (_ctx, _canvas, _config, _state) => {
         // TODO: implement render
@@ -30,7 +30,7 @@ export const {{EXPORT_NAME}}: TimelinePlugin = {
   },
   deactivate(_context) {
 {{#IF renderLayer}}
-    _context.api.unregisterRenderLayer("{{METADATA_NAME}}-layer");
+    _context.api.unregisterRenderLayer({{RENDER_LAYER_NAME_LITERAL}});
 {{/IF}}
   },
 {{#IF lifecycle}}

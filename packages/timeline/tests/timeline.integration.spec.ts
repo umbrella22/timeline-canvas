@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   LightThemePlugin,
@@ -9,6 +9,9 @@ import {
 import { PluginType, type TimelinePlugin } from "../src/plugins/types";
 import { MutexGuardPlugin } from "../src/plugins/builtin/MutexGuardPlugin";
 import { createMockCanvas } from "./helpers";
+import { LayerBufferManager } from "../src/core/managers/LayerBufferManager";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function createTimeline(
   options: ConstructorParameters<typeof Timeline>[1] = {}
@@ -25,6 +28,82 @@ function createTimeline(
 }
 
 describe("Timeline integration", () => {
+  it("rebuilds all layers when DPR changes without changing the CSS size or hit coordinates", async () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const queries: MediaQueryList[] = [];
+    vi.spyOn(window, "matchMedia").mockImplementation((media) => {
+      const query = Object.assign(new EventTarget(), {
+        media,
+        matches: true,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      }) as MediaQueryList;
+      queries.push(query);
+      return query;
+    });
+    const initializeBuffers = vi.spyOn(LayerBufferManager.prototype, "initialize");
+    const timeline = createTimeline({
+      timelineHeight: 20,
+      firstTrackTopMargin: 0,
+      trackHeight: 40,
+    });
+    timeline.loadData({ tracks: [{ events: [{ startTime: 2, endTime: 8, title: "Sharp text" }] }] });
+    const canvas = timeline.getCanvas();
+    const hit = timeline.getEventAtPosition(50, 40);
+    const zoom = timeline.state.zoomLevel;
+
+    expect([canvas.width, canvas.height]).toEqual([200, 120]);
+    expect(queries[0].media).toBe("(resolution: 1dppx)");
+    for (const dpr of [2, 1.25, 1]) {
+      vi.stubGlobal("devicePixelRatio", dpr);
+      queries.at(-1)!.dispatchEvent(new Event("change"));
+      expect([canvas.width, canvas.height]).toEqual([200 * dpr, 120 * dpr]);
+      expect([canvas.style.width, canvas.style.height]).toEqual(["200px", "120px"]);
+      expect(initializeBuffers).toHaveBeenLastCalledWith(200, 120, dpr);
+      expect(timeline.getEventAtPosition(50, 40)).toEqual(hit);
+      expect(timeline.state.zoomLevel).toBe(zoom);
+      expect(queries.at(-1)!.media).toBe(`(resolution: ${dpr}dppx)`);
+    }
+
+    await timeline.destroy();
+    initializeBuffers.mockClear();
+    vi.stubGlobal("devicePixelRatio", 2);
+    queries.at(-1)!.dispatchEvent(new Event("change"));
+    window.dispatchEvent(new Event("resize"));
+    expect([canvas.width, canvas.height]).toEqual([200, 120]);
+    expect(initializeBuffers).not.toHaveBeenCalled();
+  });
+
+  it("refreshes DPR when the host explicitly resizes the canvas", async () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const timeline = createTimeline();
+    vi.stubGlobal("devicePixelRatio", 2);
+    timeline.setCanvasSize(300, 180);
+    expect([timeline.getCanvas().width, timeline.getCanvas().height]).toEqual([600, 360]);
+    expect(timeline.getCanvas().style.width).toBe("300px");
+    await timeline.destroy();
+  });
+
+  it("destroy releases plugins once and prevents subsequent drawing or loading", async () => {
+    const timeline = createTimeline();
+    const deactivate = vi.fn();
+    const destroy = vi.fn();
+    await timeline.usePlugin({
+      metadata: { name: "cleanup", version: "1.0.0", description: "cleanup", type: PluginType.EXTENSION },
+      deactivate,
+      destroy,
+    });
+    const disposal = timeline.destroy();
+    expect(timeline.destroy()).toBe(disposal);
+    await disposal;
+    expect(deactivate).toHaveBeenCalledTimes(1);
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(timeline.getLoadedPlugins()).toEqual([]);
+    await expect(timeline.usePlugin(LightThemePlugin)).resolves.toBe(false);
+    expect(() => timeline.draw()).not.toThrow();
+  });
+
   it("内置插件 metadata 描述支持按 locale 解析", () => {
     expect(getPluginMetadataDescription(DarkThemePlugin.metadata, "zh-CN")).toBe(
       "时间轴暗色主题"
@@ -231,7 +310,7 @@ describe("Timeline integration", () => {
     expect(timeline.isPluginLoaded("theme-light")).toBe(true);
     expect(timeline.config.colors.canvasBackground).toBe("#FFFFFF");
     expect(timeline.config.colors.eventColors[0]).toBe("rgba(63, 118, 252, 0.16)");
-    expect(timeline.config.colors.eventText).toBe("#FFFFFF");
+    expect(timeline.config.colors.eventText).toBe("#173B75");
     expect(timeline.config.colors.eventOverlay).toBe("rgba(63, 118, 252, 0.12)");
   });
 

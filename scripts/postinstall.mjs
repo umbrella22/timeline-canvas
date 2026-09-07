@@ -26,6 +26,7 @@ const run = (cmd, args) => {
 const builds = [
     'timeline-canvas',
     'timeline-canvas-mcp',
+    'timeline-canvas-user-mcp',
 ]
 
 await Promise.all(builds.map((pkg) => run('pnpm', ['--filter', pkg, 'build'])))

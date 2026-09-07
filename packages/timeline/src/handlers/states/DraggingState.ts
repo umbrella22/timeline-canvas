@@ -362,6 +362,13 @@ export class DraggingState extends BaseState {
     return this.createIdleState();
   }
 
+  handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    this.timeline.state.draggingEvent = null;
+    this.timeline.getCanvas().style.cursor = "default";
+    this.timeline.notifyChange("events:move");
+    return this.createIdleState();
+  }
+
   private createIdleState(): InteractionState {
     return new IdleState(this.timeline);
   }
