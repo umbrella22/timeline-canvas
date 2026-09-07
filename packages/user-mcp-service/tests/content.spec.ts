@@ -137,8 +137,9 @@ function createRuntimeContext() {
 }
 
 describe("getUsageGuide", () => {
-  it("returns framework examples using the public package API and container resizing", async () => {
-    for (const framework of ["vanilla", "react", "vue"] as const) {
+  it.each(["vanilla", "react", "vue"] as const)(
+    "returns a %s example using the public package API and container resizing",
+    async (framework) => {
       const guide = getUsageGuide({ framework });
       const source = guide.files.map((file) => file.content).join("\n");
 
@@ -161,35 +162,34 @@ describe("getUsageGuide", () => {
       expect(source).not.toMatch(/timeline-canvas\/(src|dist|plugins|core)/);
       expect(guide.notes.join(" ")).toContain("ResizeObserver");
       expect(guide.notes.join(" ")).toContain("1.4.1");
-    }
 
-    const vanilla = getUsageGuide({ framework: "vanilla" });
-    const vanillaMain = vanilla.files.find((file) => file.path === "src/main.ts");
-    expect(vanillaMain).toBeDefined();
-    await expectProgramToCompile(vanillaMain!.content, "guide/main.ts");
-    expect(vanillaMain!.content).toContain("let disposed = false;");
-    expect(vanillaMain!.content).toContain("if (disposed) return;");
-    expect(vanillaMain!.content).toContain("disposed = true;");
-
-    const react = getUsageGuide({ framework: "react" });
-    const reactSource = react.files.find((file) => file.path.endsWith(".tsx"));
-    expect(reactSource).toBeDefined();
-    await expectProgramToCompile(
-      reactSource!.content,
-      "guide/TimelineExample.tsx",
-      ts.ScriptKind.TSX,
-    );
-    expect(reactSource!.content).toContain("if (cancelled) return;");
-    expect(reactSource!.content).toContain("if (cancelled) await timeline.destroy();");
-
-    const vue = getUsageGuide({ framework: "vue" });
-    const vueSource = vue.files.find((file) => file.path.endsWith(".vue"));
-    const vueScript = vueSource?.content.match(
-      /<script setup lang="ts">\n([\s\S]*?)<\/script>/,
-    )?.[1];
-    expect(vueScript).toBeDefined();
-    await expectProgramToCompile(vueScript!, "guide/TimelineExample.vue.ts");
-  });
+      if (framework === "vanilla") {
+        const main = guide.files.find((file) => file.path === "src/main.ts");
+        expect(main).toBeDefined();
+        await expectProgramToCompile(main!.content, "guide/main.ts");
+        expect(main!.content).toContain("let disposed = false;");
+        expect(main!.content).toContain("if (disposed) return;");
+        expect(main!.content).toContain("disposed = true;");
+      } else if (framework === "react") {
+        const component = guide.files.find((file) => file.path.endsWith(".tsx"));
+        expect(component).toBeDefined();
+        await expectProgramToCompile(
+          component!.content,
+          "guide/TimelineExample.tsx",
+          ts.ScriptKind.TSX,
+        );
+        expect(component!.content).toContain("if (cancelled) return;");
+        expect(component!.content).toContain("if (cancelled) await timeline.destroy();");
+      } else {
+        const component = guide.files.find((file) => file.path.endsWith(".vue"));
+        const script = component?.content.match(
+          /<script setup lang="ts">\n([\s\S]*?)<\/script>/,
+        )?.[1];
+        expect(script).toBeDefined();
+        await expectProgramToCompile(script!, "guide/TimelineExample.vue.ts");
+      }
+    },
+  );
 
   it("returns fresh file records on each call", () => {
     const first = getUsageGuide({ framework: "vanilla" });
@@ -199,8 +199,9 @@ describe("getUsageGuide", () => {
 });
 
 describe("generatePlugin", () => {
-  it("generates every template against the installed public type surface", async () => {
-    for (const template of ["basic", "render", "event-handler"] as const) {
+  it.each(["basic", "render", "event-handler"] as const)(
+    "generates the %s template against the installed public type surface",
+    async (template) => {
       const result = generatePlugin({
         template,
         exportName: "createExamplePlugin",
@@ -219,8 +220,8 @@ describe("generatePlugin", () => {
       expect(result.notes.join(" ")).toContain("1.4.1");
       expect(result.notes.join(" ")).toContain("do not claim compatibility with every version");
       await expectProgramToCompile(result.files[0].content, `plugins/${template}.ts`);
-    }
-  });
+    },
+  );
 
   it("preserves encoded metadata strings through generated source", () => {
     const name = 'name "quoted" \\ slash\nnext ${value}';
