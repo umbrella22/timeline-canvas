@@ -1,3 +1,2 @@
-import "../types-BovVI9wC.mjs";
-import { t as ContextMenuPlugin } from "../ContextMenuPlugin-Ce29-J1v.mjs";
+import { t as ContextMenuPlugin } from "../ContextMenuPlugin-C84Iiz8U.mjs";
 export { ContextMenuPlugin };

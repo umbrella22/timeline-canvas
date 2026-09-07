@@ -1,7 +1,9 @@
 import TimelinePlayground from "../public/components/TimelinePlayground";
 
-Explore the core features of Timeline Canvas.
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
+    Playground
+  </h1>
 
-> Try adding tracks and events, dragging to adjust them, and using the context menu.
-
-<TimelinePlayground lang="en" />
+  <TimelinePlayground lang="en" />
+</main>

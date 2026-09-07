@@ -50,15 +50,15 @@ const AutoLocale = () => {
     const originalPush = history.pushState;
     const originalReplace = history.replaceState;
 
-    history.pushState = function (...args) {
-      originalPush.apply(this, args as any);
+    history.pushState = function (this: History, ...args: Parameters<History['pushState']>) {
+      originalPush.apply(this, args);
       notify();
-    } as any;
+    };
 
-    history.replaceState = function (...args) {
-      originalReplace.apply(this, args as any);
+    history.replaceState = function (this: History, ...args: Parameters<History['replaceState']>) {
+      originalReplace.apply(this, args);
       notify();
-    } as any;
+    };
 
     window.addEventListener('popstate', notify);
     window.addEventListener('rspress:locationchange', syncLocaleToStorage);
@@ -75,4 +75,3 @@ const AutoLocale = () => {
 };
 
 export default AutoLocale;
-

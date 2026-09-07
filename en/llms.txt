@@ -12,6 +12,7 @@
 
 ## Plugins
 
+- [Built-in Plugins](/timeline-canvas/en/plugins/builtin/index.md)
 - [ContextMenuPlugin](/timeline-canvas/en/plugins/builtin/context-menu.md)
 - [EventTooltipPlugin](/timeline-canvas/en/plugins/builtin/event-tooltip.md)
 - [LightThemePlugin](/timeline-canvas/en/plugins/builtin/light-theme.md)
@@ -19,27 +20,27 @@
 - [PerformanceOverlayPlugin](/timeline-canvas/en/plugins/builtin/performance-overlay.md)
 - [EventMediaPlugin](/timeline-canvas/en/plugins/builtin/event-media.md)
 - [MutexGuardPlugin](/timeline-canvas/en/plugins/builtin/mutex-guard.md)
-- [Built-in Plugins](/timeline-canvas/en/plugins/builtin/index.md)
 
 ## API
 
+- [Timeline API Overview](/timeline-canvas/en/api/timeline/index.md)
 - [Data Management API](/timeline-canvas/en/api/timeline/data-management.md)
 - [View, Interaction, and State API](/timeline-canvas/en/api/timeline/view-control.md)
 - [Plugin Management API](/timeline-canvas/en/api/timeline/plugin-management.md)
 - [Event Callbacks API](/timeline-canvas/en/api/timeline/event-listeners.md)
 - [Type Definitions](/timeline-canvas/en/api/timeline/types.md)
-- [Timeline API Overview](/timeline-canvas/en/api/timeline/index.md)
 
 ## Playground
 
-- [](/timeline-canvas/en/playground.md)
+- [Playground](/timeline-canvas/en/playground.md)
 
 ## Other
 
 - [Performance & Monitoring](/timeline-canvas/en/advanced/performance.md)
 - [Installation & Build](/timeline-canvas/en/guide/installation.md)
-- [MCP Service (for Copilot Chat / AI CLI)](/timeline-canvas/en/guide/mcp.md)
+- [Maintainer MCP Service](/timeline-canvas/en/guide/mcp.md)
 - [Usage & Examples](/timeline-canvas/en/guide/usage.md)
+- [User MCP Service](/timeline-canvas/en/guide/user-mcp.md)
 - [Advanced Topics](/timeline-canvas/en/plugins/plugin-development/advanced.md)
 - [Core API](/timeline-canvas/en/plugins/plugin-development/api.md)
 - [Best Practices](/timeline-canvas/en/plugins/plugin-development/best-practices.md)

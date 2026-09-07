@@ -1,7 +1,7 @@
 import TimelinePlayground from "../public/components/TimelinePlayground";
 
-体验 Timeline Canvas 的核心功能。
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>演练场</h1>
 
-> 你可以尝试添加轨道、事件，拖拽调整，以及使用右键菜单等功能
-
-<TimelinePlayground lang="zh" />
+  <TimelinePlayground lang="zh" />
+</main>

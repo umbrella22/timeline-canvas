@@ -89,7 +89,7 @@ const timeline = new Timeline("timelineCanvas", {
 ## Destroying an instance
 
 ```ts
-timeline.destroy();
+await timeline.destroy();
 ```
 
-Call `destroy()` when the canvas is going away, such as during component unmount or page teardown.
+`destroy()` stops input and rendering immediately, releases canvas buffers, and returns a promise that resolves after plugin cleanup, including pending initialization. Repeated calls return the same promise. During synchronous component cleanup, `void timeline.destroy()` starts the same cleanup without waiting.

@@ -1,3 +1,2 @@
-import "../types-BovVI9wC.mjs";
-import { t as PerformanceOverlayPlugin } from "../PerformanceOverlayPlugin-BmjL92Bg.mjs";
+import { t as PerformanceOverlayPlugin } from "../PerformanceOverlayPlugin-DDmW-ils.mjs";
 export { PerformanceOverlayPlugin };

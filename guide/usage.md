@@ -114,7 +114,7 @@ timeline.deleteEvent(0, 0);
 import { PerformanceOverlayPlugin } from "timeline-canvas";
 
 // 基础使用
-timeline.usePlugin(PerformanceOverlayPlugin);
+await timeline.usePlugin(PerformanceOverlayPlugin);
 
 // 性能监控的开关和调试模式由 TimelineConfig 控制
 // enablePerformanceMonitor: true
@@ -252,7 +252,7 @@ interface ContextMenuData {
 
 ```javascript
 // 初始化为亮色主题
-timeline.usePlugin(LightThemePlugin);
+await timeline.usePlugin(LightThemePlugin);
 
 // 在运行时切换为暗色主题
 timeline.setTheme("dark");
