@@ -103,3 +103,22 @@ The source render order is:
 - `interaction`
 - `scrollbar`
 - `overlay`
+
+## Unified event content rendering renderEventContent (added in 1.6)
+
+`TimelineOptions.renderEventContent` is the single entry point for the content of every visible event across normal, drag and resize phases; when omitted the core default text rendering is used. The callback receives an `EventContentRenderContext`: ctx, event, track, trackIndex/eventIndex, `rect` (full event block in CSS px, scroll-adjusted, including eventVerticalPadding), `clipRect` (intersection of the content with the drawable viewport, excluding the timeline axis and scrollbars), `phase: 'normal' | 'drag' | 'resize'`, selected/highlighted/readonly, dpr and `drawDefaultContent()` (executed at most once per invocation).
+
+```ts
+const timeline = new Timeline("canvas", {
+  renderEventContent(context) {
+    const { ctx, rect, event } = context;
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(String(event.title), rect.x + 8, rect.y + 6, rect.width - 16);
+    ctx.restore();
+    // skipping drawDefaultContent() takes over the content completely
+  },
+});
+```
+
+Constraints: context data is read-only; the order is background → media hook → custom/default content → selection border/handles and other decorations; a throwing callback is logged with a fixed error code and falls back to the default content (the media hook is not drawn twice) and rendering recovers on the next frame; the callback must not change the core hit rectangle or bypass readOnly.

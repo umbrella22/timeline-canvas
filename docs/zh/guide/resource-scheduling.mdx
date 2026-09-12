@@ -1,0 +1,20 @@
+---
+pageType: custom
+title: 资源排程查看
+---
+
+import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>资源排程查看</h1>
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    固定左栏显示产线名称/状态/利用率，任务显示工单号、数量、完成百分比与告警。
+    查看模式可点击工单查看详情；增量刷新与视口订阅保持业务身份稳定。
+    「启用异步提交」后进入 M2 编辑协议（需先启动 <code>node scripts/schedule-demo-server.mjs</code>）：
+    拖动/拉伸产生候选 → 同步校验 → onBeforeCommit 提交 → 服务器接受/拒绝/修正；
+    写后断连等未知结果进入「保存结果待确认」（画布内琥珀色“待核对”角标），同任务锁定，
+    需「查询权威恢复」经 reconcileScheduleEvent 解除。演示服务器只权威管理时间窗/产线，
+    恢复时内容字段取自本地已确认事实。导出与查询始终只含已确认事实。
+  </p>
+  <ResourceScheduleHost lang="zh" />
+</main>

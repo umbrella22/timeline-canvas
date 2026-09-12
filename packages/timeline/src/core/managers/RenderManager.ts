@@ -137,6 +137,14 @@ export class RenderManager {
     return this.canvas.height / this.dpr;
   }
 
+  public getDevicePixelRatio(): number {
+    return this.dpr;
+  }
+
+  public getViewportManager(): ViewportManager {
+    return this.viewport;
+  }
+
   public getCachedLogicalWidth(): number {
     if (!this.cacheValid) {
       this.cachedLogicalWidth = this.canvas.width / this.dpr;

@@ -13,6 +13,12 @@ import {
   getTimeX,
 } from "../../utils";
 import { IdleState } from "./IdleState";
+import {
+  POINTER_CANCELLED_REASON,
+  abortGesture,
+  cancelAllPreviewsAndAbort,
+  cancelDriftedGesture,
+} from "./gestureAbort";
 import { getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("DraggingState");
@@ -41,6 +47,8 @@ export class DraggingState extends BaseState {
     const state = this.timeline.state;
     state.guideLines = [];
     state.dragTimeReference = null;
+    // cursor 复位统一在 onExit：成功/终止/取消路径一致，不再散落各分支
+    this.timeline.getCanvas().style.cursor = "default";
     this.timeline.endIndexBatch();
     this.timeline.autoRemoveEmptyLastTrack();
   }
@@ -79,14 +87,62 @@ export class DraggingState extends BaseState {
       eventIndex < 0 ||
       eventIndex >= state.tracks[trackIndex].events.length
     ) {
+      // M2：索引漂移可能使手势事件消失——原 preview 事务不得成为孤儿
+      if (
+        this.timeline.editTransactions.active &&
+        state.draggingEvent.originBusinessId !== undefined
+      ) {
+        return cancelDriftedGesture(
+          this.timeline,
+          state.draggingEvent.originBusinessId,
+          "draggingEvent",
+          "events:move",
+        );
+      }
       logger.warn(this.timeline.t("warningInvalidDraggingState"), {
         value: state.draggingEvent,
       });
-      state.draggingEvent = null;
-      return this.createIdleState();
+      return abortGesture(this.timeline, "draggingEvent", "events:move");
     }
 
     const event = state.tracks[trackIndex].events[eventIndex];
+
+    // M2：手势期间宿主修改数据（如删除同轨前序事件）会使下标漂移——
+    // 命中的事件不再是手势开始时的对象时，取消原 preview 事务并终止手势
+    if (
+      this.timeline.editTransactions.active &&
+      state.draggingEvent.originBusinessId !== undefined &&
+      event.businessId !== state.draggingEvent.originBusinessId
+    ) {
+      return cancelDriftedGesture(
+        this.timeline,
+        state.draggingEvent.originBusinessId,
+        "draggingEvent",
+        "events:move",
+      );
+    }
+
+    // M2 编辑协议：动作开始即捕获 before 快照；busy 等拒绝直接终止本次编辑。
+    // 已存在非 preview 事务（pending/待核对）同样终止：绝不能落入 legacy 事实施改路径
+    if (this.timeline.editTransactions.active && event.businessId !== undefined) {
+      const existingTransaction = this.timeline.editTransactions.getTransaction(event.businessId);
+      if (existingTransaction && existingTransaction.state !== "preview") {
+        this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
+        return abortGesture(this.timeline, "draggingEvent", "events:move");
+      }
+      if (!existingTransaction) {
+        const beginResult = this.timeline.editTransactions.tryBegin({
+          event,
+          trackIndex,
+          eventIndex,
+          action: "move",
+        });
+        if (!beginResult.ok) {
+          this.timeline.setStatus(`${beginResult.code}: ${beginResult.reason}`);
+          return abortGesture(this.timeline, "draggingEvent", "events:move");
+        }
+      }
+    }
 
     this.timeline.setStatus(
       this.timeline.t("statusDragging", { title: event.title })
@@ -105,6 +161,48 @@ export class DraggingState extends BaseState {
         (config.trackHeight + config.trackMargin)
     );
 
+    // M2 编辑协议：候选校验 + 草稿更新；不修改确认事实，不自动创建产线。
+    // 协议激活且事件带业务身份时绝不落入 legacy 事实施改路径——即使宿主在
+    // setStatus 等同步回调中重入变更 API 使事务失效，也只终止手势
+    if (this.timeline.editTransactions.active && event.businessId !== undefined) {
+      const transaction = this.timeline.editTransactions.getTransaction(event.businessId);
+      if (!transaction || transaction.state !== "preview") {
+        this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
+        return abortGesture(this.timeline, "draggingEvent", "events:move");
+      }
+      if (targetTrackIndex >= state.tracks.length) targetTrackIndex = state.tracks.length - 1;
+      if (targetTrackIndex < 0) targetTrackIndex = 0;
+      const newEndTime = fixFloatPrecision(newStartTime + event.duration);
+      const validation = this.timeline.validateScheduleEditCandidate({
+        eventBusinessId: event.businessId,
+        fromTrackIndex: trackIndex,
+        fromEventIndex: eventIndex,
+        toTrackIndex: targetTrackIndex,
+        startTime: newStartTime,
+        endTime: newEndTime,
+      });
+      if (validation.allowed) {
+        const targetResource = state.tracks[targetTrackIndex].businessId;
+        if (targetResource !== undefined) {
+          this.timeline.editTransactions.updateDraft(
+            event.businessId,
+            { resourceBusinessId: targetResource, startTime: newStartTime, endTime: newEndTime },
+            targetTrackIndex,
+          );
+        }
+      } else {
+        this.timeline.editTransactions.markCandidateInvalid(event.businessId);
+        this.timeline.setStatus(`${validation.code}: ${validation.reason}`);
+      }
+      if (state.draggingEvent) {
+        state.draggingEvent.currentMouseX = logicalX;
+        state.draggingEvent.currentMouseY = logicalY;
+        state.draggingEvent.canMove = validation.allowed;
+      }
+      this.timeline.notifyChange("events:move");
+      return null;
+    }
+
     // 自动添加轨道
     if (config.autoAddTrack && targetTrackIndex >= state.tracks.length) {
       const newTrack: Track = { id: state.tracks.length, events: [] };
@@ -117,6 +215,9 @@ export class DraggingState extends BaseState {
       if (this.timeline.callbacks.onTrackAdd) {
         this.timeline.callbacks.onTrackAdd(newTrack);
       }
+      // 拖拽自动加轨绕过了 addTrack 入口，必须补发视口相关变更，
+      // 否则订阅者快照（visibleTrackRange/revision）保持陈旧
+      this.timeline.notifyChange("tracks:add");
     }
 
     targetTrackIndex = Math.max(
@@ -266,6 +367,8 @@ export class DraggingState extends BaseState {
 
         this.timeline.invalidateIndexTrack(targetTrackIndex);
         this.timeline.invalidateIndexTrack(trackIndex);
+        this.timeline.invalidateBusinessIndexTrack(targetTrackIndex);
+        this.timeline.invalidateBusinessIndexTrack(trackIndex);
       }
     }
 
@@ -295,8 +398,7 @@ export class DraggingState extends BaseState {
         trackIndex,
         eventIndex,
       });
-      state.draggingEvent = null;
-      return this.createIdleState();
+      return cancelAllPreviewsAndAbort(this.timeline, "draggingEvent", "events:move");
     }
 
     const event = state.tracks[trackIndex]?.events[eventIndex];
@@ -305,13 +407,56 @@ export class DraggingState extends BaseState {
         trackIndex,
         eventIndex,
       });
-      state.draggingEvent = null;
-      return this.createIdleState();
+      return cancelAllPreviewsAndAbort(this.timeline, "draggingEvent", "events:move");
+    }
+
+    // M2：mouseup 与 mousemove 同等的身份校验——最后一条 move 处理完之后、
+    // mouseup 之前宿主改动数据会使下标漂移，按漂移后下标结算会提交错误事件
+    if (
+      this.timeline.editTransactions.active &&
+      state.draggingEvent.originBusinessId !== undefined &&
+      event.businessId !== state.draggingEvent.originBusinessId
+    ) {
+      return cancelDriftedGesture(
+        this.timeline,
+        state.draggingEvent.originBusinessId,
+        "draggingEvent",
+        "events:move",
+      );
     }
     const wasSelected =
       state.selectedEvent &&
       state.selectedEvent.trackIndex === originalTrackIndex &&
       state.selectedEvent.eventIndex === originalEventIndex;
+
+    // M2 编辑协议：preview 事务落点提交（校验失败/业务拒绝已由 cancelPreview 清理并通知）；
+    // 协议激活且事件带业务身份时绝不回落 legacy 结算：pending/待核对事务的真实拖拽
+    // 防御性终止（协议路径未改事实，不发布虚假 onEventMove）；事务在手势中途被宿主
+    // 作废时同样终止。锁定事件的单击保留点击语义，但不覆盖 busy 反馈。
+    const activeTransaction =
+      event.businessId !== undefined
+        ? this.timeline.editTransactions.getTransaction(event.businessId)
+        : undefined;
+    if (event.businessId !== undefined && activeTransaction?.state === "preview") {
+      this.timeline.commitScheduleEdit(event.businessId);
+      return abortGesture(this.timeline, "draggingEvent", "events:move");
+    }
+    let lockedClick = false;
+    if (event.businessId !== undefined && this.timeline.editTransactions.active) {
+      if (activeTransaction) {
+        if (state.draggingEvent.isDragging) {
+          this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
+          return abortGesture(this.timeline, "draggingEvent", "events:move");
+        }
+        lockedClick = true;
+        this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
+      } else if (state.draggingEvent.isDragging) {
+        // 协议激活的真实拖拽在手势中途丢失事务（宿主作废）：绝不回落 legacy 结算；
+        // 无事务的单击是普通点击，仍走点击语义
+        this.timeline.setStatus("cancelled: edit operation invalidated during gesture");
+        return abortGesture(this.timeline, "draggingEvent", "events:move");
+      }
+    }
 
     if (state.draggingEvent.isDragging) {
       this.timeline.setStatus(
@@ -327,19 +472,29 @@ export class DraggingState extends BaseState {
       }
 
       if (this.timeline.callbacks.onEventMove) {
+        // M2 回调扩展：oldEvent 与源/目标资源业务身份；旧字段保持不变
+        const fromTrack = state.tracks[originalTrackIndex];
+        const toTrack = state.tracks[trackIndex];
         this.timeline.callbacks.onEventMove({
           trackIndex,
           eventIndex,
           event: cloneEvent(event),
           fromTrackIndex: originalTrackIndex,
+          ...(state.draggingEvent?.oldEvent ? { oldEvent: state.draggingEvent.oldEvent } : {}),
+          ...(fromTrack?.businessId !== undefined
+            ? { fromResourceBusinessId: fromTrack.businessId }
+            : {}),
+          ...(toTrack?.businessId !== undefined ? { toResourceBusinessId: toTrack.businessId } : {}),
         });
       }
     } else {
-      // 没有实际拖拽,只是点击
+      // 没有实际拖拽,只是点击（锁定事件保留点击语义，但不覆盖 busy 反馈）
       state.selectedEvent = { trackIndex, eventIndex } as SelectedEvent;
-      this.timeline.setStatus(
-        this.timeline.t("statusEventSelected", { title: event.title })
-      );
+      if (!lockedClick) {
+        this.timeline.setStatus(
+          this.timeline.t("statusEventSelected", { title: event.title })
+        );
+      }
 
       if (this.timeline.callbacks.onEventClick) {
         this.timeline.callbacks.onEventClick({
@@ -363,10 +518,13 @@ export class DraggingState extends BaseState {
   }
 
   handleCancel(_ctx: MouseEventContext): InteractionState | null {
-    this.timeline.state.draggingEvent = null;
-    this.timeline.getCanvas().style.cursor = "default";
-    this.timeline.notifyChange("events:move");
-    return this.createIdleState();
+    // M2 编辑协议：预览取消（尚无副作用），清空候选草稿
+    return cancelAllPreviewsAndAbort(
+      this.timeline,
+      "draggingEvent",
+      "events:move",
+      POINTER_CANCELLED_REASON,
+    );
   }
 
   private createIdleState(): InteractionState {

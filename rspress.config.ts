@@ -48,13 +48,26 @@ export default defineConfig({
           { text: "配置", link: "/guide/configuration" },
           { text: "插件", link: "/plugins/builtin" },
           { text: "API", link: "/api/timeline" },
-          { text: "演练场", link: "/playground" },
+          {
+            text: "演练场",
+            items: [
+              {
+                text: "媒体时间轴",
+                link: "/playground",
+                // matchNavbar 用不锚定的正则做子串匹配，/playground 会连 /playground/schedule 一起命中，
+                // 锚定到路径末尾保证两个入口互斥高亮
+                activeMatch: "/playground/?(\\.html?)?$",
+              },
+              { text: "排产时间轴", link: "/playground/schedule", activeMatch: "/playground/schedule" },
+            ],
+          },
         ],
         sidebar: {
           "/guide/": [
             { text: "快速开始", link: "/guide/getting-started" },
             { text: "安装与构建", link: "/guide/installation" },
             { text: "使用与示例", link: "/guide/usage" },
+            { text: "资源排程查看", link: "/guide/resource-scheduling" },
             { text: "配置项", link: "/guide/configuration" },
             { text: "维护者 MCP", link: "/guide/mcp" },
             { text: "使用者 MCP", link: "/guide/user-mcp" },
@@ -117,13 +130,28 @@ export default defineConfig({
           { text: "Config", link: "/en/guide/configuration" },
           { text: "Plugins", link: "/en/plugins/builtin" },
           { text: "API", link: "/en/api/timeline" },
-          { text: "Playground", link: "/en/playground" },
+          {
+            text: "Playground",
+            items: [
+              {
+                text: "Media Timeline",
+                link: "/en/playground",
+                activeMatch: "/playground/?(\\.html?)?$",
+              },
+              {
+                text: "Resource Schedule",
+                link: "/en/playground/schedule",
+                activeMatch: "/playground/schedule",
+              },
+            ],
+          },
         ],
         sidebar: {
           "/en/guide/": [
             { text: "Getting Started", link: "/en/guide/getting-started" },
             { text: "Installation & Build", link: "/en/guide/installation" },
             { text: "Usage & Examples", link: "/en/guide/usage" },
+            { text: "Resource Schedule", link: "/en/guide/resource-scheduling" },
             { text: "Configuration", link: "/en/guide/configuration" },
             { text: "Maintainer MCP", link: "/en/guide/mcp" },
             { text: "User MCP", link: "/en/guide/user-mcp" },

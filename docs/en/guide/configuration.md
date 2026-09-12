@@ -129,6 +129,18 @@ const options = {
 };
 ```
 
+### Unified event content rendering (added in 1.6)
+
+```ts
+const options = {
+  renderEventContent: (context) => {
+    // Single entry point for the content of every visible event across normal/drag/resize phases
+  },
+};
+```
+
+When omitted the core default text rendering is used; see [rendering](/en/plugins/plugin-development/rendering).
+
 ### Plugins and callbacks
 
 ```ts

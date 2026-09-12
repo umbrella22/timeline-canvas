@@ -7,16 +7,18 @@ import {
   formatDuration,
   drawRoundedRect,
 } from "../../utils";
+import { drawEventContent } from "../core/EventContentRenderer";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("EventsRenderer");
-
-const lastTrackLogTime = new Map<number, number>();
 
 /**
  * 事件渲染器 - 绘制轨道上的所有事件
  */
 export class EventsRenderer {
+  /** 每实例限流：模块级 Map 会被多个 Timeline 实例共享且按 trackIndex 无上界增长 */
+  private lastTrackLogTime = new Map<number, number>();
+
   renderEvents(
     ctx: CanvasRenderingContext2D,
     config: RenderContext["config"],
@@ -25,7 +27,8 @@ export class EventsRenderer {
     trackY: number,
     canvas: HTMLCanvasElement,
     pluginManager?: PluginManager,
-    canvasLogicalWidth?: number
+    canvasLogicalWidth?: number,
+    dpr = 1
   ): void {
     const logicalWidth = canvasLogicalWidth ?? canvas.width;
     const track = state.tracks[trackIndex];
@@ -42,32 +45,54 @@ export class EventsRenderer {
         : textStyle.timeFontSize;
 
     const now = performance.now();
-    const lastLogTime = lastTrackLogTime.get(trackIndex) ?? 0;
+    const lastLogTime = this.lastTrackLogTime.get(trackIndex) ?? 0;
     if (now - lastLogTime >= 500) {
-      lastTrackLogTime.set(trackIndex, now);
+      this.lastTrackLogTime.set(trackIndex, now);
       logger.debugStyled(
         LogColors.eventRender,
         `Track ${trackIndex}: ${track.events.length} events`
       );
     }
 
+    const indicatorPosition = state.timeIndicatorPosition;
     for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
       const event = track.events[eventIndex];
+      // M2 编辑协议：存在候选草稿时按 draft 位置绘制（原位置不再显示）
+      const draft =
+        event.businessId !== undefined
+          ? state.editDrafts.get(event.businessId)
+          : undefined;
       const isDraggingThis =
         state.draggingEvent &&
         state.draggingEvent.isDragging &&
         state.draggingEvent.trackIndex === trackIndex &&
         state.draggingEvent.eventIndex === eventIndex;
-      if (isDraggingThis) {
+      if (isDraggingThis && !draft) {
         continue;
       }
-      const eventX =
+      let eventX =
         config.startPaddingTime +
         (event.startTime - config.startTime) *
           config.secondWidth *
           state.zoomLevel -
         state.scrollX;
-      const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
+      let eventWidth = event.duration * config.secondWidth * state.zoomLevel;
+      let displayTrackY = trackY;
+      if (draft) {
+        eventX =
+          config.startPaddingTime +
+          (draft.startTime - config.startTime) *
+            config.secondWidth *
+            state.zoomLevel -
+          state.scrollX;
+        eventWidth =
+          (draft.endTime - draft.startTime) * config.secondWidth * state.zoomLevel;
+        displayTrackY =
+          config.timelineHeight +
+          config.firstTrackTopMargin +
+          draft.targetTrackIndex * (config.trackHeight + config.trackMargin) -
+          state.scrollY;
+      }
       if (eventX + eventWidth < 0 || eventX > logicalWidth) {
         continue;
       }
@@ -80,7 +105,6 @@ export class EventsRenderer {
         state.highlightedEvent &&
         state.highlightedEvent.trackIndex === trackIndex &&
         state.highlightedEvent.eventIndex === eventIndex;
-      const indicatorPosition = state.timeIndicatorPosition;
       const isTimeIndicatorHighlighted =
         config.enableTimeIndicator &&
         !state.isManualSelection &&
@@ -95,7 +119,7 @@ export class EventsRenderer {
         drawRoundedRect(
           ctx,
           eventX,
-          trackY + eventVerticalPadding,
+          displayTrackY + eventVerticalPadding,
           eventWidth,
           eventHeight,
           borderRadius
@@ -104,7 +128,7 @@ export class EventsRenderer {
       } else {
         ctx.fillRect(
           eventX,
-          trackY + eventVerticalPadding,
+          displayTrackY + eventVerticalPadding,
           eventWidth,
           eventHeight
         );
@@ -120,7 +144,7 @@ export class EventsRenderer {
           trackIndex,
           eventIndex,
           eventX,
-          trackY,
+          displayTrackY,
           eventWidth,
           eventVerticalPadding,
           eventHeight
@@ -138,7 +162,7 @@ export class EventsRenderer {
           drawRoundedRect(
             ctx,
             eventX,
-            trackY + eventVerticalPadding,
+            displayTrackY + eventVerticalPadding,
             eventWidth,
             eventHeight,
             borderRadius,
@@ -147,7 +171,7 @@ export class EventsRenderer {
         } else {
           ctx.strokeRect(
             eventX,
-            trackY + eventVerticalPadding,
+            displayTrackY + eventVerticalPadding,
             eventWidth,
             eventHeight
           );
@@ -155,18 +179,32 @@ export class EventsRenderer {
         ctx.shadowBlur = 0;
         ctx.restore();
       }
-      this.drawEventText(
+      const isResizingThis =
+        state.resizingEvent &&
+        state.resizingEvent.trackIndex === trackIndex &&
+        state.resizingEvent.eventIndex === eventIndex;
+      this.drawEventContentEntry({
         ctx,
+        canvas,
         config,
+        state,
         event,
+        track,
+        trackIndex,
+        eventIndex,
         eventX,
-        trackY,
+        trackY: displayTrackY,
         eventWidth,
         eventVerticalPadding,
         titleFontSize,
         timeFontSize,
-        textStyle
-      );
+        textStyle,
+        dpr,
+        phase: isResizingThis ? "resize" : "normal",
+        selected: Boolean(isSelected),
+        // 与核心高亮描边同一判定（含时间指示器高亮），保证自定义渲染器能复现视觉状态
+        highlighted: Boolean(shouldHighlight),
+      });
       if (config.enableEventResize) {
         this.drawResizeHandles(
           ctx,
@@ -175,7 +213,7 @@ export class EventsRenderer {
           trackIndex,
           eventIndex,
           eventX,
-          trackY,
+          displayTrackY,
           eventWidth,
           eventHeight,
           eventVerticalPadding
@@ -187,7 +225,7 @@ export class EventsRenderer {
           config,
           event,
           eventX,
-          trackY,
+          displayTrackY,
           eventWidth,
           eventVerticalPadding
         );
@@ -205,12 +243,91 @@ export class EventsRenderer {
           state,
           trackIndex,
           eventIndex,
-          trackY,
+          displayTrackY,
           eventVerticalPadding,
           eventHeight
         );
       }
     }
+  }
+
+  /** 通过共享入口绘制内容：未配置 renderEventContent 时走默认文字绘制 */
+  private drawEventContentEntry(args: {
+    ctx: CanvasRenderingContext2D;
+    canvas: HTMLCanvasElement;
+    config: RenderContext["config"];
+    state: RenderContext["state"];
+    event: TimelineEvent;
+    track: RenderContext["state"]["tracks"][number];
+    trackIndex: number;
+    eventIndex: number;
+    eventX: number;
+    trackY: number;
+    eventWidth: number;
+    eventVerticalPadding: number;
+    titleFontSize: number;
+    timeFontSize: number;
+    textStyle: EventTextStyle;
+    dpr: number;
+    phase: "normal" | "resize";
+    selected: boolean;
+    highlighted: boolean;
+  }): void {
+    const {
+      ctx,
+      canvas,
+      config,
+      state,
+      event,
+      track,
+      trackIndex,
+      eventIndex,
+      eventX,
+      trackY,
+      eventWidth,
+      eventVerticalPadding,
+      titleFontSize,
+      timeFontSize,
+      textStyle,
+      dpr,
+      phase,
+      selected,
+      highlighted,
+    } = args;
+    drawEventContent({
+      ctx,
+      canvas,
+      config,
+      state,
+      dpr,
+      event,
+      track,
+      trackIndex,
+      eventIndex,
+      rect: {
+        x: eventX,
+        y: trackY,
+        width: eventWidth,
+        height: config.trackHeight,
+      },
+      phase,
+      selected,
+      highlighted,
+      drawDefaultContent: (defaultCtx) =>
+        this.drawEventText(
+          defaultCtx,
+          config,
+          event,
+          eventX,
+          trackY,
+          eventWidth,
+          eventVerticalPadding,
+          titleFontSize,
+          timeFontSize,
+          textStyle
+        ),
+      renderEventContent: config.renderEventContent,
+    });
   }
 
   private truncateText(
@@ -431,7 +548,11 @@ export class EventsRenderer {
     ctx.fillStyle = config.colors.eventDurationLabel;
     ctx.textAlign = "center";
     const labelX = eventX + eventWidth / 2;
-    const labelY = trackY + eventVerticalPadding - 8;
+    // 首行事件标签悬在事件框上方，clamp 到时间轴带之下，避免被轴头截断
+    const labelY = Math.max(
+      trackY + eventVerticalPadding - 8,
+      config.timelineHeight + 12
+    );
     ctx.fillText(durationText, labelX, labelY);
     ctx.restore();
   }

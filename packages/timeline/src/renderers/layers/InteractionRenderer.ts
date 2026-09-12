@@ -1,6 +1,7 @@
 import type { Renderer, RenderContext, LayerType } from "../core/types";
 import type { TimelineConfig, TimelineEvent, TimelineState } from "../../types";
 import { drawRoundedRect, formatTime } from "../../utils";
+import { drawEventContent } from "../core/EventContentRenderer";
 
 /**
  * 交互层渲染器 - 绘制拖拽预览和拖拽中的事件
@@ -20,7 +21,7 @@ export class InteractionRenderer implements Renderer {
     this.renderDragPreview(ctx, config, state);
 
     // 绘制拖拽中的事件
-    this.renderDraggingEvent(ctx, config, state);
+    this.renderDraggingEvent(context);
   }
 
   private renderDragPreview(
@@ -104,19 +105,18 @@ export class InteractionRenderer implements Renderer {
     ctx.restore();
   }
 
-  private renderDraggingEvent(
-    ctx: CanvasRenderingContext2D,
-    config: Readonly<TimelineConfig>,
-    state: Readonly<TimelineState>
-  ): void {
+  private renderDraggingEvent(context: RenderContext): void {
+    const { ctx, config, state, canvas, dpr, pluginManager } = context;
     if (!state.draggingEvent) return;
-    if (!state.tracks[state.draggingEvent.trackIndex].events) return;
+    const track = state.tracks[state.draggingEvent.trackIndex];
+    if (!track?.events) return;
 
-    const event =
-      state.tracks[state.draggingEvent.trackIndex].events[
-        state.draggingEvent.eventIndex
-      ];
+    const event = track.events[state.draggingEvent.eventIndex];
     if (!event) return;
+    // M2 编辑协议：候选显示由 EventsRenderer 按草稿投影绘制，此处不再画预览
+    if (event.businessId !== undefined && state.editDrafts.has(event.businessId)) {
+      return;
+    }
 
     const x = state.draggingEvent.currentMouseX || 0;
     const y = state.draggingEvent.currentMouseY || 0;
@@ -181,16 +181,56 @@ export class InteractionRenderer implements Renderer {
 
     ctx.restore();
 
-    // 绘制文本
-    this.renderEventText(
+    // 拖动中的事件是独立可见表示：媒体 hook 在此恰好执行一次（源实体已被 EventsRenderer 跳过）
+    if (pluginManager) {
+      pluginManager.emitEvent(
+        "render:event:media",
+        ctx,
+        canvas,
+        config,
+        state,
+        state.draggingEvent.trackIndex,
+        state.draggingEvent.eventIndex,
+        eventX,
+        eventY,
+        eventWidth,
+        eventVerticalPadding,
+        eventHeight
+      );
+    }
+
+    // 内容经共享入口绘制：rect 使用实际拖动预览位置
+    drawEventContent({
       ctx,
-      config,
+      canvas,
+      config: config as TimelineConfig,
+      state: state as TimelineState,
+      dpr,
       event,
-      eventX,
-      eventY,
-      eventWidth,
-      eventVerticalPadding
-    );
+      track,
+      trackIndex: state.draggingEvent.trackIndex,
+      eventIndex: state.draggingEvent.eventIndex,
+      rect: {
+        x: eventX,
+        y: eventY,
+        width: eventWidth,
+        height: config.trackHeight,
+      },
+      phase: "drag",
+      selected: true,
+      highlighted: true,
+      drawDefaultContent: (defaultCtx) =>
+        this.renderEventText(
+          defaultCtx,
+          config,
+          event,
+          eventX,
+          eventY,
+          eventWidth,
+          eventVerticalPadding
+        ),
+      renderEventContent: config.renderEventContent,
+    });
   }
 
   private renderEventText(

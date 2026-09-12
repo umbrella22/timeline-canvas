@@ -46,7 +46,13 @@ export class IdleMouseDownRouter {
     if (config.enableEventResize && !isReadOnly && hitResult.resizeEdge) {
       const event =
         state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
-      if (event.readonly) {
+      // M2：被编辑事务锁定的事件不允许进入 resize（与 hover 侧提示一致）
+      if (
+        event.readonly ||
+        (timeline.editTransactions.active &&
+          event.businessId !== undefined &&
+          timeline.editTransactions.hasTransaction(event.businessId))
+      ) {
         canvas.style.cursor = "not-allowed";
         return null;
       }
@@ -58,6 +64,8 @@ export class IdleMouseDownRouter {
         startX: logicalX,
         originalStartTime: event.startTime,
         originalDuration: event.duration,
+        oldEvent: cloneEvent(event),
+        ...(event.businessId !== undefined ? { originBusinessId: event.businessId } : {}),
       };
 
       return this.delegate.createResizingState();
@@ -279,7 +287,8 @@ export class IdleMouseDownRouter {
       state.lastClickEvent.eventIndex === eventIndex &&
       now - state.lastClickTime < 300;
 
-    if (isDoubleClick && config.enableEventSplit) {
+    // M2 编辑协议：split 不在提交协议内，编辑模式禁用双击切割
+    if (isDoubleClick && config.enableEventSplit && !timeline.editTransactions.active) {
       if (config.readOnly || event.readonly) {
         timeline.setStatus(timeline.t("statusReadOnlySplitBlocked"));
         state.lastClickTime = 0;
@@ -357,6 +366,9 @@ export class IdleMouseDownRouter {
       startX: logicalX,
       startY: logicalY,
       isDragging: false,
+      // 动作开始时捕获一次快照供 onEventMove 附带 oldEvent（与 resizingEvent 对齐，后续帧不得覆盖）
+      oldEvent: cloneEvent(event),
+      ...(event.businessId !== undefined ? { originBusinessId: event.businessId } : {}),
     };
     state.dragOffsetX = logicalX - eventX;
     state.dragOffsetY = logicalY - eventY;

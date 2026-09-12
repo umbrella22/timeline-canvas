@@ -316,3 +316,29 @@ timeline.setDebug(true);
 timeline.setStatus("Ready");
 console.log(timeline.getStatus());
 ```
+
+## 视口快照、订阅与坐标（1.6 新增）
+
+### getViewport(): TimelineViewportSnapshot
+
+返回当前视口快照（逻辑像素）：width/height/dpr、scrollX/Y、zoomLevel、trackHeight/trackMargin、timelineHeight/firstTrackTopMargin、contentRect、可见行索引范围 `visibleTrackRange`（无轨道为 `null`）与 `revision`。`revision` 仅在布局相关状态实际变化时递增；纯事件进度变化不会制造无意义的 revision。
+
+### subscribeViewport(listener): () => void
+
+订阅视口变化。注册时立即同步收到当前快照；此后每个绘制帧至多通知一次，且先完成派生布局与滚动 clamp。取消函数幂等；`destroy()` 会清除全部订阅与挂起通知。单个订阅者异常不影响其他订阅者。覆盖范围：scroll:x/y、zoom:change、canvas:resize、tracks:add/update/remove、data:load、config:endTime 以及宿主修改行高后调用的 `adjustCanvasSize`。
+
+```ts
+const unsubscribe = timeline.subscribeViewport((snapshot) => {
+  positionLeftColumn(snapshot);
+});
+unsubscribe();
+unsubscribe(); // 幂等
+```
+
+### getTrackRectByBusinessId(id): TrackRect | null
+
+按资源业务身份返回行几何：`businessId`、`trackIndex`、完整 `rect` 与 `visibleRect`（与可绘制视口的交集；完全不可见时为 `null`；已存在但离屏的行仍返回完整 rect）。未知身份返回 `null`。行定位与 `TracksRenderer` 使用同一公式：`y = timelineHeight + firstTrackTopMargin + index * (trackHeight + trackMargin) - scrollY`。
+
+### timeToX(time) / xToTime(x)
+
+时间↔X 坐标互转（CSS px，Canvas 原点，已扣 scrollX）。不 clamp：视口外允许负坐标/视口外时间。`NaN` / `Infinity` 输入返回 `null`。公式与渲染一致：`x = startPaddingTime + (time - startTime) * secondWidth * zoomLevel - scrollX`（`startPaddingTime` 是左侧像素偏移，不按秒解释）。

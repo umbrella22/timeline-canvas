@@ -1,0 +1,15 @@
+---
+pageType: custom
+title: 演练场 · 排产时间轴
+---
+
+import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>演练场 · 排产时间轴</h1>
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    「启用异步提交」需先启动 <code>node scripts/schedule-demo-server.mjs</code>；
+    编辑协议与恢复流程详见<a href="/timeline-canvas/guide/resource-scheduling">资源排程查看</a>。
+  </p>
+  <ResourceScheduleHost lang="zh" />
+</main>

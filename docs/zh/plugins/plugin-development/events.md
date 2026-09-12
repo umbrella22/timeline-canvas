@@ -101,3 +101,22 @@ context.api.registerEventHandler("validate:event:move", (payload) => {
 4. `LOW (0)`
 
 同优先级下，按注册先后顺序执行。
+
+## 已知事件的强类型注册（1.6 新增）
+
+`registerEventHandler` / `unregisterEventHandler` / `emitEvent` / `validateEvent` 现在对已知事件键提供精确 tuple 类型（`PluginEventMap`）；自定义字符串扩展仍走宽泛 `(...args: unknown[]) => unknown` 边界。对变量事件名的动态路径，类型保证上限是 `unknown` 扩展。
+
+```ts
+// 已知键：载荷类型精确（错误形状会被编译器拒绝）
+context.api.registerEventHandler("validate:event:move", (payload) => {
+  return Number.isFinite(payload.toTrackIndex); // 载荷必含 toTrackIndex
+});
+
+// 自定义扩展：保持 unknown 边界
+context.api.registerEventHandler("my:custom:event", (payload: unknown) => payload !== null);
+```
+
+当前已知键与载荷：
+
+- `render:event:media`：`(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)`（11 元组，与 `EventsRenderer` 的发射一致；拖动帧中拖动事件的可见表示由 `InteractionRenderer` 发射一次）
+- `validate:event:move`：单个载荷对象 `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`

@@ -36,6 +36,7 @@ export class StateManager {
       guideLines: [],
       dragTimeReference: null,
       hoveredResizeHandle: null,
+      editDrafts: new Map(),
       lastClickTime: 0,
       lastClickEvent: null,
       hoveredSplitLine: null,

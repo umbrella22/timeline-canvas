@@ -116,7 +116,13 @@ export class IdleHoverController {
       const event =
         state.tracks[hitResult.trackIndex!].events[hitResult.eventIndex!];
 
-      if (event.readonly) {
+      if (
+        event.readonly ||
+        (timeline.editTransactions.active &&
+          event.businessId !== undefined &&
+          timeline.editTransactions.hasTransaction(event.businessId))
+      ) {
+        // 只读或被编辑事务锁定的事件：不显示拉伸把手暗示
         state.hoveredResizeHandle = null;
         canvas.style.cursor = "not-allowed";
         timeline.hideSplitLine();
@@ -137,7 +143,8 @@ export class IdleHoverController {
 
     state.hoveredResizeHandle = null;
 
-    if (!config.enableEventSplit) {
+    // M2 编辑协议：split 被禁用，hover 分割线提示同步隐藏
+    if (!config.enableEventSplit || timeline.editTransactions.active) {
       timeline.hideSplitLine();
       return false;
     }

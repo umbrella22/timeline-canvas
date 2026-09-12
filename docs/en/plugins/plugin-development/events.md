@@ -101,3 +101,22 @@ Handlers run in plugin-priority order:
 4. `LOW (0)`
 
 Within the same priority, handlers run in registration order.
+
+## Typed registration for known events (added in 1.6)
+
+`registerEventHandler` / `unregisterEventHandler` / `emitEvent` / `validateEvent` now expose precise tuple types for known event keys (`PluginEventMap`); custom string extensions keep the broad `(...args: unknown[]) => unknown` boundary. Dynamic call sites with a variable event name keep the `unknown` upper bound.
+
+```ts
+// Known key: exact payload type (wrong shapes are rejected by the compiler)
+context.api.registerEventHandler("validate:event:move", (payload) => {
+  return Number.isFinite(payload.toTrackIndex); // the payload always carries toTrackIndex
+});
+
+// Custom extension: still an unknown boundary
+context.api.registerEventHandler("my:custom:event", (payload: unknown) => payload !== null);
+```
+
+Known keys and payloads:
+
+- `render:event:media`: `(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)` (11-tuple, matching `EventsRenderer`; during drags the visible representation of the dragged event is emitted once by `InteractionRenderer`)
+- `validate:event:move`: a single payload object `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`

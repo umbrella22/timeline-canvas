@@ -129,6 +129,18 @@ const options = {
 };
 ```
 
+### 统一事件内容绘制（1.6 新增）
+
+```ts
+const options = {
+  renderEventContent: (context) => {
+    // 普通/拖动/拉伸阶段所有可见任务内容的统一绘制入口
+  },
+};
+```
+
+未配置时使用核心默认文字绘制；详见[渲染机制](/plugins/plugin-development/rendering)。
+
 ### 插件与回调
 
 ```ts

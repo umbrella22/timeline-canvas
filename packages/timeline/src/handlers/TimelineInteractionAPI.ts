@@ -1,11 +1,14 @@
 import type { ChangeType } from "../core/managers/ChangeScheduler";
+import type { EditTransactionController } from "../core/managers/EditTransactionController";
 import type {
+  BusinessId,
   GuideLine,
   InteractionTarget,
   TimelineCallbacks,
   TimelineConfig,
   TimelineMessageParams,
   TimelineState,
+  ScheduleValidationResult,
 } from "../types";
 import type { TimelineMessageKey } from "../utils";
 
@@ -32,6 +35,7 @@ export interface TimelineInteractionAPI {
   beginIndexBatch(): void;
   endIndexBatch(): void;
   invalidateIndexTrack(trackIndex: number): void;
+  invalidateBusinessIndexTrack(trackIndex: number): void;
   autoRemoveEmptyLastTrack(): void;
 
   calculateGuideLines(
@@ -50,6 +54,18 @@ export interface TimelineInteractionAPI {
     newStartTime: number,
     duration: number
   ): boolean;
+
+  /** M2 编辑协议事务控制器（未配置协议时 active 为 false） */
+  readonly editTransactions: EditTransactionController;
+  validateScheduleEditCandidate(params: {
+    eventBusinessId: BusinessId;
+    fromTrackIndex: number;
+    fromEventIndex: number;
+    toTrackIndex: number;
+    startTime: number;
+    endTime: number;
+  }): ScheduleValidationResult;
+  commitScheduleEdit(businessId: BusinessId): boolean;
 
   showSplitLine(
     trackIndex: number,

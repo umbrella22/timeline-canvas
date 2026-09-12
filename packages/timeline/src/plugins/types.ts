@@ -104,13 +104,54 @@ export interface CoreLayerHook {
 
 export type PluginEventHandler = (...args: unknown[]) => unknown;
 
+/**
+ * 已知插件事件的载荷 tuple（与内部 emitEvent 实参一一对应）。
+ * 已知键使用精确类型注册/注销/发射；自定义字符串扩展仍走宽泛 unknown 边界。
+ */
+export interface PluginEventMap {
+  "render:event:media": [
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+    trackIndex: number,
+    eventIndex: number,
+    eventX: number,
+    trackY: number,
+    eventWidth: number,
+    eventVerticalPadding: number,
+    eventHeight: number,
+  ];
+  "validate:event:move": [
+    payload: {
+      fromTrackIndex: number;
+      fromEventIndex: number;
+      toTrackIndex: number;
+      newStartTime: number;
+      duration: number;
+    },
+  ];
+}
+
 export interface PluginAPI {
   registerRenderLayer: (layer: RenderLayer) => void;
   unregisterRenderLayer: (name: string) => void;
   registerCoreLayerHook: (hook: CoreLayerHook) => void;
   unregisterCoreLayerHook: (name: string) => void;
-  registerEventHandler: (event: string, handler: PluginEventHandler) => void;
-  unregisterEventHandler: (event: string, handler: PluginEventHandler) => void;
+  registerEventHandler: {
+    <K extends keyof PluginEventMap & string>(
+      event: K,
+      handler: (...args: PluginEventMap[K]) => unknown
+    ): void;
+    (event: string, handler: PluginEventHandler): void;
+  };
+  unregisterEventHandler: {
+    <K extends keyof PluginEventMap & string>(
+      event: K,
+      handler: (...args: PluginEventMap[K]) => unknown
+    ): void;
+    (event: string, handler: PluginEventHandler): void;
+  };
   showNotification: (message: string, type?: "info" | "warning" | "error") => void;
   getData: (key: string) => unknown;
   setData: (key: string, value: unknown) => void;

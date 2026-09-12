@@ -20,6 +20,7 @@ export type ChangeType =
   | "events:move"
   | "events:split"
   | "tracks:add"
+  | "tracks:update"
   | "tracks:remove"
   | "timeIndicator:move"
   | "timeIndicator:drag"
@@ -101,6 +102,11 @@ export class ChangeScheduler {
 
   /** 是否正在批量操作中 */
   private isBatching = false;
+
+  /** 当前是否处于批处理中；供嵌套调用方守卫，避免提前终止外层批次 */
+  public get batching(): boolean {
+    return this.isBatching;
+  }
   private highlightChanged = false;
 
   constructor(
@@ -181,6 +187,11 @@ export class ChangeScheduler {
     this.handlers.set("tracks:add", {
       layers: ["tracks", "timeline", "scrollbar"],
       derive: () => this.refreshHighlightList(),
+      needsDraw: true,
+    });
+
+    this.handlers.set("tracks:update", {
+      layers: ["tracks", "timeline"],
       needsDraw: true,
     });
 
@@ -495,17 +506,15 @@ export class ChangeScheduler {
   /**
    * 检测高亮列表是否变化
    *
-   * 注意：此方法依赖于列表中不存在重复的 {trackIndex, eventIndex} 对。
-   * 当 length 相同且 newKeys ⊆ oldKeys 时，由于两个 Set 大小相同，
-   * 必然 oldKeys ⊆ newKeys，所以只需单向检查即可。
-   * detectHighlightedEvents() 保证不会产生重复对。
+   * 按位置逐元素比较：两个列表都由 detectHighlightedEvents() 按确定的
+   * 轨道/事件顺序生成且不含重复对，位置比较即集合比较，且不会漏报变化。
+   * O(n) 原地比较，避免分配 Set/map 减轻 GC 压力。
    */
   private hasHighlightChanged(
     oldList: Array<{ trackIndex: number; eventIndex: number }>,
     newList: Array<{ trackIndex: number; eventIndex: number }>
   ): boolean {
     if (oldList.length !== newList.length) return true;
-    // O(n) 原地比较，避免分配 Set/map 减轻 GC 压力
     for (let i = 0; i < oldList.length; i++) {
       if (
         oldList[i].trackIndex !== newList[i].trackIndex ||
@@ -521,8 +530,9 @@ export class ChangeScheduler {
    * 检测被时间指示器高亮的事件
    *
    * 使用 EventIndexManager 的索引加速查询，避免全量扫描。
-   * 边界条件统一为 position > startTime && position < endTime（严格开区间），
-   * 与渲染侧 EventsRenderer 的判断保持一致。
+   * 边界条件统一为 position > startTime && position < endTime（严格开区间）。
+   * 注意：渲染侧 EventsRenderer 还叠加 !state.isManualSelection 条件，
+   * 本列表是“几何上被指示器覆盖”的超集，可见性由渲染侧最终裁决。
    */
   private detectHighlightedEvents(
     position: number

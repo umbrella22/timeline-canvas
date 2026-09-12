@@ -17,6 +17,9 @@ A powerful, high-performance timeline component built with HTML5 Canvas and Type
 - 📏 **Smart Guides**: Alignment guides and snapping for precise event placement.
 - ⏱️ **Time Indicator**: Draggable time head with snapping support.
 - 🔌 **Plugin System**: Extensible architecture with built-in plugins for themes, context menus, and more.
+- 🧭 **Resource scheduling (new in 1.6)**: optional `businessId` on events/tracks, strict atomic import/export (`loadScheduleData`/`exportScheduleData`), incremental upsert/patch/delete by business identity, a viewport snapshot subscription, and a unified `renderEventContent` hook covering normal, drag and resize phases.
+- 📨 **Optional async editing protocol** (`scheduleEditing`): candidate preview, typed validation, single-commit settlement with server correction, unknown-result reconciliation and per-event edit state.
+
 - 📝 **TypeScript**: Written in TypeScript with full type definitions.
 
 ## Installation

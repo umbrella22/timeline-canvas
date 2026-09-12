@@ -12,10 +12,17 @@ export class TracksRenderer implements Renderer {
   private readonly eventsRenderer = new EventsRenderer();
 
   render(context: RenderContext): void {
-    const { ctx, canvas, config, state, pluginManager, width, height } =
+    const { ctx, canvas, config, state, pluginManager, width, height, dpr } =
       context;
     const trackStartX = config.startPaddingTime - state.scrollX;
     const eventsRenderer = this.eventsRenderer;
+    // M2：候选草稿挂在源轨道渲染通道上——源行被滚出视口时仍需渲染，
+    // 否则候选在目标行位置的显示会整体消失
+    const draftSourceTracks = new Set<number>();
+    for (const draft of state.editDrafts.values()) {
+      draftSourceTracks.add(draft.sourceTrackIndex);
+      draftSourceTracks.add(draft.targetTrackIndex);
+    }
 
     for (let i = 0; i < state.tracks.length; i++) {
       const trackY =
@@ -27,8 +34,9 @@ export class TracksRenderer implements Renderer {
       if (
         trackY + config.trackHeight < config.timelineHeight ||
         trackY > height
-      )
-        continue;
+      ) {
+        if (!draftSourceTracks.has(i)) continue;
+      }
 
       let trackBgColor: string;
       const isHighlightedTrack =
@@ -65,7 +73,8 @@ export class TracksRenderer implements Renderer {
         trackY,
         canvas,
         pluginManager,
-        width
+        width,
+        dpr
       );
     }
   }

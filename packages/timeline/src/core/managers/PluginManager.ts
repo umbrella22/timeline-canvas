@@ -2,6 +2,7 @@ import type {
   CoreRenderTarget,
   PluginContext,
   PluginAPI,
+  PluginEventMap,
   PluginEventHandler,
   TimelinePlugin,
   RenderLayer,
@@ -399,6 +400,9 @@ export class PluginManager {
     this.pluginResources.delete(pluginId);
   }
 
+  /** 已知键按 PluginEventMap tuple 强类型发射；自定义扩展走 unknown 边界 */
+  emitEvent<K extends keyof PluginEventMap & string>(event: K, ...args: PluginEventMap[K]): void;
+  emitEvent(event: string, ...args: unknown[]): void;
   emitEvent(event: string, ...args: unknown[]): void {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return;
@@ -417,6 +421,8 @@ export class PluginManager {
     }
   }
 
+  validateEvent<K extends keyof PluginEventMap & string>(event: K, ...args: PluginEventMap[K]): boolean;
+  validateEvent(event: string, ...args: unknown[]): boolean;
   validateEvent(event: string, ...args: unknown[]): boolean {
     const list = this.eventHandlers.get(event);
     if (!list || list.length === 0) return true;
