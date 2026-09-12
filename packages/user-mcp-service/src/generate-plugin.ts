@@ -221,7 +221,7 @@ export function generatePlugin(input: GeneratePluginInput): GeneratedPlugin {
     usage: `import { ${input.exportName} } from "./src/timeline-plugin";\n\nawait timeline.usePlugin(${input.exportName}());`,
     notes: [
       "The template uses only the public timeline-canvas 1.4.1 API.",
-      "Static templates are tested against timeline-canvas 1.4.1 and 1.5.0 and do not claim compatibility with every version.",
+      "Static templates are tested against timeline-canvas 1.4.1, 1.5.0 and 1.6.0 and do not claim compatibility with every version.",
     ],
   };
 }

@@ -3,7 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 
 export const TESTED_TIMELINE_VERSION = "1.6.0";
-const testedVersions = ["1.4.1", "1.5.0", TESTED_TIMELINE_VERSION];
+export const TESTED_TIMELINE_VERSIONS = ["1.4.1", "1.5.0", TESTED_TIMELINE_VERSION];
 
 export const compilerDefaults: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
@@ -69,7 +69,7 @@ export function inspectProject(
       testedVersion: TESTED_TIMELINE_VERSION,
       compatibility: !resolved
         ? "not-installed"
-        : testedVersions.includes(installedVersion ?? "")
+        : TESTED_TIMELINE_VERSIONS.includes(installedVersion ?? "")
           ? "tested-version"
           : "unverified-version",
     },

@@ -303,7 +303,7 @@ export function getUsageGuide(input: UsageGuideInput): UsageGuide {
     framework: input.framework,
     files: files.map((file) => ({ ...file })),
     notes: [
-      "Examples use public timeline-canvas APIs and are tested against 1.4.1 and 1.5.0.",
+      "Examples use public timeline-canvas APIs and are tested against 1.4.1, 1.5.0 and 1.6.0.",
       "Install timeline-canvas in the application. React examples require React 18 or later; Vue examples require Vue 3.5 or later for useId().",
       "The example ResizeObserver calls the public adjustCanvasSize() method and is disconnected on teardown. It supports the published 1.4.1 release, which does not observe container-only size changes itself.",
       "Cleanup accepts both synchronous and asynchronous destroy() implementations.",

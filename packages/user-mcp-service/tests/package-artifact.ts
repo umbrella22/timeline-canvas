@@ -9,6 +9,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import ts from "typescript";
 
+import { TESTED_TIMELINE_VERSION, TESTED_TIMELINE_VERSIONS } from "../src/project.js";
+
 interface PackResult {
   id: string;
   name: string;
@@ -161,7 +163,7 @@ function assertProject(project: ProjectInfo): void {
   assert.deepEqual(project, {
     root: consumerRoot,
     installedVersion: installedTimelineVersion,
-    testedVersion: "1.5.0",
+    testedVersion: TESTED_TIMELINE_VERSION,
     compatibility: "tested-version",
   });
 }
@@ -376,10 +378,15 @@ try {
     await fs.access(archivePath);
     await extractPackage(archivePath, installedTimelineRoot);
   } else {
+    const timelinePackageManifest = JSON.parse(
+      await fs.readFile(path.join(timelinePackageRoot, "package.json"), "utf8"),
+    ) as { name: string; version: string };
+    assert.equal(timelinePackageManifest.name, "timeline-canvas");
     const timelinePack = pack(timelinePackageRoot);
     assert.equal(timelinePack.name, "timeline-canvas");
-    assert.equal(timelinePack.version, "1.5.0");
-    assert.equal(timelinePack.filename, "timeline-canvas-1.5.0.tgz");
+    // 期望版本跟随工作区包，避免每次发版都要改测试
+    assert.equal(timelinePack.version, timelinePackageManifest.version);
+    assert.equal(timelinePack.filename, `timeline-canvas-${timelinePackageManifest.version}.tgz`);
     await extractPackage(path.join(temporaryRoot, timelinePack.filename), installedTimelineRoot);
   }
   const installedTimelinePackage = JSON.parse(
@@ -387,7 +394,10 @@ try {
   ) as { name: string; version: string };
   assert.equal(installedTimelinePackage.name, "timeline-canvas");
   installedTimelineVersion = installedTimelinePackage.version;
-  assert(["1.4.1", "1.5.0"].includes(installedTimelineVersion));
+  assert(
+    TESTED_TIMELINE_VERSIONS.includes(installedTimelineVersion),
+    `packed timeline-canvas ${installedTimelineVersion} is not in the tested list`,
+  );
   await assert.rejects(
     fs.access(path.join(installedTimelineRoot, "src")),
     "consumer must validate against the packed package without source files",
@@ -397,10 +407,14 @@ try {
   }
 
   const userMcpPack = pack(packageRoot);
-  assert.equal(userMcpPack.id, "timeline-canvas-user-mcp@0.1.0");
+  // 期望版本跟随本包 manifest，避免每次发版都要改测试
+  const userMcpPackageVersion = JSON.parse(
+    await fs.readFile(path.join(packageRoot, "package.json"), "utf8"),
+  ) as { version: string };
+  assert.equal(userMcpPack.id, `timeline-canvas-user-mcp@${userMcpPackageVersion.version}`);
   assert.equal(userMcpPack.name, "timeline-canvas-user-mcp");
-  assert.equal(userMcpPack.version, "0.1.0");
-  assert.equal(userMcpPack.filename, "timeline-canvas-user-mcp-0.1.0.tgz");
+  assert.equal(userMcpPack.version, userMcpPackageVersion.version);
+  assert.equal(userMcpPack.filename, `timeline-canvas-user-mcp-${userMcpPackageVersion.version}.tgz`);
   const packedPaths = new Set(userMcpPack.files.map((file) => file.path));
   assert(packedPaths.has("bin/timeline-canvas-user-mcp.js"));
   assert(packedPaths.has("dist/server.mjs"));
@@ -415,7 +429,7 @@ try {
     await fs.readFile(path.join(installedMcpRoot, "package.json"), "utf8"),
   ) as { name: string; version: string; bin: Record<string, string> };
   assert.equal(installedMcpPackage.name, "timeline-canvas-user-mcp");
-  assert.equal(installedMcpPackage.version, "0.1.0");
+  assert.equal(installedMcpPackage.version, userMcpPackageVersion.version);
   assert.deepEqual(installedMcpPackage.bin, {
     "timeline-canvas-user-mcp": "./bin/timeline-canvas-user-mcp.js",
   });
