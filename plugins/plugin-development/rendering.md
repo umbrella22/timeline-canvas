@@ -99,3 +99,22 @@ context.api.registerCoreLayerHook({
 * `interaction`
 * `scrollbar`
 * `overlay`
+
+## 统一事件内容绘制 renderEventContent（1.6 新增）
+
+`TimelineOptions.renderEventContent` 是普通、拖动、拉伸阶段所有可见任务内容的统一入口；未配置时使用核心默认文字绘制。回调收到 `EventContentRenderContext`：ctx、event、track、trackIndex/eventIndex、`rect`（事件块完整矩形，CSS px，已扣 scroll，含 eventVerticalPadding）、`clipRect`（内容与可绘制视口交集，已排除时间轴与滚动条）、`phase: 'normal' | 'drag' | 'resize'`、selected/highlighted/readonly、dpr 与 `drawDefaultContent()`（一次调用内至多执行一次）。
+
+```ts
+const timeline = new Timeline("canvas", {
+  renderEventContent(context) {
+    const { ctx, rect, event } = context;
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(String(event.title), rect.x + 8, rect.y + 6, rect.width - 16);
+    ctx.restore();
+    // 不调用 drawDefaultContent() 即完全接管内容
+  },
+});
+```
+
+约束：所有上下文数据只读；绘制顺序为 背景 → 媒体 hook → 自定义/默认内容 → 选中边框/手柄等交互装饰；回调抛异常时以固定错误码记录并回退默认内容（不会重复绘制媒体），下一帧即可恢复；不允许通过该回调改变核心命中矩形或绕过 readOnly。

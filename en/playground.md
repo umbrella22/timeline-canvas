@@ -2,7 +2,7 @@ import TimelinePlayground from "../public/components/TimelinePlayground";
 
 <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
   <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
-    Playground
+    Playground · Media Timeline
   </h1>
 
   <TimelinePlayground lang="en" />

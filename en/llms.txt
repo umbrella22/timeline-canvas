@@ -30,17 +30,16 @@
 - [Event Callbacks API](/timeline-canvas/en/api/timeline/event-listeners.md)
 - [Type Definitions](/timeline-canvas/en/api/timeline/types.md)
 
-## Playground
-
-- [Playground](/timeline-canvas/en/playground.md)
-
 ## Other
 
 - [Performance & Monitoring](/timeline-canvas/en/advanced/performance.md)
 - [Installation & Build](/timeline-canvas/en/guide/installation.md)
 - [Maintainer MCP Service](/timeline-canvas/en/guide/mcp.md)
+- [Resource Schedule View](/timeline-canvas/en/guide/resource-scheduling.md)
 - [Usage & Examples](/timeline-canvas/en/guide/usage.md)
 - [User MCP Service](/timeline-canvas/en/guide/user-mcp.md)
+- [Playground](/timeline-canvas/en/playground.md)
+- [Playground · Resource Schedule](/timeline-canvas/en/playground/schedule.md)
 - [Advanced Topics](/timeline-canvas/en/plugins/plugin-development/advanced.md)
 - [Core API](/timeline-canvas/en/plugins/plugin-development/api.md)
 - [Best Practices](/timeline-canvas/en/plugins/plugin-development/best-practices.md)

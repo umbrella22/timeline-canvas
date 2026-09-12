@@ -312,3 +312,21 @@ timeline.setDebug(true);
 timeline.setStatus("Ready");
 console.log(timeline.getStatus());
 ```
+
+## Viewport snapshot, subscription and coordinates (added in 1.6)
+
+### getViewport(): TimelineViewportSnapshot
+
+Returns the current viewport snapshot in logical pixels: width/height/dpr, scrollX/Y, zoomLevel, trackHeight/trackMargin, timelineHeight/firstTrackTopMargin, contentRect, the visible row range `visibleTrackRange` (`null` with no tracks) and `revision`. The revision only bumps when layout-relevant state actually changes; pure event-progress updates never produce spurious notifications.
+
+### subscribeViewport(listener): () => void
+
+Subscribes to viewport changes. The listener receives the current snapshot synchronously at registration; afterwards at most one notification per rendered frame, after derived layout and scroll clamping settle. The unsubscribe function is idempotent and `destroy()` clears every subscription and pending notification. Listener exceptions are isolated. Covered changes: scroll:x/y, zoom:change, canvas:resize, tracks:add/update/remove, data:load, config:endTime and `adjustCanvasSize()` after host-driven row-height changes.
+
+### getTrackRectByBusinessId(id): TrackRect | null
+
+Returns row geometry for a resource identity: `businessId`, `trackIndex`, the full `rect` and `visibleRect` (intersection with the drawable viewport; `null` when fully off-screen; off-screen rows still return the full rect). Unknown identities return `null`. The row formula is shared with `TracksRenderer`: `y = timelineHeight + firstTrackTopMargin + index * (trackHeight + trackMargin) - scrollY`.
+
+### timeToX(time) / xToTime(x)
+
+Time↔X conversion (CSS px, canvas origin, scroll-adjusted). No clamping: out-of-viewport values may return negative coordinates or out-of-window times. `NaN` / `Infinity` inputs return `null`. The formula matches rendering: `x = startPaddingTime + (time - startTime) * secondWidth * zoomLevel - scrollX` (`startPaddingTime` is a pixel offset, not seconds).

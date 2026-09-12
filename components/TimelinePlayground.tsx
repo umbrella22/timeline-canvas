@@ -33,7 +33,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: "8px",
     overflow: "hidden",
     border: "1px solid #313244",
-    height: "clamp(280px, 38vh, 440px)",
+    height: "clamp(320px, 48vh, 560px)",
     minWidth: 0,
   },
   canvas: {

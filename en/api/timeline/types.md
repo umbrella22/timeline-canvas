@@ -187,3 +187,44 @@ Notes:
 * `TimelinePlugin`: the plugin definition
 * `PluginMetadata`: plugin metadata
 * `PluginAPI`: the plugin context API
+
+## Schedule and viewport types (added in 1.6)
+
+```ts
+type BusinessId = string | number;
+
+type ScheduleErrorCode =
+  | "invalid_input" | "duplicate_business_id" | "not_found"
+  | "missing_business_id" | "destroyed";
+
+interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
+type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };
+
+interface ScheduleEventInput {
+  businessId: BusinessId;
+  startTime: number;
+  endTime: number;
+  title: string;
+  description?: string;
+  color?: string;
+  readonly?: boolean;
+  customData?: Record<string, unknown>;
+  media?: TimelineEvent["media"];
+}
+
+type ScheduleEventPatch = Partial<Omit<ScheduleEventInput, "businessId">>;
+
+interface ScheduleTrackInput { businessId: BusinessId; customData?: Record<string, unknown>; events: ScheduleEventInput[] }
+interface ScheduleDataFormat { tracks: ScheduleTrackInput[]; timeIndicatorPosition?: number }
+interface ScheduleEventLocation { trackIndex: number; eventIndex: number; resourceBusinessId: BusinessId; event: TimelineEvent }
+interface ScheduleEventUpsert { resourceBusinessId: BusinessId; event: ScheduleEventInput }
+
+interface EventContentRect { x: number; y: number; width: number; height: number }
+type EventContentPhase = "normal" | "drag" | "resize";
+interface EventContentRenderContext { /* ctx/event/track/rect/clipRect/phase/selected/highlighted/readonly/dpr/drawDefaultContent */ }
+interface TimelineViewportSnapshot { width; height; dpr; scrollX; scrollY; zoomLevel; trackHeight; trackMargin; timelineHeight; firstTrackTopMargin; contentRect; visibleTrackRange: [number, number] | null; revision: number }
+interface TrackRect { businessId: BusinessId; trackIndex: number; rect: EventContentRect; visibleRect: EventContentRect | null }
+type ViewportListener = (snapshot: TimelineViewportSnapshot) => void;
+```
+
+Additionally: `TimelineEvent` and `Track` accept an optional `businessId`, `Track` accepts optional `customData`, `LoadDataFormat` tracks/events accept an optional `businessId`, and `TimelineOptions` accepts the optional `renderEventContent`. `TimelineEvent.id` / `Track.id` remain `number`.

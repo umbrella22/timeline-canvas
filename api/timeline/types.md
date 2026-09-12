@@ -187,3 +187,44 @@ interface LoadDataFormat {
 * `TimelinePlugin`: 插件定义
 * `PluginMetadata`: 插件元数据
 * `PluginAPI`: 插件上下文 API
+
+## 排程与视口新类型（1.6 新增）
+
+```ts
+type BusinessId = string | number;
+
+type ScheduleErrorCode =
+  | "invalid_input" | "duplicate_business_id" | "not_found"
+  | "missing_business_id" | "destroyed";
+
+interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
+type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };
+
+interface ScheduleEventInput {
+  businessId: BusinessId;
+  startTime: number;
+  endTime: number;
+  title: string;
+  description?: string;
+  color?: string;
+  readonly?: boolean;
+  customData?: Record<string, unknown>;
+  media?: TimelineEvent["media"];
+}
+
+type ScheduleEventPatch = Partial<Omit<ScheduleEventInput, "businessId">>;
+
+interface ScheduleTrackInput { businessId: BusinessId; customData?: Record<string, unknown>; events: ScheduleEventInput[] }
+interface ScheduleDataFormat { tracks: ScheduleTrackInput[]; timeIndicatorPosition?: number }
+interface ScheduleEventLocation { trackIndex: number; eventIndex: number; resourceBusinessId: BusinessId; event: TimelineEvent }
+interface ScheduleEventUpsert { resourceBusinessId: BusinessId; event: ScheduleEventInput }
+
+interface EventContentRect { x: number; y: number; width: number; height: number }
+type EventContentPhase = "normal" | "drag" | "resize";
+interface EventContentRenderContext { /* ctx/event/track/rect/clipRect/phase/selected/highlighted/readonly/dpr/drawDefaultContent */ }
+interface TimelineViewportSnapshot { width; height; dpr; scrollX; scrollY; zoomLevel; trackHeight; trackMargin; timelineHeight; firstTrackTopMargin; contentRect; visibleTrackRange: [number, number] | null; revision: number }
+interface TrackRect { businessId: BusinessId; trackIndex: number; rect: EventContentRect; visibleRect: EventContentRect | null }
+type ViewportListener = (snapshot: TimelineViewportSnapshot) => void;
+```
+
+同时：`TimelineEvent` 与 `Track` 增加可选 `businessId`，`Track` 增加可选 `customData`；`LoadDataFormat` 的轨道/事件接受可选 `businessId`；`TimelineOptions` 增加可选 `renderEventContent`。`TimelineEvent.id` / `Track.id` 保持 `number` 不变。

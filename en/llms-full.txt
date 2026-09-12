@@ -449,6 +449,18 @@ const options = {
 };
 ```
 
+### Unified event content rendering (added in 1.6)
+
+```ts
+const options = {
+  renderEventContent: (context) => {
+    // Single entry point for the content of every visible event across normal/drag/resize phases
+  },
+};
+```
+
+When omitted the core default text rendering is used; see [rendering](/timeline-canvas/en/plugins/plugin-development/rendering.md).
+
 ### Plugins and callbacks
 
 ```ts
@@ -1364,6 +1376,64 @@ timeline.invalidateIndexAll();
 
 > If you use public APIs such as `addEvent`, `updateEvent`, `deleteEvent`, or `loadData`, index invalidation is already handled for you.
 
+## Business identity and strict schedule data (added in 1.6)
+
+The new methods revolve around the optional `businessId` (`string | number`): strings compare verbatim (no trimming), numbers must be finite; `1` and `"1"` are different identities. The legacy `number` ids and their generation semantics are unchanged.
+
+### loadScheduleData(data: ScheduleDataFormat): ScheduleResult<void>
+
+Strict schedule import: the whole batch is validated first and published atomically in one shot; on failure nothing is written and previous tracks/selection/indexes stay intact. Every track and event must carry a `businessId`; empty `tracks` yields `invalid_input`, duplicate identities yield `duplicate_business_id`, out-of-window times yield `invalid_input` with `path` pointing at the field. A successful import clears selection (same as `loadData`); use `upsertScheduleEvents` / `updateEventByBusinessId` for refreshes that must preserve selection.
+
+### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
+
+Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated.
+
+### Queries, patch, upsert, delete, highlight, track metadata
+
+* `getEventByBusinessId(id)` / `getTrackByBusinessId(id)` return isolated snapshots (`null` when unknown).
+* `updateEventByBusinessId(id, patch)` validates merged times and recomputes duration; `customData` is replaced wholesale; `id` / `businessId` / `duration` cannot be patched.
+* `upsertScheduleEvents(items)` replaces complete business events; existing identities are replaced or moved atomically after whole-batch validation.
+* `deleteEventByBusinessId(id)` re-resolves interaction pointers by identity, so deleting a neighbour never drifts the selection.
+* `highlightEventByBusinessId(id)` mirrors `highlightEvent`.
+* `updateTrackByBusinessId(id, patch)` updates resource metadata only.
+
+### Compatibility notes
+
+* Legacy `loadData` / `addEvent` / `updateEvent` signatures and behaviour are unchanged; `LoadDataFormat` tracks and events now accept an optional `businessId` (tracks also accept `customData`), preserved through clones and callbacks.
+* Legacy `updateEvent` validates uniqueness before writing when `businessId` is supplied; conflicts return `false`.
+* `splitEvent` keeps the business id on the first segment and clears it on the second.
+
+## M2: optional editing protocol (scheduleEditing)
+
+The async editing protocol is enabled by `TimelineOptions.scheduleEditing`; without it every
+interaction keeps M1 synchronous semantics. The object must provide `onBeforeCommit` (the single
+save entry), with optional `validate` (synchronous business validation) and `commitTimeoutMs`
+(default 30000, finite positive, <= 2147483647); invalid configuration throws at construction.
+
+* **Flow**: a drag/resize captures a `before` snapshot at gesture start; the candidate passes core
+  validation (readonly/missing\_business\_id/busy/invalid\_time/invalid\_resource/overlap/
+  reservation\_conflict/plugin\_rejected) plus business `validate`, then commits; `onBeforeCommit` is
+  called once per operation with an `AbortSignal`.
+* **Settlement**: `{accepted:true}` (optionally with a server-corrected `placement`) publishes once
+  and fires the legacy callback once (with `oldEvent` and from/to resource ids); `{accepted:false,
+  reason}` restores the original display without retry; timeout/network error/hook throw/invalid
+  result enter `reconciliation_required` — candidate and same-task lock are kept, late results are
+  never written back, and `reconcileScheduleEvent(id, snapshot|null, {operationId})` is the only way
+  to settle with authoritative facts.
+* **Concurrency**: while an event is pending/unknown, further edits and programmatic writes are
+  rejected (`updateEventByBusinessId` / whole-batch `upsertScheduleEvents` / `deleteEventByBusinessId`
+  / `splitEvent` return `busy` or `reconciliation_required`; legacy boolean entries return `false`);
+  other events stay editable but cannot take any transaction's before/candidate slot
+  (`reservation_conflict`); resources referenced by a transaction cannot be `removeTrack`ed.
+* **State notification**: `onScheduleCommitStateChange` reports pending/accepted/rejected/cancelled/
+  validation\_failed/reconciliation\_required/invalidated/reconciled; `getScheduleEditState(id)`
+  returns null for unknown events and `idle` without a transaction.
+* **Boundaries**: drafts are render projections only — `tracks`, `getEventByBusinessId` and
+  `exportScheduleData` always contain confirmed facts; split and interactive auto track-add are
+  disabled in this mode; a successful `loadScheduleData`/`loadData` invalidates in-flight operations
+  (invalidated); the core never performs network I/O — transport/auth live in the `onBeforeCommit`
+  adapter.
+
 
 
 ---
@@ -1684,6 +1754,24 @@ timeline.setDebug(true);
 timeline.setStatus("Ready");
 console.log(timeline.getStatus());
 ```
+
+## Viewport snapshot, subscription and coordinates (added in 1.6)
+
+### getViewport(): TimelineViewportSnapshot
+
+Returns the current viewport snapshot in logical pixels: width/height/dpr, scrollX/Y, zoomLevel, trackHeight/trackMargin, timelineHeight/firstTrackTopMargin, contentRect, the visible row range `visibleTrackRange` (`null` with no tracks) and `revision`. The revision only bumps when layout-relevant state actually changes; pure event-progress updates never produce spurious notifications.
+
+### subscribeViewport(listener): () => void
+
+Subscribes to viewport changes. The listener receives the current snapshot synchronously at registration; afterwards at most one notification per rendered frame, after derived layout and scroll clamping settle. The unsubscribe function is idempotent and `destroy()` clears every subscription and pending notification. Listener exceptions are isolated. Covered changes: scroll:x/y, zoom:change, canvas:resize, tracks:add/update/remove, data:load, config:endTime and `adjustCanvasSize()` after host-driven row-height changes.
+
+### getTrackRectByBusinessId(id): TrackRect | null
+
+Returns row geometry for a resource identity: `businessId`, `trackIndex`, the full `rect` and `visibleRect` (intersection with the drawable viewport; `null` when fully off-screen; off-screen rows still return the full rect). Unknown identities return `null`. The row formula is shared with `TracksRenderer`: `y = timelineHeight + firstTrackTopMargin + index * (trackHeight + trackMargin) - scrollY`.
+
+### timeToX(time) / xToTime(x)
+
+Time↔X conversion (CSS px, canvas origin, scroll-adjusted). No clamping: out-of-viewport values may return negative coordinates or out-of-window times. `NaN` / `Infinity` inputs return `null`. The formula matches rendering: `x = startPaddingTime + (time - startTime) * secondWidth * zoomLevel - scrollX` (`startPaddingTime` is a pixel offset, not seconds).
 
 
 
@@ -2137,21 +2225,46 @@ Notes:
 * `PluginMetadata`: plugin metadata
 * `PluginAPI`: the plugin context API
 
+## Schedule and viewport types (added in 1.6)
 
+```ts
+type BusinessId = string | number;
 
----
-url: /timeline-canvas/en/playground.md
----
+type ScheduleErrorCode =
+  | "invalid_input" | "duplicate_business_id" | "not_found"
+  | "missing_business_id" | "destroyed";
 
-import TimelinePlayground from "../public/components/TimelinePlayground";
+interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
+type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };
 
-<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
-  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
-    Playground
-  </h1>
+interface ScheduleEventInput {
+  businessId: BusinessId;
+  startTime: number;
+  endTime: number;
+  title: string;
+  description?: string;
+  color?: string;
+  readonly?: boolean;
+  customData?: Record<string, unknown>;
+  media?: TimelineEvent["media"];
+}
 
-  <TimelinePlayground lang="en" />
-</main>
+type ScheduleEventPatch = Partial<Omit<ScheduleEventInput, "businessId">>;
+
+interface ScheduleTrackInput { businessId: BusinessId; customData?: Record<string, unknown>; events: ScheduleEventInput[] }
+interface ScheduleDataFormat { tracks: ScheduleTrackInput[]; timeIndicatorPosition?: number }
+interface ScheduleEventLocation { trackIndex: number; eventIndex: number; resourceBusinessId: BusinessId; event: TimelineEvent }
+interface ScheduleEventUpsert { resourceBusinessId: BusinessId; event: ScheduleEventInput }
+
+interface EventContentRect { x: number; y: number; width: number; height: number }
+type EventContentPhase = "normal" | "drag" | "resize";
+interface EventContentRenderContext { /* ctx/event/track/rect/clipRect/phase/selected/highlighted/readonly/dpr/drawDefaultContent */ }
+interface TimelineViewportSnapshot { width; height; dpr; scrollX; scrollY; zoomLevel; trackHeight; trackMargin; timelineHeight; firstTrackTopMargin; contentRect; visibleTrackRange: [number, number] | null; revision: number }
+interface TrackRect { businessId: BusinessId; trackIndex: number; rect: EventContentRect; visibleRect: EventContentRect | null }
+type ViewportListener = (snapshot: TimelineViewportSnapshot) => void;
+```
+
+Additionally: `TimelineEvent` and `Track` accept an optional `businessId`, `Track` accepts optional `customData`, `LoadDataFormat` tracks/events accept an optional `businessId`, and `TimelineOptions` accepts the optional `renderEventContent`. `TimelineEvent.id` / `Track.id` remain `number`.
 
 
 
@@ -2904,6 +3017,32 @@ Example:
 
 
 ---
+url: /timeline-canvas/en/guide/resource-scheduling.md
+---
+
+import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>Resource Schedule View</h1>
+
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    A fixed left column shows line name/status/utilization; each task shows the work order id, quantity, completion percentage and alerts. Click a work order in view mode for details. Incremental refreshes and the viewport subscription keep business identities stable.
+    Enable "Enable async commit" to enter the M2 editing protocol (start
+    <code>node scripts/schedule-demo-server.mjs</code> first): drags/resizes create a candidate →
+    synchronous validation → onBeforeCommit → server accept/reject/correction. Unknown results
+    (response cut after the server wrote) enter "save result pending confirmation", lock the task
+    (amber badge on the task), and require "Query authoritative recovery" + reconcileScheduleEvent
+    to unlock. The demo server is authoritative for placement only (time window and line);
+    recovery restores content fields from the local confirmed facts. Export and queries
+    always contain confirmed facts only.
+  </p>
+
+  <ResourceScheduleHost lang="en" />
+</main>
+
+
+
+---
 url: /timeline-canvas/en/guide/usage.md
 ---
 
@@ -3448,6 +3587,44 @@ url: /timeline-canvas/en/index.md
 ---
 
 
+
+
+
+---
+url: /timeline-canvas/en/playground.md
+---
+
+import TimelinePlayground from "../public/components/TimelinePlayground";
+
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
+    Playground · Media Timeline
+  </h1>
+
+  <TimelinePlayground lang="en" />
+</main>
+
+
+
+---
+url: /timeline-canvas/en/playground/schedule.md
+---
+
+import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+
+<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
+  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
+    Playground · Resource Schedule
+  </h1>
+
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    "Enable async commit" requires <code>node scripts/schedule-demo-server.mjs</code> first;
+    see <a href="/timeline-canvas/en/guide/resource-scheduling">Resource Schedule View</a> for the
+    editing protocol and recovery flow.
+  </p>
+
+  <ResourceScheduleHost lang="en" />
+</main>
 
 
 
@@ -4049,6 +4226,25 @@ Handlers run in plugin-priority order:
 
 Within the same priority, handlers run in registration order.
 
+## Typed registration for known events (added in 1.6)
+
+`registerEventHandler` / `unregisterEventHandler` / `emitEvent` / `validateEvent` now expose precise tuple types for known event keys (`PluginEventMap`); custom string extensions keep the broad `(...args: unknown[]) => unknown` boundary. Dynamic call sites with a variable event name keep the `unknown` upper bound.
+
+```ts
+// Known key: exact payload type (wrong shapes are rejected by the compiler)
+context.api.registerEventHandler("validate:event:move", (payload) => {
+  return Number.isFinite(payload.toTrackIndex); // the payload always carries toTrackIndex
+});
+
+// Custom extension: still an unknown boundary
+context.api.registerEventHandler("my:custom:event", (payload: unknown) => payload !== null);
+```
+
+Known keys and payloads:
+
+* `render:event:media`: `(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)` (11-tuple, matching `EventsRenderer`; during drags the visible representation of the dragged event is emitted once by `InteractionRenderer`)
+* `validate:event:move`: a single payload object `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`
+
 
 
 ---
@@ -4473,5 +4669,24 @@ The source render order is:
 * `interaction`
 * `scrollbar`
 * `overlay`
+
+## Unified event content rendering renderEventContent (added in 1.6)
+
+`TimelineOptions.renderEventContent` is the single entry point for the content of every visible event across normal, drag and resize phases; when omitted the core default text rendering is used. The callback receives an `EventContentRenderContext`: ctx, event, track, trackIndex/eventIndex, `rect` (full event block in CSS px, scroll-adjusted, including eventVerticalPadding), `clipRect` (intersection of the content with the drawable viewport, excluding the timeline axis and scrollbars), `phase: 'normal' | 'drag' | 'resize'`, selected/highlighted/readonly, dpr and `drawDefaultContent()` (executed at most once per invocation).
+
+```ts
+const timeline = new Timeline("canvas", {
+  renderEventContent(context) {
+    const { ctx, rect, event } = context;
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(String(event.title), rect.x + 8, rect.y + 6, rect.width - 16);
+    ctx.restore();
+    // skipping drawDefaultContent() takes over the content completely
+  },
+});
+```
+
+Constraints: context data is read-only; the order is background → media hook → custom/default content → selection border/handles and other decorations; a throwing callback is logged with a fixed error code and falls back to the default content (the media hook is not drawn twice) and rendering recovers on the next frame; the callback must not change the core hit rectangle or bypass readOnly.
 
 

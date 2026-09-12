@@ -30,17 +30,16 @@
 - [事件监听 API](/timeline-canvas/api/timeline/event-listeners.md)
 - [类型定义](/timeline-canvas/api/timeline/types.md)
 
-## 演练场
-
-- [演练场](/timeline-canvas/playground.md)
-
 ## Other
 
 - [性能与监控](/timeline-canvas/advanced/performance.md)
 - [安装与构建](/timeline-canvas/guide/installation.md)
 - [维护者 MCP 服务](/timeline-canvas/guide/mcp.md)
+- [资源排程查看](/timeline-canvas/guide/resource-scheduling.md)
 - [使用与示例](/timeline-canvas/guide/usage.md)
 - [用户 MCP 服务](/timeline-canvas/guide/user-mcp.md)
+- [演练场](/timeline-canvas/playground.md)
+- [演练场 · 排产时间轴](/timeline-canvas/playground/schedule.md)
 - [高级主题](/timeline-canvas/plugins/plugin-development/advanced.md)
 - [核心 API](/timeline-canvas/plugins/plugin-development/api.md)
 - [最佳实践](/timeline-canvas/plugins/plugin-development/best-practices.md)
