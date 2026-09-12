@@ -1,6 +1,6 @@
 {
   "name": "timeline-canvas-user-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP tools for integrating timeline-canvas and developing external plugins",
   "license": "MIT",
   "bin": {
