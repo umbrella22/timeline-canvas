@@ -1,0 +1,166 @@
+
+> timeline-canvas@1.5.0 test:run /Volumes/project_home/github/timeline-canvas/packages/timeline
+> vp test run
+
+
+ RUN  v4.1.11 /Volumes/project_home/github/timeline-canvas/packages/timeline
+
+ ✓ |timeline| tests/event-index-manager.spec.ts (5 tests) 100ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+stdout | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[DirtyCheck] ✓ Marking layers dirty: [tracks, timeline, scrollbar, guideLines]
+[LayerBuffer] LayerBufferManager initialized: 200x120 (dpr=1)
+
+stderr | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[PluginManager] Plugin load failed: broken-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/timeline.integration.spec.ts:264:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at PluginController.usePlugin (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginController.ts:51:20)
+
+ ✓ |timeline| tests/schedule-cleanup.spec.ts (3 tests) 62ms
+ ✓ |timeline| tests/timeline.integration.spec.ts (20 tests) 72ms
+stderr | tests/event-content.spec.ts > M1 unified event content contracts > C-04 unified event content rendering (T-RENDER) > falls back to default content when the custom renderer throws
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+
+ ✓ |timeline| tests/event-content.spec.ts (4 tests) 108ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+ ✓ |timeline| tests/timeline-playground.spec.ts (5 tests) 231ms
+ ✓ |timeline| tests/schedule-recovery.spec.ts (7 tests) 262ms
+ ✓ |timeline| tests/schedule-commit.spec.ts (7 tests) 472ms
+ ✓ |timeline| tests/viewport-subscription.spec.ts (8 tests) 100ms
+ ✓ |timeline| tests/event-media-plugin.spec.ts (8 tests) 74ms
+ ✓ |timeline| tests/schedule-edit.spec.ts (6 tests) 64ms
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects invalid batches without mutating previous state
+[Timeline] [schedule] loadScheduleData rejected (code=duplicate_business_id, path=tracks[1].events[0].businessId)
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].endTime)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > refuses to export legacy events without business identity
+[Timeline] [schedule] exportScheduleData rejected (code=missing_business_id, path=tracks[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects circular or malformed media with typed errors and zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+[Timeline] [schedule] updateEventByBusinessId rejected (code=invalid_input, path=media.waveform.data[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > patches placement with merged validation and reports not_found for unknown ids
+[Timeline] [schedule] updateEventByBusinessId rejected (code=not_found)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > rejects batches referencing unknown resources without partial writes
+[Timeline] [schedule] upsertScheduleEvents rejected (code=not_found, path=items[1].resourceBusinessId)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects non-finite timeIndicatorPosition with zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=timeIndicatorPosition)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > returns a typed error instead of throwing when legacy-loaded media is circular
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects legacy-loaded waveform buffers containing non-finite values on export
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.waveform.data[0])
+
+ ✓ |timeline| tests/schedule-data.spec.ts (24 tests) 71ms
+ ✓ |timeline| tests/mouse-handler.spec.ts (4 tests) 33ms
+ ✓ |timeline| tests/schedule-lifecycle.spec.ts (5 tests) 54ms
+ ✓ |timeline| tests/snapping-interactions.spec.ts (15 tests) 73ms
+ ✓ |timeline| tests/schedule-validation.spec.ts (6 tests) 40ms
+ ✓ |timeline| tests/schedule-concurrency.spec.ts (4 tests) 40ms
+ ✓ |timeline| tests/pointer-input.spec.ts (3 tests) 20ms
+ ✓ |timeline| tests/idle-state.spec.ts (9 tests) 69ms
+stderr | tests/plugin-manager.spec.ts > PluginManager > 插件加载失败时回滚已注册资源并执行反向生命周期清理
+[PluginManager] Plugin load failed: test-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/plugin-manager.spec.ts:339:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+ ✓ |timeline| tests/plugin-manager.spec.ts (14 tests) 32ms
+ ✓ |timeline| tests/renderers.spec.ts (4 tests) 16ms
+ ✓ |timeline| tests/event-tooltip-plugin.spec.ts (1 test) 16ms
+ ✓ |timeline| tests/interaction-manager.spec.ts (2 tests) 4ms
+ ✓ |timeline| tests/viewport-controller.spec.ts (5 tests) 5ms
+ ✓ |timeline| tests/canvas-controller.spec.ts (5 tests) 26ms
+ ✓ |timeline| tests/hit-test-service.spec.ts (3 tests) 4ms
+ ✓ |timeline| tests/performance-overlay-plugin.spec.ts (2 tests) 13ms
+ ✓ |timeline| tests/time-utils.spec.ts (14 tests) 18ms
+ ✓ |timeline| tests/plugin-controller.spec.ts (4 tests) 30ms
+ ✓ |timeline| tests/change-scheduler.spec.ts (3 tests) 9ms
+ ✓ |timeline| tests/time-indicator-controller.spec.ts (8 tests) 6ms
+ ✓ |timeline| tests/state-manager.spec.ts (2 tests) 4ms
+ ✓ |timeline| tests/track-manager.spec.ts (3 tests) 5ms
+ ✓ |timeline| tests/object-utils.spec.ts (1 test) 3ms
+ ✓ |timeline| tests/smoke.spec.ts (3 tests) 3ms
+ ✓ |timeline| tests/light-theme-plugin.spec.ts (1 test) 2ms
+ ✓ |timeline| tests/type-regression.spec.ts (2 tests) 3ms
+
+ Test Files  36 passed (36)
+      Tests  220 passed (220)
+   Start at  06:00:08
+   Duration  4.64s (transform 2.12s, setup 481ms, import 4.11s, tests 2.14s, environment 19.65s)
+

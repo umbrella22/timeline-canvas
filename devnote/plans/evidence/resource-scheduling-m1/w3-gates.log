@@ -1,0 +1,15 @@
+=== W3 targeted G0 x3 ===
+      Tests  41 passed (41)
+RUN1_EXIT=0
+      Tests  41 passed (41)
+RUN2_EXIT=0
+      Tests  41 passed (41)
+RUN3_EXIT=0
+=== G2 ===
+> tsc -p tsconfig.docs.json
+
+G2_EXIT=0
+=== G8 ===
+OK
+=== G10 ===
+G10_EXIT=0

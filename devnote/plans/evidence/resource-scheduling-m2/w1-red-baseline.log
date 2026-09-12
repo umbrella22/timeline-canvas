@@ -1,0 +1,489 @@
+
+> timeline-canvas@1.5.0 test:run /Volumes/project_home/github/timeline-canvas/packages/timeline
+> vp test run
+
+
+ RUN  v4.1.11 /Volumes/project_home/github/timeline-canvas/packages/timeline
+
+ ❯ |timeline| tests/schedule-recovery.spec.ts (4 tests | 4 failed) 23ms
+       × invalidates a pending operation when loadScheduleData replaces the dataset 16ms
+       × never writes a late accepted response back after destroy 2ms
+       × exposes reconcileScheduleEvent as the authoritative single-event entry 3ms
+       × returns not_found when reconciling an event that does not exist 1ms
+ ❯ |timeline| tests/schedule-concurrency.spec.ts (4 tests | 4 failed) 37ms
+       × exposes pending state for a locked event and idle for others 21ms
+       × rejects re-editing the same event while its commit is pending 5ms
+       × does not let another event take the candidate slot of a pending event 7ms
+       × still allows another event to move to a genuinely free slot 3ms
+ ❯ |timeline| tests/schedule-commit.spec.ts (4 tests | 4 failed) 34ms
+       × publishes once and fires legacy callback after acceptance 17ms
+       × restores original display on explicit rejection without touching other events 6ms
+       × publishes the server-corrected placement on accepted with correction 4ms
+       × reject is not silently retried and commit hook is called exactly once per intent 6ms
+ ❯ |timeline| tests/schedule-validation.spec.ts (6 tests | 2 failed) 36ms
+       ✓ does not call commit when the final drop overlaps a confirmed event 18ms
+       × lets business validator reject with code and reason before commit 7ms
+       ✓ treats a Promise-returning validate as validation_error, never a pass 2ms
+       ✓ does not allow business allowed:true to bypass core overlap rejection 2ms
+       × keeps new-schedule mode from auto-adding tracks on drag beyond last row 5ms
+       ✓ rejects readonly events with a typed code and zero commit 2ms
+ ❯ |timeline| tests/schedule-edit.spec.ts (6 tests | 5 failed) 30ms
+       × exposes editing capabilities only when scheduleEditing is configured 14ms
+       × keeps confirmed facts unchanged while a commit is in flight 8ms
+       × captures before snapshot at gesture start, detached from live tracks 2ms
+       × reports cross-resource move with before resource and after resource 2ms
+       ✓ does not create a commit for a click without movement 1ms
+       × exposes per-event edit state and returns null for unknown ids 2ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+ ❯ |timeline| tests/schedule-cleanup.spec.ts (3 tests | 3 failed) 88ms
+       × returns to idle and allows fresh edits after a terminal settle 25ms
+       × survives repeated mount/unmount cycles with unresolved commits 53ms
+       × does not fire legacy success callbacks after destroy settled a pending commit 8ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+ ✓ |timeline| tests/timeline-playground.spec.ts (5 tests) 359ms
+ ✓ |timeline| tests/snapping-interactions.spec.ts (15 tests) 42ms
+ ✓ |timeline| tests/event-index-manager.spec.ts (5 tests) 106ms
+ ✓ |timeline| tests/mouse-handler.spec.ts (4 tests) 31ms
+ ✓ |timeline| tests/idle-state.spec.ts (9 tests) 39ms
+ ✓ |timeline| tests/viewport-subscription.spec.ts (8 tests) 71ms
+stderr | tests/event-content.spec.ts > M1 unified event content contracts > C-04 unified event content rendering (T-RENDER) > falls back to default content when the custom renderer throws
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+
+ ✓ |timeline| tests/event-content.spec.ts (4 tests) 136ms
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects invalid batches without mutating previous state
+[Timeline] [schedule] loadScheduleData rejected (code=duplicate_business_id, path=tracks[1].events[0].businessId)
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].endTime)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > refuses to export legacy events without business identity
+[Timeline] [schedule] exportScheduleData rejected (code=missing_business_id, path=tracks[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects circular or malformed media with typed errors and zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+[Timeline] [schedule] updateEventByBusinessId rejected (code=invalid_input, path=media.waveform.data[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > patches placement with merged validation and reports not_found for unknown ids
+[Timeline] [schedule] updateEventByBusinessId rejected (code=not_found)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > rejects batches referencing unknown resources without partial writes
+[Timeline] [schedule] upsertScheduleEvents rejected (code=not_found, path=items[1].resourceBusinessId)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects non-finite timeIndicatorPosition with zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=timeIndicatorPosition)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > returns a typed error instead of throwing when legacy-loaded media is circular
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects legacy-loaded waveform buffers containing non-finite values on export
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.waveform.data[0])
+
+ ✓ |timeline| tests/schedule-data.spec.ts (24 tests) 87ms
+ ✓ |timeline| tests/canvas-controller.spec.ts (5 tests) 22ms
+stderr | tests/plugin-manager.spec.ts > PluginManager > 插件加载失败时回滚已注册资源并执行反向生命周期清理
+[PluginManager] Plugin load failed: test-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/plugin-manager.spec.ts:339:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ✓ |timeline| tests/plugin-manager.spec.ts (14 tests) 16ms
+ ✓ |timeline| tests/event-media-plugin.spec.ts (8 tests) 92ms
+ ✓ |timeline| tests/renderers.spec.ts (4 tests) 19ms
+stdout | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[DirtyCheck] ✓ Marking layers dirty: [tracks, timeline, scrollbar, guideLines]
+[LayerBuffer] LayerBufferManager initialized: 200x120 (dpr=1)
+
+stderr | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[PluginManager] Plugin load failed: broken-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/timeline.integration.spec.ts:264:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at PluginController.usePlugin (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginController.ts:51:20)
+
+ ✓ |timeline| tests/schedule-lifecycle.spec.ts (5 tests) 51ms
+ ✓ |timeline| tests/timeline.integration.spec.ts (20 tests) 64ms
+ ✓ |timeline| tests/pointer-input.spec.ts (3 tests) 32ms
+ ✓ |timeline| tests/event-tooltip-plugin.spec.ts (1 test) 8ms
+ ✓ |timeline| tests/viewport-controller.spec.ts (5 tests) 6ms
+ ✓ |timeline| tests/performance-overlay-plugin.spec.ts (2 tests) 9ms
+ ✓ |timeline| tests/change-scheduler.spec.ts (3 tests) 7ms
+ ✓ |timeline| tests/track-manager.spec.ts (3 tests) 4ms
+ ✓ |timeline| tests/time-utils.spec.ts (14 tests) 9ms
+ ✓ |timeline| tests/hit-test-service.spec.ts (3 tests) 9ms
+ ✓ |timeline| tests/object-utils.spec.ts (1 test) 5ms
+ ✓ |timeline| tests/plugin-controller.spec.ts (4 tests) 10ms
+ ✓ |timeline| tests/time-indicator-controller.spec.ts (8 tests) 18ms
+ ✓ |timeline| tests/interaction-manager.spec.ts (2 tests) 9ms
+ ✓ |timeline| tests/state-manager.spec.ts (2 tests) 3ms
+ ✓ |timeline| tests/smoke.spec.ts (3 tests) 4ms
+ ✓ |timeline| tests/type-regression.spec.ts (2 tests) 3ms
+ ✓ |timeline| tests/light-theme-plugin.spec.ts (1 test) 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 22 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |timeline| tests/schedule-cleanup.spec.ts > M2 schedule cleanup contracts > C-19 transaction release and runtime cost (T-CLEANUP) > returns to idle and allows fresh edits after a terminal settle
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-cleanup.spec.ts:69:30
+     67|       drag.move(220, 40);
+     68|       drag.release(220, 40);
+     69|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+     70|       resolveCommit({ accepted: true });
+     71|       await Promise.resolve();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/22]⎯
+
+ FAIL  |timeline| tests/schedule-cleanup.spec.ts > M2 schedule cleanup contracts > C-19 transaction release and runtime cost (T-CLEANUP) > survives repeated mount/unmount cycles with unresolved commits
+AssertionError: expected "vi.fn()" to be called 20 times, but got 0 times
+ ❯ tests/schedule-cleanup.spec.ts:96:30
+     94|         expect(() => timeline.destroy()).not.toThrow();
+     95|       }
+     96|       expect(onBeforeCommit).toHaveBeenCalledTimes(20);
+       |                              ^
+     97|     });
+     98|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/22]⎯
+
+ FAIL  |timeline| tests/schedule-cleanup.spec.ts > M2 schedule cleanup contracts > C-19 transaction release and runtime cost (T-CLEANUP) > does not fire legacy success callbacks after destroy settled a pending commit
+TypeError: resolveCommit is not a function
+ ❯ tests/schedule-cleanup.spec.ts:117:7
+    115|       drag.release(220, 40);
+    116|       timeline.destroy();
+    117|       resolveCommit({ accepted: true });
+       |       ^
+    118|       await Promise.resolve();
+    119|       await Promise.resolve();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/22]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > publishes once and fires legacy callback after acceptance
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:85:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/22]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > restores original display on explicit rejection without touching other events
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:105:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/22]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > publishes the server-corrected placement on accepted with correction
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:120:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/22]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > reject is not silently retried and commit hook is called exactly once per intent
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-commit.spec.ts:145:30
+    143|       await Promise.resolve();
+    144|       await Promise.resolve();
+    145|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    146|     });
+    147|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/22]⎯
+
+ FAIL  |timeline| tests/schedule-concurrency.spec.ts > M2 schedule concurrency contracts > C-14 same-event mutual exclusion and cross-event reservations (T-CONCURRENCY) > exposes pending state for a locked event and idle for others
+AssertionError: M2 capability: Timeline.getScheduleEditState must exist (C-14): expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ ❯ tests/schedule-concurrency.spec.ts:67:9
+     65|         typeof getScheduleEditState,
+     66|         "M2 capability: Timeline.getScheduleEditState must exist (C-14…
+     67|       ).toBe("function");
+       |         ^
+     68|     });
+     69|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/22]⎯
+
+ FAIL  |timeline| tests/schedule-concurrency.spec.ts > M2 schedule concurrency contracts > C-14 same-event mutual exclusion and cross-event reservations (T-CONCURRENCY) > rejects re-editing the same event while its commit is pending
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-concurrency.spec.ts:82:30
+     80|       first.move(220, 40);
+     81|       first.release(220, 40);
+     82|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+     83|
+     84|       // 同一任务在 pending 期间再次拖动：必须被 busy 拒绝，第二次提交不发生
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/22]⎯
+
+ FAIL  |timeline| tests/schedule-concurrency.spec.ts > M2 schedule concurrency contracts > C-14 same-event mutual exclusion and cross-event reservations (T-CONCURRENCY) > does not let another event take the candidate slot of a pending event
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-concurrency.spec.ts:103:30
+    101|       first.move(220, 90);
+    102|       first.release(220, 90);
+    103|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    104|
+    105|       // WO-2 拖向 WO-1 的候选时段（A3 39600 起 → x 379 附近）；即使本地不重叠判定放行，
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/22]⎯
+
+ FAIL  |timeline| tests/schedule-concurrency.spec.ts > M2 schedule concurrency contracts > C-14 same-event mutual exclusion and cross-event reservations (T-CONCURRENCY) > still allows another event to move to a genuinely free slot
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-concurrency.spec.ts:140:30
+    138|       first.move(220, 40);
+    139|       first.release(220, 40);
+    140|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    141|
+    142|       // WO-2 移到 A1 的 39600（11:00–12:00）：不与 WO-1 原占用/候选占用冲突
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/22]⎯
+
+ FAIL  |timeline| tests/schedule-edit.spec.ts > M2 schedule edit contracts > C-11 unified edit change and snapshots (T-CHANGE) > exposes editing capabilities only when scheduleEditing is configured
+AssertionError: M2 capability: Timeline.getScheduleEditState must exist when scheduleEditing is configured (C-11): expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ ❯ requireMethod tests/schedule-edit.spec.ts:31:5
+     29|     typeof method,
+     30|     `M2 capability: Timeline.${name} must exist when scheduleEditing i…
+     31|   ).toBe("function");
+       |     ^
+     32|   return method.bind(timeline) as (...args: unknown[]) => unknown;
+     33| }
+ ❯ tests/schedule-edit.spec.ts:79:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/22]⎯
+
+ FAIL  |timeline| tests/schedule-edit.spec.ts > M2 schedule edit contracts > C-11 unified edit change and snapshots (T-CHANGE) > keeps confirmed facts unchanged while a commit is in flight
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-edit.spec.ts:93:30
+     91|
+     92|       // onBeforeCommit 在落点被调用一次，携带 move change
+     93|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+     94|       const change = onBeforeCommit.mock.calls[0][0] as AnyRecord;
+     95|       expect(change.action).toBe("move");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/22]⎯
+
+ FAIL  |timeline| tests/schedule-edit.spec.ts > M2 schedule edit contracts > C-11 unified edit change and snapshots (T-CHANGE) > captures before snapshot at gesture start, detached from live tracks
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-edit.spec.ts:126:30
+    124|       await Promise.resolve();
+    125|
+    126|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    127|       const change = onBeforeCommit.mock.calls[0][0] as AnyRecord;
+    128|       const before = change.before as AnyRecord;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/22]⎯
+
+ FAIL  |timeline| tests/schedule-edit.spec.ts > M2 schedule edit contracts > C-11 unified edit change and snapshots (T-CHANGE) > reports cross-resource move with before resource and after resource
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-edit.spec.ts:157:30
+    155|       await Promise.resolve();
+    156|
+    157|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    158|       const change = onBeforeCommit.mock.calls[0][0] as AnyRecord;
+    159|       expect((change.before as AnyRecord).resourceBusinessId).toBe("A1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/22]⎯
+
+ FAIL  |timeline| tests/schedule-edit.spec.ts > M2 schedule edit contracts > C-11 unified edit change and snapshots (T-CHANGE) > exposes per-event edit state and returns null for unknown ids
+AssertionError: M2 capability: Timeline.getScheduleEditState must exist when scheduleEditing is configured (C-11): expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ ❯ requireMethod tests/schedule-edit.spec.ts:31:5
+     29|     typeof method,
+     30|     `M2 capability: Timeline.${name} must exist when scheduleEditing i…
+     31|   ).toBe("function");
+       |     ^
+     32|   return method.bind(timeline) as (...args: unknown[]) => unknown;
+     33| }
+ ❯ tests/schedule-edit.spec.ts:175:36
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/22]⎯
+
+ FAIL  |timeline| tests/schedule-recovery.spec.ts > M2 schedule recovery contracts > C-16 lifecycle and authoritative recovery (T-RECOVER) > invalidates a pending operation when loadScheduleData replaces the dataset
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-recovery.spec.ts:65:30
+     63|       drag.move(220, 90);
+     64|       drag.release(220, 90);
+     65|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+     66|
+     67|       // 整批权威导入：旧 operation 失效
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/22]⎯
+
+ FAIL  |timeline| tests/schedule-recovery.spec.ts > M2 schedule recovery contracts > C-16 lifecycle and authoritative recovery (T-RECOVER) > never writes a late accepted response back after destroy
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/schedule-recovery.spec.ts:100:30
+     98|       drag.move(220, 40);
+     99|       drag.release(220, 40);
+    100|       expect(onBeforeCommit).toHaveBeenCalledTimes(1);
+       |                              ^
+    101|
+    102|       timeline.destroy();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/22]⎯
+
+ FAIL  |timeline| tests/schedule-recovery.spec.ts > M2 schedule recovery contracts > C-16 lifecycle and authoritative recovery (T-RECOVER) > exposes reconcileScheduleEvent as the authoritative single-event entry
+AssertionError: M2 capability: Timeline.reconcileScheduleEvent must exist (C-16): expected 'undefined' to be 'function' // Object.is equality
+
+Expected: "function"
+Received: "undefined"
+
+ ❯ tests/schedule-recovery.spec.ts:122:9
+    120|         typeof reconcileScheduleEvent,
+    121|         "M2 capability: Timeline.reconcileScheduleEvent must exist (C-…
+    122|       ).toBe("function");
+       |         ^
+    123|     });
+    124|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/22]⎯
+
+ FAIL  |timeline| tests/schedule-recovery.spec.ts > M2 schedule recovery contracts > C-16 lifecycle and authoritative recovery (T-RECOVER) > returns not_found when reconciling an event that does not exist
+TypeError: reconcileScheduleEvent is not a function
+ ❯ tests/schedule-recovery.spec.ts:136:22
+    134|         options: unknown,
+    135|       ) => { ok: boolean; error?: { code: string } };
+    136|       const result = reconcileScheduleEvent(
+       |                      ^
+    137|         "WO-404",
+    138|         { resourceBusinessId: "A1", event: { businessId: "WO-404", sta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/22]⎯
+
+ FAIL  |timeline| tests/schedule-validation.spec.ts > M2 schedule validation contracts > C-12 synchronous validation with typed reasons (T-VALIDATE) > lets business validator reject with code and reason before commit
+AssertionError: expected "vi.fn()" to be called at least once
+ ❯ tests/schedule-validation.spec.ts:83:24
+     81|       drag.move(400, 90);
+     82|       drag.release(400, 90);
+     83|       expect(validate).toHaveBeenCalled();
+       |                        ^
+     84|       expect(onBeforeCommit).not.toHaveBeenCalled();
+     85|       // 事实未变：拒绝落点后事件仍在原资源原时间
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/22]⎯
+
+ FAIL  |timeline| tests/schedule-validation.spec.ts > M2 schedule validation contracts > C-12 synchronous validation with typed reasons (T-VALIDATE) > keeps new-schedule mode from auto-adding tracks on drag beyond last row
+AssertionError: expected 3 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 3
+
+ ❯ tests/schedule-validation.spec.ts:121:44
+    119|       drag.release(215, 190);
+    120|       // 编辑协议不自动创建业务产线
+    121|       expect(timeline.state.tracks.length).toBe(2);
+       |                                            ^
+    122|       expect(onBeforeCommit).not.toHaveBeenCalled();
+    123|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/22]⎯
+
+
+ Test Files  6 failed | 30 passed (36)
+      Tests  22 failed | 192 passed (214)
+   Start at  04:43:05
+   Duration  4.90s (transform 1.77s, setup 998ms, import 3.28s, tests 1.52s, environment 21.41s)
+
+ ELIFECYCLE  Command failed with exit code 1.

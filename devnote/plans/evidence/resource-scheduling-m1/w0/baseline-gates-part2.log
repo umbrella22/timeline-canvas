@@ -1,0 +1,70 @@
+=== G3: test:coverage ===
+  ...tsRenderer.ts |   81.93 |    81.96 |   83.33 |   81.45 | ...35,202,365-406 
+  ...esRenderer.ts |   88.46 |    52.63 |      50 |      92 | 90-95             
+  ...orRenderer.ts |   78.12 |       40 |      50 |   82.14 | 46-53             
+  ...onRenderer.ts |    78.3 |    51.38 |      80 |   83.83 | ...57-158,258-292 
+  ...arRenderer.ts |   81.66 |    54.54 |      75 |   82.75 | 88-90,162-182     
+  ...neRenderer.ts |   94.47 |    60.81 |   92.85 |   95.51 | 445,463-478       
+  ...ksRenderer.ts |   82.14 |    65.51 |      50 |   84.61 | 74-79             
+ utils             |    60.3 |    47.89 |   59.61 |   63.78 |                   
+  MediaLRUCache.ts |   65.45 |    41.17 |      60 |   66.66 | ...5,82-87,98,158 
+  canvas.ts        |   93.75 |      100 |   66.66 |   93.75 | 44                
+  defaults.ts      |     100 |      100 |     100 |     100 |                   
+  i18n.ts          |   93.75 |     87.5 |     100 |   93.75 | 222               
+  object.ts        |   30.43 |    44.11 |      40 |   31.81 | 10-36,41,76-81    
+  ...nceMonitor.ts |   23.63 |     9.09 |    37.5 |   25.58 | 25,29-70,77-83    
+  time.ts          |     100 |    93.75 |     100 |     100 | 33                
+ workers           |       0 |        0 |       0 |       0 |                   
+  ...rkerBridge.ts |       0 |        0 |       0 |       0 | 30-234            
+  media.worker.ts  |       0 |        0 |       0 |       0 | 21-142            
+  types.ts         |       0 |        0 |       0 |       0 |                   
+-------------------|---------|----------|---------|---------|-------------------
+G3_EXIT=0
+=== G4: build ===
+packages/timeline build: ℹ dist/builtin-plugin/ContextMenuPlugin.d.mts           0.10 kB │ gzip:  0.09 kB
+packages/timeline build: ℹ dist/builtin-plugin/EventMediaPlugin.d.mts            0.10 kB │ gzip:  0.09 kB
+packages/timeline build: ℹ dist/types-Ch6RMCi9.d.mts                            27.27 kB │ gzip:  7.08 kB
+packages/timeline build: ℹ dist/EventTooltipPlugin-r1624PXo.d.mts                1.08 kB │ gzip:  0.61 kB
+packages/timeline build: ℹ dist/ContextMenuPlugin-C84Iiz8U.d.mts                 0.40 kB │ gzip:  0.31 kB
+packages/timeline build: ℹ dist/PerformanceOverlayPlugin-DDmW-ils.d.mts          0.23 kB │ gzip:  0.16 kB
+packages/timeline build: ℹ dist/EventMediaPlugin-BiG8wzdz.d.mts                  0.21 kB │ gzip:  0.16 kB
+packages/timeline build: ℹ dist/LightThemePlugin-CGDyxruq.d.mts                  0.21 kB │ gzip:  0.15 kB
+packages/timeline build: ℹ dist/DarkThemePlugin-YD-fFNVt.d.mts                   0.20 kB │ gzip:  0.15 kB
+packages/timeline build: ℹ 31 files, total: 179.45 kB
+packages/timeline build: ✔ Build complete in 524ms
+packages/timeline build: Done
+G4_EXIT=0
+=== G5: docs:build ===
+doc_build/guide/usage.html                                    92.8 kB     9.0 kB
+doc_build/en/guide/usage.html                                 93.1 kB     8.6 kB
+doc_build/llms-full.txt                                       103.6 kB    32.5 kB
+doc_build/en/llms-full.txt                                    106.0 kB    30.0 kB
+doc_build/api/timeline/view-control.html                      117.5 kB    10.6 kB
+doc_build/en/api/timeline/view-control.html                   117.7 kB    10.1 kB
+doc_build/guide/mcp.html                                      126.8 kB    14.5 kB
+doc_build/en/guide/mcp.html                                   127.1 kB    13.6 kB
+
+                                                     Total:   3553.4 kB   568.0 kB
+
+info    Generate sitemap.xml for 62 pages.
+G5_EXIT=0
+=== G6: mcp-service test:package ===
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "electron-mirror". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "overrides". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown global config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Packed MCP artifact generated media, render, theme, and .spec.ts files successfully.
+G6_EXIT=0
+=== G7: user-mcp-service test:package ===
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "electron-mirror". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "overrides". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown global config "store-dir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Source and packed user MCP protocol/package checks passed.
+G7_EXIT=0

@@ -1,0 +1,251 @@
+
+> timeline-canvas@1.5.0 test:run /Volumes/project_home/github/timeline-canvas/packages/timeline
+> vp test run
+
+
+ RUN  v4.1.11 /Volumes/project_home/github/timeline-canvas/packages/timeline
+
+ ✓ |timeline| tests/event-index-manager.spec.ts (5 tests) 97ms
+ ❯ |timeline| tests/schedule-commit.spec.ts (4 tests | 3 failed) 27ms
+       × publishes once and fires legacy callback after acceptance 13ms
+       × restores original display on explicit rejection without touching other events 2ms
+       × publishes the server-corrected placement on accepted with correction 3ms
+       ✓ reject is not silently retried and commit hook is called exactly once per intent 8ms
+ ❯ |timeline| tests/schedule-concurrency.spec.ts (4 tests | 1 failed) 37ms
+       ✓ exposes pending state for a locked event and idle for others 16ms
+       ✓ rejects re-editing the same event while its commit is pending 9ms
+       × does not let another event take the candidate slot of a pending event 6ms
+       ✓ still allows another event to move to a genuinely free slot 4ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+ ✓ |timeline| tests/schedule-edit.spec.ts (6 tests) 73ms
+ ❯ |timeline| tests/schedule-cleanup.spec.ts (3 tests | 1 failed) 97ms
+       × returns to idle and allows fresh edits after a terminal settle 32ms
+       ✓ survives repeated mount/unmount cycles with unresolved commits 64ms
+       ✓ does not fire legacy success callbacks after destroy settled a pending commit 1ms
+stderr | tests/event-content.spec.ts > M1 unified event content contracts > C-04 unified event content rendering (T-RENDER) > falls back to default content when the custom renderer throws
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+[EventContentRenderer] [render] custom event content failed (code=event_content_error); falling back to default content (renderer boom)
+
+ ✓ |timeline| tests/event-content.spec.ts (4 tests) 107ms
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > renders a synchronized keyboard-selectable and editable event list
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+stderr | tests/timeline-playground.spec.ts > TimelinePlayground playback > uses live playback speed and cancels the pending frame on unmount
+The current testing environment is not configured to support act(...)
+
+ ✓ |timeline| tests/timeline-playground.spec.ts (5 tests) 381ms
+ ✓ |timeline| tests/snapping-interactions.spec.ts (15 tests) 68ms
+ ✓ |timeline| tests/idle-state.spec.ts (9 tests) 26ms
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects invalid batches without mutating previous state
+[Timeline] [schedule] loadScheduleData rejected (code=duplicate_business_id, path=tracks[1].events[0].businessId)
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].endTime)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > refuses to export legacy events without business identity
+[Timeline] [schedule] exportScheduleData rejected (code=missing_business_id, path=tracks[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-02 atomic import, export and metadata (T-DATA) > rejects circular or malformed media with typed errors and zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+[Timeline] [schedule] updateEventByBusinessId rejected (code=invalid_input, path=media.waveform.data[0])
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > patches placement with merged validation and reports not_found for unknown ids
+[Timeline] [schedule] updateEventByBusinessId rejected (code=not_found)
+
+ ✓ |timeline| tests/schedule-lifecycle.spec.ts (5 tests) 45ms
+ ✓ |timeline| tests/event-media-plugin.spec.ts (8 tests) 72ms
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > C-03 incremental update by business id (T-UPSERT) > rejects batches referencing unknown resources without partial writes
+[Timeline] [schedule] upsertScheduleEvents rejected (code=not_found, path=items[1].resourceBusinessId)
+
+ ✓ |timeline| tests/viewport-subscription.spec.ts (8 tests) 74ms
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects non-finite timeIndicatorPosition with zero writes
+[Timeline] [schedule] loadScheduleData rejected (code=invalid_input, path=timeIndicatorPosition)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > returns a typed error instead of throwing when legacy-loaded media is circular
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.images[0].loop)
+
+stderr | tests/schedule-data.spec.ts > M1 schedule data contracts > review round 2 regressions > rejects legacy-loaded waveform buffers containing non-finite values on export
+[Timeline] [schedule] exportScheduleData rejected (code=invalid_input, path=tracks[0].events[0].media.waveform.data[0])
+
+ ✓ |timeline| tests/schedule-data.spec.ts (24 tests) 101ms
+stdout | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[DirtyCheck] ✓ Marking layers dirty: [tracks, timeline, scrollbar, guideLines]
+[LayerBuffer] LayerBufferManager initialized: 200x120 (dpr=1)
+
+stderr | tests/timeline.integration.spec.ts > Timeline integration > 公开插件 API 保持失败返回语义
+[PluginManager] Plugin load failed: broken-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/timeline.integration.spec.ts:264:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at PluginController.usePlugin (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginController.ts:51:20)
+
+ ✓ |timeline| tests/timeline.integration.spec.ts (20 tests) 75ms
+ ✓ |timeline| tests/pointer-input.spec.ts (3 tests) 44ms
+stderr | tests/plugin-manager.spec.ts > PluginManager > 插件加载失败时回滚已注册资源并执行反向生命周期清理
+[PluginManager] Plugin load failed: test-plugin@1.0.0 Error: boom
+    at Object.activate (/Volumes/project_home/github/timeline-canvas/packages/timeline/tests/plugin-manager.spec.ts:339:15)
+    at PluginManager.performLoad (/Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:90:22)
+    at /Volumes/project_home/github/timeline-canvas/packages/timeline/src/core/managers/PluginManager.ts:58:24
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ✓ |timeline| tests/plugin-manager.spec.ts (14 tests) 26ms
+ ✓ |timeline| tests/canvas-controller.spec.ts (5 tests) 17ms
+ ✓ |timeline| tests/schedule-validation.spec.ts (6 tests) 35ms
+ ✓ |timeline| tests/mouse-handler.spec.ts (4 tests) 47ms
+ ✓ |timeline| tests/schedule-recovery.spec.ts (4 tests) 69ms
+ ✓ |timeline| tests/renderers.spec.ts (4 tests) 10ms
+ ✓ |timeline| tests/event-tooltip-plugin.spec.ts (1 test) 14ms
+ ✓ |timeline| tests/viewport-controller.spec.ts (5 tests) 5ms
+ ✓ |timeline| tests/plugin-controller.spec.ts (4 tests) 5ms
+ ✓ |timeline| tests/performance-overlay-plugin.spec.ts (2 tests) 17ms
+ ✓ |timeline| tests/time-indicator-controller.spec.ts (8 tests) 13ms
+ ✓ |timeline| tests/change-scheduler.spec.ts (3 tests) 18ms
+ ✓ |timeline| tests/track-manager.spec.ts (3 tests) 4ms
+ ✓ |timeline| tests/time-utils.spec.ts (14 tests) 16ms
+ ✓ |timeline| tests/interaction-manager.spec.ts (2 tests) 16ms
+ ✓ |timeline| tests/state-manager.spec.ts (2 tests) 8ms
+ ✓ |timeline| tests/hit-test-service.spec.ts (3 tests) 6ms
+ ✓ |timeline| tests/object-utils.spec.ts (1 test) 3ms
+ ✓ |timeline| tests/smoke.spec.ts (3 tests) 3ms
+ ✓ |timeline| tests/type-regression.spec.ts (2 tests) 3ms
+ ✓ |timeline| tests/light-theme-plugin.spec.ts (1 test) 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |timeline| tests/schedule-cleanup.spec.ts > M2 schedule cleanup contracts > C-19 transaction release and runtime cost (T-CLEANUP) > returns to idle and allows fresh edits after a terminal settle
+AssertionError: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ tests/schedule-cleanup.spec.ts:78:30
+     76|       second.move(240, 40);
+     77|       second.release(240, 40);
+     78|       expect(onBeforeCommit).toHaveBeenCalledTimes(2);
+       |                              ^
+     79|     });
+     80|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > publishes once and fires legacy callback after acceptance
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:85:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > restores original display on explicit rejection without touching other events
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:105:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  |timeline| tests/schedule-commit.spec.ts > M2 schedule commit settle contracts > C-13 accept, reject and server correction (T-SETTLE) > publishes the server-corrected placement on accepted with correction
+Error: M2 capability: commit settle flow not implemented (C-13)
+ ❯ startPendingMove tests/schedule-commit.spec.ts:75:9
+     73|   void api;
+     74|   void onBeforeCommit;
+     75|   throw new Error("M2 capability: commit settle flow not implemented (…
+       |         ^
+     76| }
+     77|
+ ❯ tests/schedule-commit.spec.ts:120:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  |timeline| tests/schedule-concurrency.spec.ts > M2 schedule concurrency contracts > C-14 same-event mutual exclusion and cross-event reservations (T-CONCURRENCY) > does not let another event take the candidate slot of a pending event
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/schedule-concurrency.spec.ts:114:28
+    112|         return change.eventBusinessId === "WO-2";
+    113|       });
+    114|       expect(calls.length).toBe(0);
+       |                            ^
+    115|     });
+    116|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  3 failed | 33 passed (36)
+      Tests  5 failed | 209 passed (214)
+   Start at  05:03:42
+   Duration  4.70s (transform 1.76s, setup 935ms, import 3.57s, tests 1.66s, environment 20.91s)
+
+ ELIFECYCLE  Command failed with exit code 1.

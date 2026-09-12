@@ -1,0 +1,23 @@
+=== G0 x3 ===
+      Tests  175 passed (175)
+RUN1_EXIT=0
+      Tests  175 passed (175)
+RUN2_EXIT=0
+      Tests  175 passed (175)
+RUN3_EXIT=0
+=== G2 typecheck ===
+> tsc -p tsconfig.docs.json
+
+G2_EXIT=0
+=== G4 build ===
+packages/timeline build: ✔ Build complete in 581ms
+packages/timeline build: Done
+G4_EXIT=0
+=== G5 docs:build ===
+
+info    Generate sitemap.xml for 64 pages.
+G5_EXIT=0
+=== G8 ===
+OK
+=== G10 ===
+G10_EXIT=0

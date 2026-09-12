@@ -1,0 +1,19 @@
+=== W2 targeted G0 ===
+      Tests  43 passed (43)
+   Start at  01:15:35
+   Duration  766ms (transform 494ms, setup 84ms, import 583ms, tests 159ms, environment 2.01s)
+
+EXIT=0
+=== G2 typecheck ===
+> timeline-canvas-workspace@ docs:typecheck /Volumes/project_home/github/timeline-canvas
+> tsc -p tsconfig.docs.json
+
+EXIT=0
+=== G8 ===
+OK
+=== G10 ===
+EXIT=0
+      Tests  43 passed (43)
+RUN2_EXIT=0
+      Tests  43 passed (43)
+RUN3_EXIT=0

@@ -1,0 +1,38 @@
+=== G8: git diff --check ===
+G8_EXIT=0
+
+=== G0: timeline tests ===
+ ✓ |timeline| tests/viewport-controller.spec.ts (5 tests) 5ms
+ ✓ |timeline| tests/time-indicator-controller.spec.ts (8 tests) 6ms
+ ✓ |timeline| tests/light-theme-plugin.spec.ts (1 test) 3ms
+ ✓ |timeline| tests/hit-test-service.spec.ts (3 tests) 5ms
+ ✓ |timeline| tests/state-manager.spec.ts (2 tests) 3ms
+ ✓ |timeline| tests/smoke.spec.ts (3 tests) 3ms
+ ✓ |timeline| tests/object-utils.spec.ts (1 test) 3ms
+ ✓ |timeline| tests/plugin-controller.spec.ts (4 tests) 5ms
+ ✓ |timeline| tests/interaction-manager.spec.ts (2 tests) 4ms
+
+ Test Files  26 passed (26)
+      Tests  146 passed (146)
+   Start at  00:34:24
+   Duration  3.56s (transform 2.08s, setup 406ms, import 2.82s, tests 923ms, environment 16.22s)
+
+G0_EXIT=0
+=== G1: lint ===
+
+> timeline-canvas-workspace@ lint /Volumes/project_home/github/timeline-canvas
+> vp lint packages docs/public/components scripts rspress.config.ts vite.config.ts
+
+Found 0 warnings and 0 errors.
+Finished in 118ms on 138 files with 96 rules using 8 threads.
+G1_EXIT=0
+=== G2: typecheck ===
+packages/user-mcp-service typecheck$ tsc -p tsconfig.json --noEmit
+packages/user-mcp-service typecheck: Done
+packages/timeline typecheck: Done
+packages/mcp-service typecheck: Done
+
+> timeline-canvas-workspace@ docs:typecheck /Volumes/project_home/github/timeline-canvas
+> tsc -p tsconfig.docs.json
+
+G2_EXIT=0
