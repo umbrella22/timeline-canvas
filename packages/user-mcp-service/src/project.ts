@@ -2,8 +2,8 @@ import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import ts from "typescript";
 
-export const TESTED_TIMELINE_VERSION = "1.5.0";
-const testedVersions = ["1.4.1", TESTED_TIMELINE_VERSION];
+export const TESTED_TIMELINE_VERSION = "1.6.0";
+const testedVersions = ["1.4.1", "1.5.0", TESTED_TIMELINE_VERSION];
 
 export const compilerDefaults: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
