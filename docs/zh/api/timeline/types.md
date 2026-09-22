@@ -199,7 +199,9 @@ type BusinessId = string | number;
 
 type ScheduleErrorCode =
   | "invalid_input" | "duplicate_business_id" | "not_found"
-  | "missing_business_id" | "destroyed";
+  | "missing_business_id" | "destroyed"
+  // M2 编辑协议新增
+  | "busy" | "reconciliation_required" | "invalid_server_result" | "stale_operation";
 
 interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
 type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };

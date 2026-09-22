@@ -196,18 +196,44 @@ The new methods revolve around the optional `businessId` (`string | number`): st
 
 Strict schedule import: the whole batch is validated first and published atomically in one shot; on failure nothing is written and previous tracks/selection/indexes stay intact. Every track and event must carry a `businessId`; empty `tracks` yields `invalid_input`, duplicate identities yield `duplicate_business_id`, out-of-window times yield `invalid_input` with `path` pointing at the field. A successful import clears selection (same as `loadData`); use `upsertScheduleEvents` / `updateEventByBusinessId` for refreshes that must preserve selection.
 
+```ts
+const result = timeline.loadScheduleData({
+  tracks: [
+    {
+      businessId: "A1",
+      customData: { name: "Line A1", status: "Running", utilization: 22.2 },
+      events: [
+        { businessId: "A1-WO-00001", startTime: 28800, endTime: 32400, title: "Work order 1" },
+      ],
+    },
+  ],
+});
+if (!result.ok) {
+  console.log(result.error.code, result.error.path); // safe: never contains the raw payload
+}
+```
+
 ### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
 
-Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated.
+Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated. Colors equal to the palette default are not exported (reloading derives the same color again).
 
-### Queries, patch, upsert, delete, highlight, track metadata
+### getEventByBusinessId(id) / getTrackByBusinessId(id)
 
-- `getEventByBusinessId(id)` / `getTrackByBusinessId(id)` return isolated snapshots (`null` when unknown).
-- `updateEventByBusinessId(id, patch)` validates merged times and recomputes duration; `customData` is replaced wholesale; `id` / `businessId` / `duration` cannot be patched.
-- `upsertScheduleEvents(items)` replaces complete business events; existing identities are replaced or moved atomically after whole-batch validation.
+Look up by business identity; returns a snapshot isolated from memory (`customData` deep-copied). Unknown identities return `null`.
+
+### updateEventByBusinessId(id, patch): ScheduleResult<void>
+
+Merging patch: start/end are validated after the merge and duration is recomputed; `customData` is replaced wholesale at the top level (no deep merge); `id` / `businessId` / `duration` cannot be patched. Unknown identities return `not_found`.
+
+### upsertScheduleEvents(items): ScheduleResult<void>
+
+Whole-batch replacement of complete business events: the batch is validated first (including duplicates inside the batch and resource existence) and applied in order once everything passes. Existing business identities are replaced in place or moved to the target resource (identity and internal numeric id preserved); missing ones are appended using the existing internal id allocation; omitted optional fields fall back to their defaults.
+
+### deleteEventByBusinessId(id) / highlightEventByBusinessId(id) / updateTrackByBusinessId(id, patch)
+
 - `deleteEventByBusinessId(id)` re-resolves interaction pointers by identity, so deleting a neighbour never drifts the selection.
 - `highlightEventByBusinessId(id)` mirrors `highlightEvent`.
-- `updateTrackByBusinessId(id, patch)` updates resource metadata only.
+- `updateTrackByBusinessId(id, patch)` updates resource metadata only (`customData` replaced wholesale) and does not change time configuration.
 
 ### Compatibility notes
 

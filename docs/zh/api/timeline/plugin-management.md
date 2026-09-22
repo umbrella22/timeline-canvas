@@ -51,7 +51,7 @@ await timeline.usePlugin(ContextMenuPlugin());
 
 - 返回 `true` 表示插件成功加载或主题切换成功
 - 非主题插件若重复加载，当前实现会返回 `false`
-- 主题插件会走专门的 `switchTheme()` 流程
+- 主题插件会走专门的 `setTheme()` 流程（内部为私有的 `switchThemePlugin`）
 - 如果插件声明了 `metadata.dependencies`，加载前会先检查依赖是否存在
 
 ## getLoadedPlugins(): TimelinePlugin[]

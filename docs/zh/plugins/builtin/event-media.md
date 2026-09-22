@@ -44,19 +44,18 @@ timeline.loadData({
 ## media 字段结构
 
 ```ts
-interface TimelineEvent["media"] {
-  images?: Array<{
-    src: string;
-    fit?: "cover" | "contain" | "stretch";
-    opacity?: number;
-  }>;
-  waveform?: {
-    data: Float32Array | number[];
-    color?: string;
-    backgroundColor?: string;
-    opacity?: number;
-  };
-}
+type EventMedia = NonNullable<TimelineEvent["media"]>;
+
+// 等价于：
+// {
+//   images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
+//   waveform?: {
+//     data: Float32Array | number[];
+//     color?: string;
+//     backgroundColor?: string;
+//     opacity?: number;
+//   };
+// }
 ```
 
 ## 混合渲染示例

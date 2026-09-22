@@ -2,11 +2,14 @@ packages:
   - 'packages/*'
 
 overrides:
-  'vite@*': npm:@voidzero-dev/vite-plus-core@0.3.0
   'vitest@*': 4.1.11
 
-# The Vite+ alias is versioned independently from its bundled Vite 8 runtime.
+# 刻意不使用 vite 别名形态（vite -> @voidzero-dev/vite-plus-core）。
+# 上游建议（viteplus.dev/guide/migrate-rules → Vite and Overrides）是在每个包声明 vite 别名 +
+# workspace override 重定向，以避免 vitest 的 vite peer 落到上游 Vite；本仓库选择不这样做，
+# 因此依赖图会同时包含 @voidzero-dev/vite-plus-core（vp pack/build 使用）与上游 vite（vitest 使用）。
+# 下列规则仅用于放行由此产生的 vite peer 版本告警。
 peerDependencyRules:
   allowedVersions:
-    'vitest>vite': '0.3.0'
-    '@vitest/mocker>vite': '0.3.0'
+    'vitest>vite': '0.3.3'
+    '@vitest/mocker>vite': '0.3.3'

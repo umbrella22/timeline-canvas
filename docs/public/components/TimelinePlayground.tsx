@@ -526,7 +526,6 @@ const TimelinePlayground = ({ lang = "zh" }: { lang?: TimelinePlaygroundLang }) 
           if (cancelled) return;
           setStatus(t.eventSelected(data.event.title, data.trackName));
           refreshAccessibleEvents(timeline);
-          console.log("Event Clicked:", data);
         },
         onStatusChange: (text) => {
           if (cancelled) return;
@@ -541,7 +540,6 @@ const TimelinePlayground = ({ lang = "zh" }: { lang?: TimelinePlaygroundLang }) 
         onEventHighlight: () => refreshAccessibleEvents(timeline),
         onContextMenu: (data) => {
           if (cancelled) return;
-          console.log("Context Menu:", data);
           if (data.menuType === "delete") {
             if (confirm(t.confirmDelete(data.event.title))) {
               timeline.deleteEvent(data.trackIndex, data.eventIndex);
@@ -581,8 +579,8 @@ const TimelinePlayground = ({ lang = "zh" }: { lang?: TimelinePlaygroundLang }) 
       const N = 20000;
       const waveformData = new Float32Array(N);
       for (let i = 0; i < N; i++) {
-        const t = i / 200;
-        waveformData[i] = Math.sin(t) * 0.8 + Math.sin(t * 0.25) * 0.2;
+        const phase = i / 200;
+        waveformData[i] = Math.sin(phase) * 0.8 + Math.sin(phase * 0.25) * 0.2;
       }
 
       if (cancelled) return;
@@ -674,13 +672,14 @@ const TimelinePlayground = ({ lang = "zh" }: { lang?: TimelinePlaygroundLang }) 
         timeline.removeTrack();
         refreshAccessibleEvents(timeline);
         break;
-      case "addEvent":
+      case "addEvent": {
         const trackIndex = timeline.state?.selectedTrack ?? 0;
         const startTime = timeline.state?.timeIndicatorPosition ?? timeline.config.startTime;
         timeline.addEvent(trackIndex, startTime, startTime + 100, t.newEventTitle, t.newEventDesc);
         setStatus(t.eventAdded);
         refreshAccessibleEvents(timeline);
         break;
+      }
       case "zoomIn":
         timeline.zoom(1.2);
         break;

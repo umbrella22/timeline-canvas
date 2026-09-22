@@ -44,19 +44,18 @@ timeline.loadData({
 ## `media` field
 
 ```ts
-interface TimelineEvent["media"] {
-  images?: Array<{
-    src: string;
-    fit?: "cover" | "contain" | "stretch";
-    opacity?: number;
-  }>;
-  waveform?: {
-    data: Float32Array | number[];
-    color?: string;
-    backgroundColor?: string;
-    opacity?: number;
-  };
-}
+type EventMedia = NonNullable<TimelineEvent["media"]>;
+
+// equivalent to:
+// {
+//   images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
+//   waveform?: {
+//     data: Float32Array | number[];
+//     color?: string;
+//     backgroundColor?: string;
+//     opacity?: number;
+//   };
+// }
 ```
 
 ## Mixed-media example

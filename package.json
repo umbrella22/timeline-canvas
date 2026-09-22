@@ -28,22 +28,21 @@
     "docs:preview": "rspress preview"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.2",
+    "@changesets/cli": "^3.0.3",
     "@rsbuild/plugin-vue": "^2.0.1",
-    "@rspress/core": "^2.0.21",
-    "@rspress/plugin-llms": "2.0.21",
-    "@rspress/plugin-preview": "^2.0.21",
-    "@rspress/plugin-sitemap": "^2.0.21",
-    "@rspress/plugin-twoslash": "^2.0.21",
-    "@types/node": "^26.4.1",
-    "@types/react": "^19.2.18",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "rspress-plugin-mermaid": "^1.0.1",
+    "@rspress/core": "^2.0.22",
+    "@rspress/plugin-llms": "2.0.22",
+    "@rspress/plugin-preview": "^2.0.22",
+    "@rspress/plugin-sitemap": "^2.0.22",
+    "@rspress/plugin-twoslash": "^2.0.22",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "rspress-plugin-mermaid": "^1.0.3",
     "@vitest/coverage-v8": "4.1.11",
     "typescript": "^6.0.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
-    "vite-plus": "0.3.0",
-    "vue": "^3.5.42"
+    "vite-plus": "0.3.3",
+    "vue": "^3.5.43"
   }
 }

@@ -7,9 +7,18 @@ title: Advanced Topics
 ```javascript
 // Communicate via shared data or exposed methods
 const SharedStorePlugin = () => ({
+  metadata: {
+    name: "shared-store",
+    version: "1.0.0",
+    description: "Shares messages between plugins",
+    type: PluginType.EXTENSION,
+  },
+  // Only init / activate / deactivate / destroy are lifecycle hooks.
   activate(context) {
     context.api.setData("shared:messages", []);
   },
+  // Any other method is a plain custom method, not a hook: call it explicitly
+  // on the object returned by the factory.
   pushMessage(context, message) {
     const list = context.api.getData("shared:messages") || [];
     list.push(message);
@@ -21,11 +30,27 @@ const SharedStorePlugin = () => ({
 ## Chaining via priority
 
 ```javascript
-// Use plugin priority to control execution order
+// Use plugin priority to control the order in which plugins are activated
+const performValidation = (payload) => {
+  // ...validation logic
+  return { allowed: true };
+};
+
 const ValidationPlugin = () => ({
-  metadata: { priority: PluginPriority.HIGH },
-  validateEventMove(payload) {
-    return this.performValidation(payload);
+  metadata: {
+    // name / version / description / type are required; only priority is optional
+    name: "validation",
+    version: "1.0.0",
+    description: "Validates event moves before they are committed",
+    type: PluginType.EVENT_HANDLER,
+    priority: PluginPriority.HIGH,
+  },
+  activate(context) {
+    // The plugin is a plain object literal, so there is no `this`:
+    // register the handler through the plugin API instead.
+    context.api.registerEventHandler("validate:event:move", (payload) =>
+      performValidation(payload)
+    );
   },
 });
 ```
@@ -34,15 +59,22 @@ const ValidationPlugin = () => ({
 
 ```javascript
 // Conditional loading
-const ConditionalPlugin = () => ({
+const ConditionalPlugin = (options = {}) => ({
+  metadata: {
+    name: "conditional",
+    version: "1.0.0",
+    description: "Loads an extra plugin when the host enables it",
+    type: PluginType.EXTENSION,
+  },
   init(context) {
-    // Check conditions
-    if (context.timeline.config.enableAdvancedFeatures) {
-      // Dynamically load an advanced plugin
-      import("./advanced-plugin.js").then((module) => {
-        context.timeline.usePlugin(module.default);
-      });
-    }
+    // The switch comes from the caller: TimelineConfig has no
+    // `enableAdvancedFeatures` option.
+    if (!options.enableAdvancedFeatures) return;
+
+    // Dynamically load an advanced plugin
+    import("./advanced-plugin.js").then((module) => {
+      context.timeline.usePlugin(module.default);
+    });
   },
 });
 ```
@@ -54,15 +86,21 @@ const ConditionalPlugin = () => ({
 ```javascript
 // Add debug output
 const DebugPlugin = () => ({
+  metadata: {
+    name: "debug",
+    version: "1.0.0",
+    description: "Logs plugin debug information",
+    type: PluginType.TOOL,
+  },
   activate(context) {
-    if (context.timeline.config.debug) {
-      console.log("Plugin debug mode is enabled");
+    if (!context.timeline.config.debug) return;
 
-      // Register debug events
-      context.api.registerEventHandler("debug:info", (info) => {
-        console.log("Debug info:", info);
-      });
-    }
+    console.log("Plugin debug mode is enabled");
+
+    // Register debug events
+    context.api.registerEventHandler("debug:info", (info) => {
+      console.log("Debug info:", info);
+    });
   },
 });
 ```

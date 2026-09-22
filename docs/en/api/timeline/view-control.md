@@ -327,6 +327,14 @@ Returns the current viewport snapshot in logical pixels: width/height/dpr, scrol
 
 Subscribes to viewport changes. The listener receives the current snapshot synchronously at registration; afterwards at most one notification per rendered frame, after derived layout and scroll clamping settle. The unsubscribe function is idempotent and `destroy()` clears every subscription and pending notification. Listener exceptions are isolated. Covered changes: scroll:x/y, zoom:change, canvas:resize, tracks:add/update/remove, data:load, config:endTime and `adjustCanvasSize()` after host-driven row-height changes.
 
+```ts
+const unsubscribe = timeline.subscribeViewport((snapshot) => {
+  positionLeftColumn(snapshot);
+});
+unsubscribe();
+unsubscribe(); // idempotent
+```
+
 ### getTrackRectByBusinessId(id): TrackRect | null
 
 Returns row geometry for a resource identity: `businessId`, `trackIndex`, the full `rect` and `visibleRect` (intersection with the drawable viewport; `null` when fully off-screen; off-screen rows still return the full rect). Unknown identities return `null`. The row formula is shared with `TracksRenderer`: `y = timelineHeight + firstTrackTopMargin + index * (trackHeight + trackMargin) - scrollY`.

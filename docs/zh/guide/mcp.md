@@ -279,7 +279,7 @@ pnpm -C packages/mcp-service start
 
 ## 工具列表
 
-下面列出本仓库 MCP server v2.0 暴露的全部工具（8 个）。返回值统一为文本（text）。
+下面列出本仓库 MCP server v2.0 暴露的全部工具（10 个）。返回值统一为文本（text）。
 
 > **与 v1.0 的区别**：删除了 6 个与 VS Code 内置工具重叠的工具（`timeline_search`、`timeline_read_excerpt`、`timeline_repo_map`、`timeline_trace_entrypoints`、`timeline_run_repo_script`、`timeline_run_mcp_script`），新增 5 个语义分析工具。
 
