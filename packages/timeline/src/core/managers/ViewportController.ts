@@ -69,13 +69,11 @@ export class ViewportController {
       return { type: "unchanged" };
     }
 
+    // Content width is affine in zoom; compute the first 0.05 step directly.
+    const pixelsPerZoom = (this.config.endTime + this.config.endPaddingTime - this.config.startTime) * this.config.secondWidth;
+    const fitZoom = (canvasWidth - this.config.startPaddingTime) / pixelsPerZoom;
     const step = 0.05;
-    while (
-      zoom <= maxZoom &&
-      this.renderManager.getContentWidth(zoom) < canvasWidth
-    ) {
-      zoom += step;
-    }
+    zoom += Math.ceil((fitZoom - zoom) / step) * step;
 
     if (
       zoom <= maxZoom &&
@@ -148,14 +146,15 @@ export class ViewportController {
     const oldZoomLevel = this.state.zoomLevel;
     const oldScrollX = this.state.scrollX;
     const centerX = this.renderManager.getCachedLogicalWidth() / 2;
+    const padding = this.config.startPaddingTime ?? 0;
     const centerTimeOffset =
-      (centerX + oldScrollX) / (this.config.secondWidth * oldZoomLevel);
+      (centerX + oldScrollX - padding) / (this.config.secondWidth * oldZoomLevel);
 
     this.state.zoomLevel = this.clampZoomLevel(targetZoomLevel);
 
     const newCenterX =
       centerTimeOffset * this.config.secondWidth * this.state.zoomLevel;
-    this.state.scrollX = newCenterX - centerX;
+    this.state.scrollX = newCenterX + padding - centerX;
 
     const maxScrollX = this.renderManager.computeMaxScrollX(this.state.zoomLevel);
     this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));

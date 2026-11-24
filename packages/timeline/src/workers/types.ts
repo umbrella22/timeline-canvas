@@ -14,7 +14,7 @@ export interface MediaTaskRequest {
 
 export interface WaveformPayload {
   eventId: number;
-  /** 原始波形数据（通过 Transferable 零拷贝） */
+  /** 调用方保留原始波形；桥接层仅复制并移交此视图覆盖的样本 */
   data: Float32Array;
   /** 目标像素宽度 */
   targetWidth: number;

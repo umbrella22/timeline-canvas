@@ -1,3 +1,4 @@
+import { SCROLLBAR_GUTTER } from "../../utils/scrollbars";
 import type {
   BusinessId,
   TimelineConfig,
@@ -12,7 +13,6 @@ export class ViewportManager {
   private state: TimelineState;
   private cwZoom?: number;
   private cwValue?: number;
-  private readonly H_SCROLLBAR_PADDING = 13;
   private listeners = new Set<ViewportListener>();
   private lastSnapshot: TimelineViewportSnapshot | null = null;
   private revision = 0;
@@ -61,8 +61,8 @@ export class ViewportManager {
 
   public getAvailableHeight(canvasLogicalHeight: number, canvasLogicalWidth: number, zoomLevel: number): number {
     const hasH = this.hasHorizontalScrollbar(canvasLogicalWidth, zoomLevel);
-    const padding = hasH ? this.H_SCROLLBAR_PADDING : 0;
-    return canvasLogicalHeight - padding;
+    const padding = hasH ? SCROLLBAR_GUTTER : 0;
+    return Math.max(0, canvasLogicalHeight - padding);
   }
 
   public computeMaxScrollYWithPadding(canvasLogicalHeight: number, canvasLogicalWidth: number, zoomLevel: number): number {
@@ -114,7 +114,7 @@ export class ViewportManager {
     // 避免行落入“range 可见但 visibleRect 为 null”的滚动条带
     const availableHeight =
       logicalHeight -
-      (this.hasHorizontalScrollbar(logicalWidth, this.state.zoomLevel) ? this.H_SCROLLBAR_PADDING : 0);
+      (this.hasHorizontalScrollbar(logicalWidth, this.state.zoomLevel) ? SCROLLBAR_GUTTER : 0);
     let first: number | null = null;
     let last: number | null = null;
     for (let index = 0; index < this.state.tracks.length; index++) {
@@ -145,7 +145,7 @@ export class ViewportManager {
     const visibleTop = Math.max(top, this.config.timelineHeight);
     const visibleBottom = Math.min(
       top + this.config.trackHeight,
-      logicalHeight - (this.hasHorizontalScrollbar(logicalWidth, this.state.zoomLevel) ? this.H_SCROLLBAR_PADDING : 0)
+      logicalHeight - (this.hasHorizontalScrollbar(logicalWidth, this.state.zoomLevel) ? SCROLLBAR_GUTTER : 0)
     );
     const visibleRect =
       visibleBottom > visibleTop
@@ -199,7 +199,7 @@ export class ViewportManager {
     this.revision += 1;
     snapshot.revision = this.revision;
     this.lastSnapshot = snapshot;
-    for (const listener of [...this.listeners]) {
+    for (const listener of Array.from(this.listeners)) {
       try {
         listener(snapshot);
       } catch {

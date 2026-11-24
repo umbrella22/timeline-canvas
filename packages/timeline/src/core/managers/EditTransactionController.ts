@@ -17,12 +17,13 @@ import type { BusinessIdentityIndex } from "./BusinessIdentityIndex";
 /** 宿主定时器可表示的最大毫秒数；commitTimeoutMs 超出视为配置错误 */
 const MAX_TIMEOUT_MS = 2147483647;
 
-interface EditTransaction {
+export interface EditTransaction {
   operationId: string;
   eventBusinessId: BusinessId;
   action: "move" | "resize";
   resizeEdge?: "left" | "right";
   before: ScheduleEditSnapshot;
+  source: TimelineEvent;
   beforeTrackIndex: number;
   beforeEventIndex: number;
   draft: SchedulePlacement;
@@ -32,6 +33,14 @@ interface EditTransaction {
   /** 待核对原因码（timeout/transport_error/invalid_response/reconciliation_required） */
   reasonCode?: string;
   abort: AbortController;
+}
+
+function copySnapshot(snapshot: ScheduleEditSnapshot): ScheduleEditSnapshot {
+  return { resourceBusinessId: snapshot.resourceBusinessId, event: cloneEvent(snapshot.event) };
+}
+
+function copyChange(change: ScheduleChange): ScheduleChange {
+  return { ...change, before: copySnapshot(change.before), after: copySnapshot(change.after) };
 }
 
 export type EditBeginResult =
@@ -129,9 +138,7 @@ export class EditTransactionController {
       return { ok: false, code: "busy", reason: "event is locked by an in-flight edit operation" };
     }
     const location = this.businessIdentityIndex.getEventLocation(event.businessId);
-    const resourceBusinessId = location
-      ? this.state.tracks[location.trackIndex]?.businessId
-      : undefined;
+    const resourceBusinessId = location ? this.state.tracks[trackIndex]?.businessId : undefined;
     if (resourceBusinessId === undefined) {
       return { ok: false, code: "missing_business_id", reason: "resource has no business id" };
     }
@@ -146,6 +153,7 @@ export class EditTransactionController {
       action,
       ...(resizeEdge !== undefined ? { resizeEdge } : {}),
       before,
+      source: event,
       beforeTrackIndex: trackIndex,
       beforeEventIndex: eventIndex,
       draft: {
@@ -181,16 +189,22 @@ export class EditTransactionController {
     return this.transactions.get(businessId);
   }
 
+  public matchesSource(businessId: BusinessId): boolean {
+    const tx = this.transactions.get(businessId);
+    if (!tx) return false;
+    const track = this.state.tracks[tx.beforeTrackIndex];
+    return track?.events[tx.beforeEventIndex] === tx.source && track.businessId === tx.before.resourceBusinessId &&
+      tx.source.businessId === businessId && tx.source.startTime === tx.before.event.startTime && tx.source.endTime === tx.before.event.endTime;
+  }
+
   /** 用最终候选构建 ScheduleChange（after 为独立快照） */
   public buildChange(businessId: BusinessId): ScheduleChange | null {
     const transaction = this.transactions.get(businessId);
-    if (!transaction) return null;
-    const sourceTrack = this.state.tracks[transaction.beforeTrackIndex];
-    const liveEvent = sourceTrack?.events[transaction.beforeEventIndex];
+    if (!transaction || !this.matchesSource(businessId)) return null;
     const after: ScheduleEditSnapshot = {
       resourceBusinessId: transaction.draft.resourceBusinessId,
       event: {
-        ...cloneEvent(liveEvent ?? (transaction.before.event as TimelineEvent)),
+        ...cloneEvent(transaction.source),
         id: (transaction.before.event as TimelineEvent).id,
         startTime: transaction.draft.startTime,
         endTime: transaction.draft.endTime,
@@ -222,11 +236,12 @@ export class EditTransactionController {
     if (!validate) return { allowed: true };
     let result: ScheduleValidationResult | Promise<ScheduleValidationResult>;
     try {
-      result = validate(change);
+      result = validate(copyChange(change));
     } catch {
       return { allowed: false, code: "validation_error", reason: "business validator threw an exception" };
     }
     if (result instanceof Promise) {
+      void result.catch(() => {});
       return { allowed: false, code: "validation_error", reason: "business validator must be synchronous" };
     }
     if (!result || typeof result !== "object") {
@@ -256,16 +271,24 @@ export class EditTransactionController {
       operationId: transaction.operationId,
       eventBusinessId: businessId,
       action: transaction.action,
-      before: transaction.before,
-      after: change.after,
+      before: copySnapshot(transaction.before),
+      after: copySnapshot(change.after),
     });
     // 同步抛错保守视为结果未知（外部函数可能先触发副作用再 throw）
     const hook = this.options?.onBeforeCommit;
-    if (!hook) return false;
+    if (!hook || this.transactions.get(businessId) !== transaction || transaction.abort.signal.aborted) return false;
+    if (!this.matchesSource(businessId)) {
+      this.transactions.delete(businessId);
+      this.state.editDrafts.delete(businessId);
+      transaction.abort.abort();
+      this.notify({ state: "validation_failed", operationId: transaction.operationId, eventBusinessId: businessId,
+        action: transaction.action, before: transaction.before, reasonCode: "missing_business_id", reason: "edit source changed before dispatch" });
+      return false;
+    }
     let promise: Promise<ScheduleCommitResult>;
     try {
       promise = Promise.resolve(
-        hook.call(this.options as ScheduleEditingOptions, change, {
+        hook.call(this.options as ScheduleEditingOptions, copyChange(change), {
           signal: transaction.abort.signal,
         }),
       );
@@ -325,10 +348,11 @@ export class EditTransactionController {
   public handleDatasetReplaced(): string[] {
     const invalidatedOperations: string[] = [];
     for (const transaction of Array.from(this.transactions.values())) {
-      transaction.abort.abort();
+      if (this.transactions.get(transaction.eventBusinessId) !== transaction) continue;
       invalidatedOperations.push(transaction.operationId);
       this.transactions.delete(transaction.eventBusinessId);
       this.state.editDrafts.delete(transaction.eventBusinessId);
+      transaction.abort.abort();
       this.notify({
         state: "invalidated",
         operationId: transaction.operationId,
@@ -373,9 +397,9 @@ export class EditTransactionController {
   public releaseForAccept(businessId: BusinessId): void {
     const transaction = this.transactions.get(businessId);
     if (!transaction) return;
-    transaction.abort.abort();
     this.transactions.delete(businessId);
     this.state.editDrafts.delete(businessId);
+    transaction.abort.abort();
   }
 
   public hasTransaction(businessId: BusinessId): boolean {
@@ -407,20 +431,19 @@ export class EditTransactionController {
 
   /** 实例销毁：清空全部事务与计时引用，不发任何通知（销毁后回调被抑制） */
   public destroyAll(): void {
-    for (const transaction of this.transactions.values()) {
-      transaction.abort.abort();
-      this.state.editDrafts.delete(transaction.eventBusinessId);
-    }
+    const transactions = Array.from(this.transactions.values());
     this.transactions.clear();
+    this.state.editDrafts.clear();
+    for (const transaction of transactions) transaction.abort.abort();
   }
 
   /** 权威恢复入口使用：作废指定事务并清理草稿（不发成功类通知） */
   public invalidateTransaction(businessId: BusinessId, reason: string): void {
     const transaction = this.transactions.get(businessId);
     if (!transaction) return;
-    transaction.abort.abort();
     this.transactions.delete(businessId);
     this.state.editDrafts.delete(businessId);
+    transaction.abort.abort();
     if (transaction.state === "pending") {
       this.notify({
         state: "invalidated",
@@ -437,9 +460,9 @@ export class EditTransactionController {
   public rejectPending(businessId: BusinessId, reason: string, code?: string): void {
     const transaction = this.transactions.get(businessId);
     if (!transaction || transaction.state !== "pending") return;
-    transaction.abort.abort();
     this.transactions.delete(businessId);
     this.state.editDrafts.delete(businessId);
+    transaction.abort.abort();
     this.notify({
       state: "rejected",
       operationId: transaction.operationId,
@@ -484,12 +507,11 @@ export class EditTransactionController {
 
   /** 草稿投影与事务表保持一致（预览期间渲染器读取 state.editDrafts） */
   private syncDraftProjection(transaction: EditTransaction): void {
-    const location = this.businessIdentityIndex.getEventLocation(transaction.eventBusinessId);
     this.state.editDrafts.set(transaction.eventBusinessId, {
       operationId: transaction.operationId,
       eventBusinessId: transaction.eventBusinessId,
-      sourceTrackIndex: location?.trackIndex ?? transaction.beforeTrackIndex,
-      targetTrackIndex: location?.trackIndex ?? transaction.beforeTrackIndex,
+      sourceTrackIndex: transaction.beforeTrackIndex,
+      targetTrackIndex: transaction.beforeTrackIndex,
       startTime: transaction.draft.startTime,
       endTime: transaction.draft.endTime,
       action: transaction.action,

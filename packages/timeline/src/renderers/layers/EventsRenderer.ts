@@ -7,10 +7,10 @@ import {
   formatDuration,
   drawRoundedRect,
 } from "../../utils";
+import { graphemes } from "../core/graphemes";
 import { drawEventContent } from "../core/EventContentRenderer";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
-const logger = getLogger("EventsRenderer");
 
 /**
  * 事件渲染器 - 绘制轨道上的所有事件
@@ -28,7 +28,8 @@ export class EventsRenderer {
     canvas: HTMLCanvasElement,
     pluginManager?: PluginManager,
     canvasLogicalWidth?: number,
-    dpr = 1
+    dpr = 1,
+    pass: "all" | "confirmed" | "drafts" = "all"
   ): void {
     const logicalWidth = canvasLogicalWidth ?? canvas.width;
     const track = state.tracks[trackIndex];
@@ -46,9 +47,9 @@ export class EventsRenderer {
 
     const now = performance.now();
     const lastLogTime = this.lastTrackLogTime.get(trackIndex) ?? 0;
-    if (now - lastLogTime >= 500) {
+    if (config.debug && now - lastLogTime >= 500) {
       this.lastTrackLogTime.set(trackIndex, now);
-      logger.debugStyled(
+      getLogger("EventsRenderer", config).debugStyled(
         LogColors.eventRender,
         `Track ${trackIndex}: ${track.events.length} events`
       );
@@ -62,6 +63,7 @@ export class EventsRenderer {
         event.businessId !== undefined
           ? state.editDrafts.get(event.businessId)
           : undefined;
+      if ((pass === "confirmed" && draft) || (pass === "drafts" && !draft)) continue;
       const isDraggingThis =
         state.draggingEvent &&
         state.draggingEvent.isDragging &&
@@ -92,6 +94,7 @@ export class EventsRenderer {
           config.firstTrackTopMargin +
           draft.targetTrackIndex * (config.trackHeight + config.trackMargin) -
           state.scrollY;
+        if (displayTrackY + config.trackHeight < config.timelineHeight || displayTrackY > canvas.height / dpr) continue;
       }
       if (eventX + eventWidth < 0 || eventX > logicalWidth) {
         continue;
@@ -200,7 +203,7 @@ export class EventsRenderer {
         timeFontSize,
         textStyle,
         dpr,
-        phase: isResizingThis ? "resize" : "normal",
+        phase: isResizingThis ? "resize" : isDraggingThis ? "drag" : "normal",
         selected: Boolean(isSelected),
         // 与核心高亮描边同一判定（含时间指示器高亮），保证自定义渲染器能复现视觉状态
         highlighted: Boolean(shouldHighlight),
@@ -269,7 +272,7 @@ export class EventsRenderer {
     timeFontSize: number;
     textStyle: EventTextStyle;
     dpr: number;
-    phase: "normal" | "resize";
+    phase: "normal" | "drag" | "resize";
     selected: boolean;
     highlighted: boolean;
   }): void {
@@ -341,12 +344,13 @@ export class EventsRenderer {
     const ellipsis = "...";
     const ellipsisWidth = ctx.measureText(ellipsis).width;
     if (ellipsisWidth >= maxWidth) return ellipsis;
+    const units = graphemes(text);
     let left = 0;
-    let right = text.length;
+    let right = units.length;
     let result = "";
     while (left < right) {
       const mid = Math.floor((left + right + 1) / 2);
-      const testText = text.substring(0, mid) + ellipsis;
+      const testText = units.slice(0, mid).join("") + ellipsis;
       const testWidth = ctx.measureText(testText).width;
       if (testWidth <= maxWidth) {
         result = testText;
@@ -485,7 +489,8 @@ export class EventsRenderer {
       splitLine.eventIndex === eventIndex
     ) {
       const splitX =
-        (splitLine.splitTime + config.startPaddingTime - config.startTime) *
+        config.startPaddingTime +
+        (splitLine.splitTime - config.startTime) *
           config.secondWidth *
           state.zoomLevel -
         state.scrollX;

@@ -1,12 +1,13 @@
 export function formatTime(seconds: number, showSeconds = true): string {
-  const totalSecs = Math.round(seconds);
+  const totalSecs = Math.round(Math.abs(seconds));
+  const sign = seconds < 0 && totalSecs > 0 ? "-" : "";
   const h = Math.floor(totalSecs / 3600);
   const m = Math.floor((totalSecs % 3600) / 60);
   const s = totalSecs % 60;
   if (showSeconds) {
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return `${sign}${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   } else {
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+    return `${sign}${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
   }
 }
 
@@ -43,6 +44,7 @@ export function getSnapInterval(
 }
 
 export function snapToInterval(seconds: number, snapInterval: number): number {
+  if (!Number.isFinite(snapInterval) || snapInterval <= 0) return seconds;
   return Math.round(seconds / snapInterval) * snapInterval;
 }
 

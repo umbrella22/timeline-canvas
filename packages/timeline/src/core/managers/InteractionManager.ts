@@ -45,6 +45,10 @@ export class InteractionManager {
     this.canvasController.setupEventListeners(this.createEventListeners());
   }
 
+  public cancelGesture(): void {
+    this.mouseHandler.handleCancel();
+  }
+
   public destroy(): void {
     this.canvasController.destroy();
     this.mouseHandler.destroy();
@@ -67,6 +71,7 @@ export class InteractionManager {
         this.mouseHandler.handleCancel(event),
       lostpointercapture: (event: PointerEvent) =>
         this.mouseHandler.handleCancel(event),
+      blur: () => this.mouseHandler.handleCancel(),
       contextmenu: (event: MouseEvent) =>
         this.mouseHandler.handleContextMenu(event),
       wheel: (event: WheelEvent) => this.wheelHandler.handleWheel(event),

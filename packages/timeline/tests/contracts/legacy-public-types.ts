@@ -81,3 +81,6 @@ export function onMove(data: {
 }
 
 export const optionsWithMove: TimelineOptions = { onEventMove: onMove };
+
+export const messageKey: import("../../src").TimelineMessageKey = "statusReady";
+export type PublicEventBlockStyle = import("../../src").EventBlockStyle;

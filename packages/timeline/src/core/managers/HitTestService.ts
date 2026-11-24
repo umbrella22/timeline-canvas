@@ -94,7 +94,7 @@ export class HitTestService {
 
   private resolveTrackIndex(canvasY: number): number | null {
     const logicalY = canvasY + this.state.scrollY;
-    if (logicalY < this.config.timelineHeight) return null;
+    if (!Number.isFinite(canvasY) || canvasY < this.config.timelineHeight) return null;
 
     const trackIndex = Math.floor(
       (logicalY -
@@ -157,17 +157,18 @@ export class HitTestService {
       const event = this.state.tracks[trackIndex].events[eventIndex];
       const { eventX, eventWidth } = this.getEventGeometry(event);
       const handleWidth = this.config.resizeHandleWidth;
+      const insideHandle = Math.min(handleWidth / 2, eventWidth / 3);
 
       if (
         canvasX >= eventX - handleWidth / 2 &&
-        canvasX <= eventX + handleWidth / 2
+        canvasX <= eventX + insideHandle
       ) {
         if (bestResizeIndex === null || eventIndex > bestResizeIndex) {
           bestResizeIndex = eventIndex;
           bestResizeEdge = "left";
         }
       } else if (
-        canvasX >= eventX + eventWidth - handleWidth / 2 &&
+        canvasX >= eventX + eventWidth - insideHandle &&
         canvasX <= eventX + eventWidth + handleWidth / 2
       ) {
         if (bestResizeIndex === null || eventIndex > bestResizeIndex) {

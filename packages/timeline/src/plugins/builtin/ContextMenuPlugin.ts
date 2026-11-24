@@ -35,10 +35,9 @@ export function ContextMenuPlugin(
         options.htmlTemplate ||
         (typeof cfgHtml === "string" ? cfgHtml : undefined);
       // 传入 htmlTemplate 自动启用 HTML 模式，但需要验证内容有效性
-      let useHtml = !!htmlTemplate;
-      if (useHtml && (!htmlTemplate || htmlTemplate.trim() === "")) {
+      const useHtml = htmlTemplate && htmlTemplate.trim() !== "";
+      if (htmlTemplate && !useHtml) {
         logger.warn(context.timeline.t("warningEmptyHtmlTemplateFallback"));
-        useHtml = false;
       }
       const layer: RenderLayer = {
         name: "context-menu-overlay",
@@ -139,23 +138,8 @@ export function ContextMenuPlugin(
             container.style.top = `${menuY}px`;
             container.style.width = `${menuWidth}px`;
             container.style.height = `${menuHeight}px`;
-            if (htmlTemplate) {
-              container.innerHTML = htmlTemplate;
-            } else {
-              let html = "";
-              for (let i = 0; i < config.contextMenuItems.length; i++) {
-                const item = config.contextMenuItems[i];
-                const isHover = state.hoveredContextMenuItem === i;
-                const bg = isHover
-                  ? config.colors.contextMenuHoverBackground
-                  : "transparent";
-                const fg = isHover
-                  ? config.colors.contextMenuHoverText
-                  : config.colors.contextMenuText;
-                html += `<div style="height:${itemHeight}px; padding:${padding}px; background:${bg}; color:${fg}; display:flex; align-items:center;">${item.name}</div>`;
-              }
-              container.innerHTML = html;
-            }
+            // HTML mode is enabled only for a nonempty host-supplied template.
+            container.innerHTML = htmlTemplate;
             ctx.restore();
             return;
           }

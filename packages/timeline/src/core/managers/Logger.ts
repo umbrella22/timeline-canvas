@@ -56,23 +56,28 @@ const globalConfig: GlobalLogConfig = {
  * Logger 实例缓存
  */
 const loggerInstances = new Map<string, Logger>();
+interface DebugScope { readonly debug: boolean }
+const instanceLoggers = new WeakMap<DebugScope, Map<string, Logger>>();
 
 export class Logger {
   private enabled: boolean;
   private level: LogLevel;
   private prefix: string;
   private useGlobalConfig: boolean;
+  private readonly scope?: DebugScope;
 
   constructor(options?: {
     enabled?: boolean;
     level?: LogLevel;
     prefix?: string;
     useGlobalConfig?: boolean;
+    scope?: DebugScope;
   }) {
     this.enabled = options?.enabled ?? true;
     this.level = options?.level ?? "info";
     this.prefix = options?.prefix ?? "Timeline";
     this.useGlobalConfig = options?.useGlobalConfig ?? true;
+    this.scope = options?.scope;
   }
 
   setEnabled(enabled: boolean): void {
@@ -106,7 +111,8 @@ export class Logger {
       if (!globalConfig.enabled) return false;
       return this.rank(level) >= this.rank(globalConfig.level);
     }
-    return this.enabled && this.rank(level) >= this.rank(this.level);
+    const threshold = this.scope ? (this.scope.debug ? "debug" : "info") : this.level;
+    return this.enabled && this.rank(level) >= this.rank(threshold);
   }
 
   debug(...args: unknown[]): void {
@@ -146,14 +152,24 @@ export class Logger {
  * @param module 模块名称
  * @returns Logger 实例
  */
-export function getLogger(module: string): Logger {
-  let logger = loggerInstances.get(module);
+export function getLogger(module: string, scope?: DebugScope): Logger {
+  let cache = loggerInstances;
+  if (scope) {
+    let scoped = instanceLoggers.get(scope);
+    if (!scoped) {
+      scoped = new Map();
+      instanceLoggers.set(scope, scoped);
+    }
+    cache = scoped;
+  }
+  let logger = cache.get(module);
   if (!logger) {
     logger = new Logger({
       prefix: module,
-      useGlobalConfig: true,
+      useGlobalConfig: !scope,
+      scope,
     });
-    loggerInstances.set(module, logger);
+    cache.set(module, logger);
   }
   return logger;
 }

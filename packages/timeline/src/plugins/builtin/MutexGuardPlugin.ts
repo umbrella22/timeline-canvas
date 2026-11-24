@@ -70,7 +70,8 @@ export function MutexGuardPlugin(): TimelinePlugin {
         const overlap = !(
           newEndTime <= event.startTime || newStartTime >= event.endTime
         );
-        if (overlap) {
+        const draft = event.businessId !== undefined ? state.editDrafts?.get(event.businessId) : undefined;
+        if (overlap || (draft && newStartTime < draft.endTime && newEndTime > draft.startTime)) {
           return false;
         }
       }

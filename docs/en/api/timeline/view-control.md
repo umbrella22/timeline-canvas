@@ -180,7 +180,7 @@ Common `ChangeType` values:
 
 ### endChangeBatch(): void
 
-Batches multiple state changes into a single redraw cycle.
+Batches multiple state changes into a single redraw cycle. Batches can nest. The outermost `endChangeBatch()` draws the final state and delivers any time-indicator highlight change.
 
 ```ts
 timeline.beginChangeBatch();

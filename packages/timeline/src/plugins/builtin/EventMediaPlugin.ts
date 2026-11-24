@@ -20,7 +20,7 @@ type EventMediaCacheKey =
   | "eventMediaIdentityStore"
   | "eventMediaImageCache"
   | "eventMediaImageLoading"
-  | "eventMediaImageControllers"
+  | "eventMediaImageSources"
   | "eventMediaLifecycle"
   | "eventMediaWaveCache"
   | "eventMediaWaveStateCache"
@@ -59,6 +59,123 @@ type RenderEventMediaHandler = (
 
 const MAX_WAVEFORM_EVENTS = 1024;
 const MAX_WAVEFORM_PATHS = 1024;
+
+const MAX_IMAGE_SOURCES = 256;
+const IMAGE_CACHE_MIB = 64;
+const MAX_IMAGE_PIXELS = IMAGE_CACHE_MIB * 1024 * 1024 / 4;
+const IMAGE_RETRY_DELAY = 1000;
+const MAX_AUTOMATIC_RETRIES = 2;
+
+type ImageFailure = {
+  attempts: number;
+  retryAt: number;
+  timer?: ReturnType<typeof setTimeout>;
+};
+
+/** One decoded image and one pending request per src, shared only within this activation. */
+class ImageSources {
+  readonly bitmaps = new MediaLRUCache(IMAGE_CACHE_MIB, MAX_IMAGE_SOURCES);
+  readonly pending = new Map<string, Promise<ImageBitmap | undefined>>();
+  private controllers = new Map<string, AbortController>();
+  private failures = new Map<string, ImageFailure>();
+  private active = true;
+  // A decode-triggered repaint must not fetch every image it just evicted.
+  private repaint: { retry?: string } | undefined;
+
+  constructor(private readonly redraw: () => void) {}
+
+  get(src: string): ImageBitmap | undefined {
+    const image = this.bitmaps.get(src);
+    if (image || !this.active || this.pending.has(src)) return image;
+    if (this.repaint && this.repaint.retry !== src) return undefined;
+    const failure = this.failures.get(src);
+    if (failure && Date.now() < failure.retryAt) return undefined;
+
+    const controller = new AbortController();
+    this.controllers.set(src, controller);
+    const request = this.load(src, controller).finally(() => {
+      this.pending.delete(src);
+      this.controllers.delete(src);
+    });
+    this.pending.set(src, request);
+    return undefined;
+  }
+
+  private async load(src: string, controller: AbortController): Promise<ImageBitmap | undefined> {
+    let bitmap: ImageBitmap;
+    try {
+      const response = await fetch(src, { signal: controller.signal });
+      if (response.ok === false) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!this.active) return undefined;
+      bitmap = await createImageBitmap(blob);
+      if (this.active && bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
+        const original = bitmap;
+        const scale = Math.sqrt(MAX_IMAGE_PIXELS / (original.width * original.height));
+        try {
+          bitmap = await createImageBitmap(original, {
+            resizeWidth: Math.max(1, Math.floor(original.width * scale)),
+            resizeHeight: Math.max(1, Math.floor(original.height * scale)),
+          });
+        } finally {
+          original.close();
+        }
+      }
+    } catch (error) {
+      if (this.active) {
+        this.recordFailure(src, true);
+        console.debug("[EventMediaPlugin] Failed to load event image", error);
+      }
+      return undefined;
+    }
+    if (!this.active) {
+      bitmap.close();
+      return undefined;
+    }
+    if (!this.bitmaps.set(src, bitmap)) {
+      this.recordFailure(src, false);
+      return undefined;
+    }
+    this.forgetFailure(src);
+    this.redrawMedia();
+    return bitmap;
+  }
+
+  private redrawMedia(retry?: string): void {
+    const previous = this.repaint;
+    this.repaint = { retry };
+    try { this.redraw(); } finally { this.repaint = previous; }
+  }
+
+  private recordFailure(src: string, retryable: boolean): void {
+    const attempts = (this.failures.get(src)?.attempts ?? 0) + 1;
+    this.forgetFailure(src);
+    if (this.failures.size >= MAX_IMAGE_SOURCES) this.forgetFailure(this.failures.keys().next().value!);
+    const delay = Math.min(30_000, IMAGE_RETRY_DELAY * 2 ** (attempts - 1));
+    const failure: ImageFailure = { attempts, retryAt: retryable ? Date.now() + delay : Infinity };
+    this.failures.set(src, failure);
+    if (retryable && attempts <= MAX_AUTOMATIC_RETRIES) {
+      failure.timer = setTimeout(() => {
+        if (this.active) this.redrawMedia(src);
+      }, delay);
+    }
+  }
+
+  private forgetFailure(src: string): void {
+    const failure = this.failures.get(src);
+    if (failure?.timer !== undefined) clearTimeout(failure.timer);
+    this.failures.delete(src);
+  }
+
+  dispose(): void {
+    this.active = false;
+    for (const controller of this.controllers.values()) controller.abort();
+    this.controllers.clear();
+    this.pending.clear();
+    for (const src of this.failures.keys()) this.forgetFailure(src);
+    this.bitmaps.clear();
+  }
+}
 
 /**
  * 构建 Path2D 缓存（级别 1 优化）
@@ -155,8 +272,7 @@ function getOrCreateWaveformBitmap(
     ctx.stroke(path);
 
     const bitmap = offscreen.transferToImageBitmap();
-    bitmapCache.set(key, bitmap);
-    return bitmap;
+    return bitmapCache.set(key, bitmap) ? bitmap : null;
   } catch (error) {
     console.debug("[EventMediaPlugin] Failed to create waveform bitmap", error);
     return null;
@@ -237,18 +353,19 @@ export function EventMediaPlugin(): TimelinePlugin {
         ids: new WeakMap<object, EventMediaIdentity>(),
         nextId: 0,
       };
-      const imageCache = new Map<string, ImageBitmap>();
-      const loadingMap = new Map<string, Promise<ImageBitmap | undefined>>();
-      const imageControllers = new Map<string, AbortController>();
+      const images = new ImageSources(() => {
+        context.timeline.markDirty(context.state.draggingEvent?.isDragging ? ["tracks", "interaction"] : ["tracks"]);
+        context.timeline.draw();
+      });
       const lifecycle: EventMediaLifecycle = { active: true };
       const waveCache = new Map<string, Float32Array>();
       const waveStateCache = new Map<string, WaveformState>();
       const waveformBitmapCache = new MediaLRUCache();
       const waveformPathCache = new Map<string, Path2D>();
       context.api.setData("eventMediaIdentityStore", identityStore);
-      context.api.setData("eventMediaImageCache", imageCache);
-      context.api.setData("eventMediaImageLoading", loadingMap);
-      context.api.setData("eventMediaImageControllers", imageControllers);
+      context.api.setData("eventMediaImageCache", images.bitmaps);
+      context.api.setData("eventMediaImageLoading", images.pending);
+      context.api.setData("eventMediaImageSources", images);
       context.api.setData("eventMediaLifecycle", lifecycle);
       context.api.setData("eventMediaWaveCache", waveCache);
       context.api.setData("eventMediaWaveStateCache", waveStateCache);
@@ -271,41 +388,10 @@ export function EventMediaPlugin(): TimelinePlugin {
         if (!lifecycle.active) {
           return;
         }
-        const imageCache = getPluginData<Map<string, ImageBitmap>>(
-          context.api.getData,
-          "eventMediaImageCache"
-        );
-        const loadingMap = getPluginData<
-          Map<string, Promise<ImageBitmap | undefined>>
-        >(
-          context.api.getData,
-          "eventMediaImageLoading"
-        );
-        const waveCache = getPluginData<Map<string, Float32Array>>(
-          context.api.getData,
-          "eventMediaWaveCache"
-        );
-        const waveStateCache = getPluginData<Map<string, WaveformState>>(
-          context.api.getData,
-          "eventMediaWaveStateCache"
-        );
-        const identityStore = getPluginData<EventMediaIdentityStore>(
-          context.api.getData,
-          "eventMediaIdentityStore"
-        );
-        const ev = state.tracks[trackIndex].events[eventIndex];
-        if (!ev.media || !identityStore) {
-          return;
-        }
-
+        const ev = state.tracks[trackIndex]?.events[eventIndex];
+        if (!ev?.media) return;
         const eventY = trackY + eventVerticalPadding;
         const borderRadius = config.eventBlockStyle.borderRadius;
-        const eventIdentity = getEventMediaIdentity(
-          identityStore,
-          ev,
-          trackIndex,
-          eventIndex
-        );
 
         ctx.save();
         try {
@@ -326,72 +412,35 @@ export function EventMediaPlugin(): TimelinePlugin {
           }
 
           const evImages: ImageRenderDefinition[] = ev.media.images || [];
-          if (evImages.length > 0 && imageCache && loadingMap) {
-            for (const s of evImages) {
-              const key = `${eventIdentity.key}_${s.src}`;
-              let bmp = imageCache.get(key);
-              if (!bmp && !loadingMap.get(key)) {
-                const controller = new AbortController();
-                imageControllers.set(key, controller);
-                let p: Promise<ImageBitmap | undefined>;
-                p = fetch(s.src, { signal: controller.signal })
-                  .then((response) => response.blob())
-                  .then((blob) => createImageBitmap(blob))
-                  .then((ib) => {
-                    if (!lifecycle.active || loadingMap.get(key) !== p) {
-                      ib.close();
-                      return undefined;
-                    }
-                    imageCache.set(key, ib);
-                    loadingMap.delete(key);
-                    imageControllers.delete(key);
-                    context.timeline.markDirty(["tracks"]);
-                    context.timeline.draw();
-                    return ib;
-                  })
-                  .catch((error) => {
-                    if (!controller.signal.aborted) {
-                      console.debug(
-                        "[EventMediaPlugin] Failed to load event image",
-                        error
-                      );
-                    }
-                    if (loadingMap.get(key) === p) {
-                      loadingMap.delete(key);
-                      imageControllers.delete(key);
-                    }
-                    return undefined;
-                  });
-                loadingMap.set(key, p);
+          for (const s of evImages) {
+            const bmp = images.get(s.src);
+            if (bmp) {
+              const fit: FitMode = s.fit || "cover";
+              const opacity = s.opacity !== undefined ? s.opacity : 0.35;
+              let dw = eventWidth;
+              let dh = eventHeight;
+              if (fit !== "stretch") {
+                const iw = bmp.width;
+                const ih = bmp.height;
+                const scale =
+                  fit === "cover"
+                    ? Math.max(eventWidth / iw, eventHeight / ih)
+                    : Math.min(eventWidth / iw, eventHeight / ih);
+                dw = Math.max(1, Math.floor(iw * scale));
+                dh = Math.max(1, Math.floor(ih * scale));
               }
-              bmp = imageCache.get(key);
-              if (bmp) {
-                const fit: FitMode = s.fit || "cover";
-                const opacity = s.opacity !== undefined ? s.opacity : 0.35;
-                let dw = eventWidth;
-                let dh = eventHeight;
-                if (fit !== "stretch") {
-                  const iw = bmp.width;
-                  const ih = bmp.height;
-                  const scale =
-                    fit === "cover"
-                      ? Math.max(eventWidth / iw, eventHeight / ih)
-                      : Math.min(eventWidth / iw, eventHeight / ih);
-                  dw = Math.max(1, Math.floor(iw * scale));
-                  dh = Math.max(1, Math.floor(ih * scale));
-                }
-                const dx = eventX + (eventWidth - dw) / 2;
-                const dy = eventY + (eventHeight - dh) / 2;
-                const prev = ctx.globalAlpha;
-                ctx.globalAlpha = opacity;
-                ctx.drawImage(bmp, 0, 0, bmp.width, bmp.height, dx, dy, dw, dh);
-                ctx.globalAlpha = prev;
-              }
+              const dx = eventX + (eventWidth - dw) / 2;
+              const dy = eventY + (eventHeight - dh) / 2;
+              const prev = ctx.globalAlpha;
+              ctx.globalAlpha = opacity;
+              ctx.drawImage(bmp, 0, 0, bmp.width, bmp.height, dx, dy, dw, dh);
+              ctx.globalAlpha = prev;
             }
           }
 
           const wfDef: WaveformDefinition | undefined = ev.media.waveform;
-          if (wfDef && waveCache && waveStateCache) {
+          if (wfDef) {
+            const eventIdentity = getEventMediaIdentity(identityStore, ev, trackIndex, eventIndex);
             const wfKey = `${eventIdentity.key}_wf`;
             let waveState = waveStateCache.get(wfKey);
             let arr = waveCache.get(wfKey);
@@ -508,33 +557,7 @@ export function EventMediaPlugin(): TimelinePlugin {
       if (handler) {
         context.api.unregisterEventHandler("render:event:media", handler);
       }
-      const imgCache = getPluginData<Map<string, ImageBitmap>>(
-        context.api.getData,
-        "eventMediaImageCache"
-      );
-      if (imgCache) {
-        for (const bitmap of new Set(imgCache.values())) {
-          bitmap.close();
-        }
-        imgCache.clear();
-      }
-      const imageControllers = getPluginData<Map<string, AbortController>>(
-        context.api.getData,
-        "eventMediaImageControllers"
-      );
-      if (imageControllers) {
-        for (const controller of imageControllers.values()) {
-          controller.abort();
-        }
-        imageControllers.clear();
-      }
-      const loadMap = getPluginData<
-        Map<string, Promise<ImageBitmap | undefined>>
-      >(
-        context.api.getData,
-        "eventMediaImageLoading"
-      );
-      if (loadMap) loadMap.clear();
+      getPluginData<ImageSources>(context.api.getData, "eventMediaImageSources")?.dispose();
       const waveCache = getPluginData<Map<string, Float32Array>>(
         context.api.getData,
         "eventMediaWaveCache"

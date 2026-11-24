@@ -65,6 +65,7 @@ addEvent(
 
 Notes:
 
+- With `onEventAdd` registered, the library clones the callback snapshot before insertion. An uncloneable `customData` value such as a function raises `DataCloneError` before the event is added or the callback runs.
 - `trackIndex` must refer to an existing track
 - In the public API, the third argument is documented as `endTime`
 - The current implementation tolerates some duration-like inputs, but you should pass a real end time for clarity
@@ -105,7 +106,7 @@ timeline.deleteEvent(0, 1);
 Notes:
 
 - A successful delete triggers `events:delete`
-- If `autoRemoveEmptyLastTrack` is enabled, the final empty track may be removed automatically
+- With `autoRemoveEmptyLastTrack` enabled, cleanup removes trailing empty tracks up to the first reserved track. Automatic removal invokes `onTrackRemove` before `onEventDelete`.
 
 ## addTrack(): void
 
@@ -215,7 +216,7 @@ if (!result.ok) {
 
 ### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
 
-Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated. Colors equal to the palette default are not exported (reloading derives the same color again).
+Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated. Duplicate resource or event identities in legacy data produce `duplicate_business_id` with the path of the duplicate. Colors equal to the palette default are not exported (reloading derives the same color again).
 
 ### getEventByBusinessId(id) / getTrackByBusinessId(id)
 

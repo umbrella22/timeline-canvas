@@ -39,14 +39,16 @@ import {
   translateTimelineMessage,
   type TimelineMessageKey,
 } from "../utils";
+import { validateGeometryConfig } from "../utils/geometryConfig";
 import { RenderManager } from "./managers/RenderManager";
 import { PluginManager } from "./managers/PluginManager";
-import { Logger, configureGlobalLogger } from "./managers/Logger";
+import { clearRemovedTrackPointers, remapEventSplice } from "./managers/eventPointers";
+import { Logger } from "./managers/Logger";
 import { ErrorHandler } from "./managers/ErrorHandler";
 import { StateManager } from "./managers/StateManager";
 import { EventIndexManager } from "./managers/EventIndexManager";
 import { BusinessIdentityIndex } from "./managers/BusinessIdentityIndex";
-import { EditTransactionController as EditTransactionControllerClass } from "./managers/EditTransactionController";
+import { EditTransactionController as EditTransactionControllerClass, type EditTransaction } from "./managers/EditTransactionController";
 import { ScheduleCommitCoordinator, type AcceptedPublishResult } from "./managers/ScheduleCommitCoordinator";
 import { ScheduleDataService } from "./managers/ScheduleDataService";
 import { ChangeScheduler, type ChangeType } from "./managers/ChangeScheduler";
@@ -63,6 +65,15 @@ import { PluginController } from "./managers/PluginController";
 import { LightThemePlugin } from "../plugins/builtin/LightThemePlugin";
 import { DarkThemePlugin } from "../plugins/builtin/DarkThemePlugin";
 import { type TimelinePlugin } from "../plugins/types";
+
+interface ScheduleCandidate {
+  eventBusinessId: BusinessId;
+  fromTrackIndex: number;
+  fromEventIndex: number;
+  toTrackIndex: number;
+  startTime: number;
+  endTime: number;
+}
 
 export class Timeline {
   private canvas: HTMLCanvasElement;
@@ -96,6 +107,7 @@ export class Timeline {
   private destroyed = false;
   /** 数据集代数：整批权威替换（loadData/loadScheduleData）成功时自增，供提交协调器检测 accepted 通知内的重入刷新 */
   private datasetEpoch = 0;
+  private readonly finalizingEdits = new Set<string>();
   private destroyPromise: Promise<void> | undefined;
 
   constructor(canvasId: string, options: TimelineOptions = {}) {
@@ -107,11 +119,6 @@ export class Timeline {
       level: options.debug ? "debug" : "info",
       prefix: "Timeline",
       useGlobalConfig: false, // 主 Timeline 实例使用独立配置
-    });
-    // 同步全局日志配置
-    configureGlobalLogger({
-      enabled: true,
-      level: options.debug ? "debug" : "info",
     });
     this.errorHandler = new ErrorHandler(this.logger);
     const canvas = document.getElementById(canvasId);
@@ -132,13 +139,10 @@ export class Timeline {
     }
     this.ctx = ctx as CanvasRenderingContext2D;
 
-    if (options.startPaddingTime === undefined) {
-      options.startPaddingTime = 10;
-    }
-
     this.config = {
       ...DEFAULT_CONFIG,
-      ...options,
+      ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)),
+      startPaddingTime: options.startPaddingTime ?? 10,
       locale,
       messages,
       colors: {
@@ -163,6 +167,7 @@ export class Timeline {
       },
     } as TimelineConfig;
 
+    validateGeometryConfig(this.config);
     this.logger.setLevel(this.config.debug ? "debug" : "info");
 
     this.callbacks = {
@@ -194,13 +199,13 @@ export class Timeline {
     this.editTransactions = new EditTransactionControllerClass(
       this.state,
       this.businessIdentityIndex,
-      (data) => this.onScheduleCommitStateChange?.(data),
+      (data) => { if (!this.destroyed) this.onScheduleCommitStateChange?.(data); },
     );
     if (options.scheduleEditing) {
       this.editTransactions.configure(options.scheduleEditing);
     }
     this.commitCoordinator = new ScheduleCommitCoordinator({
-      notify: (data) => this.onScheduleCommitStateChange?.(data),
+      notify: (data) => { if (!this.destroyed) this.onScheduleCommitStateChange?.(data); },
       isAlive: () => !this.destroyed,
       getDatasetEpoch: () => this.datasetEpoch,
       notifySettled: () => this.notifyChange("events:update"),
@@ -307,7 +312,7 @@ export class Timeline {
   }
 
   public async usePlugin(plugin: TimelinePlugin): Promise<boolean> {
-    return this.pluginController.usePlugin(plugin);
+    return !this.destroyed && this.pluginController.usePlugin(plugin);
   }
 
   public getLoadedPlugins(): TimelinePlugin[] {
@@ -319,11 +324,11 @@ export class Timeline {
   }
 
   public async removePlugin(pluginId: string): Promise<boolean> {
-    return this.pluginController.removePlugin(pluginId);
+    return !this.destroyed && this.pluginController.removePlugin(pluginId);
   }
 
   public async setTheme(theme: "light" | "dark"): Promise<boolean> {
-    return this.pluginController.setTheme(theme);
+    return !this.destroyed && this.pluginController.setTheme(theme);
   }
 
   private init(): void {
@@ -395,6 +400,7 @@ export class Timeline {
 
   /** 订阅视口变化：立即同步收到当前快照；返回幂等取消函数 */
   public subscribeViewport(listener: ViewportListener): () => void {
+    if (this.destroyed) return () => {};
     const viewport = this.renderManager.getViewportManager();
     return viewport.subscribeViewport(listener, () => ({
       width: this.renderManager.getCanvasLogicalWidth(),
@@ -445,6 +451,7 @@ export class Timeline {
    * 开始批量变更操作
    */
   public beginChangeBatch(): void {
+    if (this.destroyed) return;
     this.viewportBatching = true;
     this.changeScheduler.beginBatch();
   }
@@ -453,7 +460,9 @@ export class Timeline {
    * 结束批量变更操作
    */
   public endChangeBatch(): void {
+    if (this.destroyed) return;
     this.changeScheduler.endBatch();
+    if (this.changeScheduler.batching) return;
     this.viewportBatching = false;
     // 显式批次只通知最终状态
     this.renderManager.getViewportManager().flushViewportNotifications({
@@ -464,14 +473,15 @@ export class Timeline {
   }
 
   public setDebug(enabled: boolean): void {
+    if (this.destroyed) return;
     if (this.config.debug === enabled) return;
     this.config.debug = enabled;
     this.logger.setLevel(enabled ? "debug" : "info");
-    configureGlobalLogger({ level: enabled ? "debug" : "info" });
     this.notifyChange("config:debug");
   }
 
   public setEnableTimeIndicator(enabled: boolean): void {
+    if (this.destroyed) return;
     if (this.config.enableTimeIndicator === enabled) return;
     this.config.enableTimeIndicator = enabled;
     if (!enabled) {
@@ -509,6 +519,7 @@ export class Timeline {
   }
 
   public invalidateIndexTrack(trackIndex: number): void {
+    this.clearGuideLineCache();
     this.eventIndexManager.invalidateTrack(trackIndex);
   }
 
@@ -548,6 +559,8 @@ export class Timeline {
   }
 
   public setCanvasSize(width: number, height: number): void {
+    if (this.destroyed) return;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
     this.canvasController.setCanvasSize(width, height);
   }
 
@@ -560,14 +573,15 @@ export class Timeline {
   }
 
   public adjustCanvasSize(): void {
+    if (this.destroyed) return;
     this.canvasController.adjustCanvasSize();
   }
 
   public addTrack(): void {
+    if (this.destroyed) return;
     const track = this.trackManager.addTrack();
-    this.clearGuideLineCache();
+    this.invalidateTrackStructure(this.state.tracks.length - 1);
     this.adjustCanvasSize();
-    this.businessIdentityIndex.markTrackDirty(this.state.tracks.length - 1);
     this.setStatus(
       this.t("statusTrackAdded", { count: this.state.tracks.length })
     );
@@ -575,14 +589,8 @@ export class Timeline {
   }
 
   public removeTrack(): void {
-    // W3：pending/unknown 事务引用的资源不可被普通 removeTrack 删除
-    const lastTrack = this.state.tracks[this.state.tracks.length - 1];
-    if (
-      lastTrack?.businessId !== undefined &&
-      this.editTransactions
-        .getReservations()
-        .some((r) => r.resourceBusinessId === lastTrack.businessId)
-    ) {
+    if (this.destroyed) return;
+    if (this.lastTrackReserved()) {
       this.setStatus("resource is reserved by an in-flight edit operation");
       return;
     }
@@ -592,9 +600,9 @@ export class Timeline {
       this.setStatus(this.t("statusAtLeastOneTrackRequired"));
       return;
     }
-    this.clearGuideLineCache();
+    clearRemovedTrackPointers(this.state, removedTrackIndex);
+    this.invalidateTrackStructure(removedTrackIndex);
     this.adjustCanvasSize();
-    this.businessIdentityIndex.markTrackDirty(removedTrackIndex);
     this.setStatus(
       this.t("statusTrackRemoved", { count: this.state.tracks.length })
     );
@@ -603,21 +611,12 @@ export class Timeline {
   }
 
   public autoRemoveEmptyLastTrack(): void {
-    if (!this.config.autoRemoveEmptyLastTrack) return;
-    // W3：被事务引用的资源不参与空尾轨自动清理
-    const lastTrack = this.state.tracks[this.state.tracks.length - 1];
-    if (
-      lastTrack?.businessId !== undefined &&
-      this.editTransactions
-        .getReservations()
-        .some((r) => r.resourceBusinessId === lastTrack.businessId)
-    ) {
-      return;
-    }
-    let removedTrack = this.trackManager.removeEmptyLastTrack();
-    while (removedTrack) {
-      this.clearGuideLineCache();
-      this.businessIdentityIndex.markTrackDirty(this.state.tracks.length);
+    const epoch = this.datasetEpoch;
+    while (!this.destroyed && this.datasetEpoch === epoch && this.config.autoRemoveEmptyLastTrack && !this.lastTrackReserved()) {
+      const removedTrack = this.trackManager.removeEmptyLastTrack();
+      if (!removedTrack) return;
+      clearRemovedTrackPointers(this.state, this.state.tracks.length);
+      this.invalidateTrackStructure(this.state.tracks.length);
       this.setStatus(
         this.t("statusEmptyTrackRemoved", {
           count: this.state.tracks.length,
@@ -626,8 +625,18 @@ export class Timeline {
       if (this.callbacks.onTrackRemove)
         this.callbacks.onTrackRemove(removedTrack);
       this.adjustCanvasSize();
-      removedTrack = this.trackManager.removeEmptyLastTrack();
     }
+  }
+
+  private lastTrackReserved(): boolean {
+    const id = this.state.tracks[this.state.tracks.length - 1]?.businessId;
+    return id !== undefined && this.editTransactions.getReservations().some(r => r.resourceBusinessId === id);
+  }
+
+  private invalidateTrackStructure(trackIndex: number): void {
+    this.eventIndexManager.invalidateTrack(trackIndex);
+    this.businessIdentityIndex.markTrackDirty(trackIndex);
+    this.clearGuideLineCache();
   }
 
   public addEvent(
@@ -639,6 +648,9 @@ export class Timeline {
     customData?: Record<string, unknown>,
     readonly = false
   ): void {
+    if (this.destroyed) return;
+    const onAdd = this.callbacks.onEventAdd;
+    const epoch = this.datasetEpoch;
     const event = this.eventMutationService.addEvent(
       trackIndex,
       startTime,
@@ -646,13 +658,13 @@ export class Timeline {
       title,
       description,
       customData,
-      readonly
+      readonly,
+      !!onAdd
     );
     if (!event) return;
 
     this.notifyChange("events:add");
-    if (this.callbacks.onEventAdd)
-      this.callbacks.onEventAdd({ trackIndex, event: cloneEvent(event) });
+    if (!this.destroyed && this.datasetEpoch === epoch) onAdd?.({ trackIndex, event });
   }
 
   public updateEvent(
@@ -660,6 +672,7 @@ export class Timeline {
     eventIndex: number,
     updates: Partial<TimelineEvent>
   ): boolean {
+    if (this.destroyed) return false;
     // W3：被编辑事务锁定的事件不接受程序化字段修改（void 入口静默 no-op）
     const target = this.state.tracks[trackIndex]?.events[eventIndex];
     if (target?.businessId !== undefined && this.editTransactions.hasTransaction(target.businessId)) {
@@ -699,6 +712,7 @@ export class Timeline {
       description?: string;
     }
   ): boolean {
+    if (this.destroyed) return false;
     // W3：被编辑事务锁定的事件不接受程序化数据修改（void 入口按既有反馈方式 no-op）
     const targetEvent = this.state.tracks[trackIndex]?.events[eventIndex];
     if (targetEvent?.businessId !== undefined && this.editTransactions.hasTransaction(targetEvent.businessId)) {
@@ -730,6 +744,7 @@ export class Timeline {
   }
 
   public deleteEvent(trackIndex: number, eventIndex: number): boolean {
+    if (this.destroyed) return false;
     const target = this.state.tracks[trackIndex]?.events[eventIndex];
     if (target?.businessId !== undefined && this.editTransactions.hasTransaction(target.businessId)) {
       return false;
@@ -746,11 +761,13 @@ export class Timeline {
   }
 
   public loadData(data: LoadDataFormat): boolean {
+    if (this.destroyed) return false;
     const loaded = this.eventMutationService.loadData(data);
     if (!loaded) return false;
 
-    this.datasetEpoch += 1;
+    const epoch = ++this.datasetEpoch;
     this.commitCoordinator.invalidateOperations(this.editTransactions.handleDatasetReplaced());
+    if (this.destroyed || this.datasetEpoch !== epoch) return true;
     if (this.state.tracks.length === 0) this.addTrack();
     if (data.timeIndicatorPosition !== undefined)
       this.setTimeIndicator(data.timeIndicatorPosition);
@@ -814,15 +831,26 @@ export class Timeline {
         error: { code: "stale_operation", message: "operation no longer matches the current transaction" },
       };
     }
+    const epoch = this.datasetEpoch;
+    const location = this.businessIdentityIndex.getEventLocation(id)!;
+    const source = this.state.tracks[location.trackIndex].events[location.eventIndex];
+    const { startTime, endTime } = source;
+    const stillOwnsSource = () => !this.destroyed && this.datasetEpoch === epoch &&
+      this.state.tracks[location.trackIndex]?.events[location.eventIndex] === source &&
+      source.businessId === id && source.startTime === startTime && source.endTime === endTime &&
+      !this.editTransactions.hasTransaction(id);
+    const stale = { ok: false, error: { code: "stale_operation", message: "event changed during reconciliation" } } as const;
+    if (source !== transaction.source) return stale;
     if (snapshot === null) {
       // 权威删除：先作废事务（解除锁定），再删除事实，失败时事务已按权威语义终结
       const beforeSnapshot = transaction.before;
       const transactionAction = transaction.action;
       this.commitCoordinator.invalidateOperations([transaction.operationId]);
       this.editTransactions.invalidateTransaction(id, "authoritative deletion");
+      if (!stillOwnsSource()) return stale;
       const deleted = this.deleteEventByBusinessId(id);
       if (!deleted.ok) return deleted;
-      this.notifyChange("events:delete");
+      if (this.destroyed || this.datasetEpoch !== epoch || this.businessIdentityIndex.hasEvent(id)) return stale;
       this.onScheduleCommitStateChange?.({
         state: "reconciled",
         operationId: options.operationId,
@@ -861,14 +889,15 @@ export class Timeline {
     // 先作废旧 operation（含停表），再原子发布权威事实
     this.commitCoordinator.invalidateOperations([transaction.operationId]);
     this.editTransactions.invalidateTransaction(id, "authoritative snapshot applied");
+    if (!stillOwnsSource()) return stale;
     const upsert = this.upsertScheduleEvents([
       { resourceBusinessId: snapshot.resourceBusinessId, event: snapshot.event },
     ]);
     if (!upsert.ok) {
       return { ok: false, error: upsert.error };
     }
+    if (this.destroyed || this.datasetEpoch !== epoch) return stale;
     const located = this.getEventByBusinessId(id);
-    this.notifyChange("events:update");
     this.onScheduleCommitStateChange?.({
       state: "reconciled",
       operationId: options.operationId,
@@ -892,16 +921,22 @@ export class Timeline {
    * scheduleEditing.validate 在提交前单独执行，二者不允许互相替代。
    */
   public validateScheduleEditCandidate(
-    params: {
-      eventBusinessId: BusinessId;
-      fromTrackIndex: number;
-      fromEventIndex: number;
-      toTrackIndex: number;
-      startTime: number;
-      endTime: number;
-    },
+    params: ScheduleCandidate,
     options?: { forPublish?: boolean },
   ): ScheduleValidationResult {
+    const facts = this.validateScheduleFacts(params, options?.forPublish ?? false);
+    if (!facts.allowed || options?.forPublish) return facts;
+    const allowed = this.pluginManager.validateEvent("validate:event:move", {
+      fromTrackIndex: params.fromTrackIndex,
+      fromEventIndex: params.fromEventIndex,
+      toTrackIndex: params.toTrackIndex,
+      newStartTime: params.startTime,
+      duration: params.endTime - params.startTime,
+    });
+    return allowed ? facts : { allowed: false, code: "plugin_rejected", reason: "rejected by event-move plugin validation" };
+  }
+
+  private validateScheduleFacts(params: ScheduleCandidate, forPublish = false): ScheduleValidationResult {
     const { eventBusinessId, fromTrackIndex, fromEventIndex, toTrackIndex, startTime, endTime } = params;
     if (this.destroyed) {
       return { allowed: false, code: "invalid_time", reason: "timeline instance is destroyed" };
@@ -910,7 +945,7 @@ export class Timeline {
     if (!event) {
       return { allowed: false, code: "invalid_time", reason: "source event no longer exists" };
     }
-    if (!options?.forPublish && (event.readonly || this.config.readOnly)) {
+    if (!forPublish && (event.readonly || this.config.readOnly)) {
       return { allowed: false, code: "readonly", reason: "event or timeline is read-only" };
     }
     if (event.businessId === undefined || event.businessId !== eventBusinessId) {
@@ -954,19 +989,6 @@ export class Timeline {
         };
       }
     }
-    // 旧 boolean 插件仍生效，不能被新协议绕过（发布路径豁免：插件属 UI 级守卫）
-    const pluginOk = options?.forPublish
-      ? true
-      : this.pluginManager.validateEvent("validate:event:move", {
-      fromTrackIndex,
-      fromEventIndex,
-      toTrackIndex,
-      newStartTime: startTime,
-      duration: endTime - startTime,
-        });
-    if (!pluginOk) {
-      return { allowed: false, code: "plugin_rejected", reason: "rejected by event-move plugin validation" };
-    }
     return { allowed: true };
   }
 
@@ -978,6 +1000,16 @@ export class Timeline {
     if (this.destroyed) return false;
     const transaction = this.editTransactions.getTransaction(businessId);
     if (!transaction || transaction.state !== "preview") return false;
+    if (this.finalizingEdits.has(transaction.operationId)) return false;
+    this.finalizingEdits.add(transaction.operationId);
+    try {
+      return this.finalizeScheduleEdit(businessId, transaction);
+    } finally {
+      this.finalizingEdits.delete(transaction.operationId);
+    }
+  }
+
+  private finalizeScheduleEdit(businessId: BusinessId, transaction: EditTransaction): boolean {
     // 落点无效：丢弃当前编辑，不隐式提交上一个有效位置
     if (!transaction.lastCandidateValid) {
       this.editTransactions.cancelPreview(
@@ -990,14 +1022,27 @@ export class Timeline {
     }
     const draft = this.state.editDrafts.get(businessId);
     if (!draft) return false;
-    const validation = this.validateScheduleEditCandidate({
+    // Validators may synchronously reload data, edit a neighbour or start another operation.
+    const placement = transaction.draft;
+    const stillCurrent = () => this.editTransactions.getTransaction(businessId) === transaction && transaction.state === "preview";
+    const verifyCandidate = () => {
+      if (!stillCurrent()) return false;
+      if (this.editTransactions.matchesSource(businessId) && transaction.draft === placement &&
+          this.state.tracks[draft.targetTrackIndex]?.businessId === placement.resourceBusinessId) return true;
+      this.editTransactions.cancelPreview(businessId, "edit source or candidate changed during validation", "missing_business_id", "validation_failed");
+      return false;
+    };
+    if (!verifyCandidate()) return false;
+    const candidate = {
       eventBusinessId: businessId,
       fromTrackIndex: transaction.beforeTrackIndex,
       fromEventIndex: transaction.beforeEventIndex,
       toTrackIndex: draft.targetTrackIndex,
       startTime: draft.startTime,
       endTime: draft.endTime,
-    });
+    };
+    const validation = this.validateScheduleEditCandidate(candidate);
+    if (!verifyCandidate()) return false;
     if (!validation.allowed) {
       this.editTransactions.cancelPreview(businessId, validation.reason, validation.code, "validation_failed");
       this.setStatus(`${validation.code}: ${validation.reason}`);
@@ -1006,16 +1051,23 @@ export class Timeline {
     const change = this.editTransactions.buildChange(businessId);
     if (!change) return false;
     const businessResult = this.editTransactions.runBusinessValidate(change);
+    if (!verifyCandidate()) return false;
     if (!businessResult.allowed) {
       this.editTransactions.cancelPreview(businessId, businessResult.reason, businessResult.code, "validation_failed");
       this.setStatus(`${businessResult.code}: ${businessResult.reason}`);
+      return false;
+    }
+    // A validator can also insert a conflicting event or change readOnly. Recheck facts without running host code twice.
+    const facts = this.validateScheduleFacts(candidate);
+    if (!facts.allowed) {
+      this.editTransactions.cancelPreview(businessId, facts.reason, facts.code, "validation_failed");
       return false;
     }
     const started = this.editTransactions.beginCommit(businessId, change);
     if (started) {
       // hook 同步抛错时已在 beginCommit 内结算（进入待核对）：不再武装僵尸 timer
       const pendingTransaction = this.editTransactions.getTransaction(businessId);
-      if (pendingTransaction?.state === "pending") {
+      if (pendingTransaction === transaction && pendingTransaction.state === "pending") {
         this.commitCoordinator.beginTiming(change);
       }
     }
@@ -1059,6 +1111,7 @@ export class Timeline {
     // 落到未被编辑的事件上
     const beforeSnapshot = _change.before;
     const identityMatches =
+      this.editTransactions.getTransaction(businessId)?.source === event &&
       event.businessId === businessId &&
       event.startTime === beforeSnapshot.event.startTime &&
       event.endTime === beforeSnapshot.event.endTime &&
@@ -1070,6 +1123,7 @@ export class Timeline {
         reason: "located event no longer matches the edit snapshot; accepted placement withheld",
       };
     }
+    this.clearGuideLineCache();
     event.startTime = placement.startTime;
     event.endTime = placement.endTime;
     event.duration = fixFloatPrecision(placement.endTime - placement.startTime);
@@ -1080,16 +1134,10 @@ export class Timeline {
       this.eventIndexManager.invalidateTrack(targetTrackIndex);
       this.businessIdentityIndex.markTrackDirty(location.trackIndex);
       this.businessIdentityIndex.markTrackDirty(targetTrackIndex);
-      if (
-        this.state.selectedEvent &&
-        this.state.selectedEvent.trackIndex === location.trackIndex &&
-        this.state.selectedEvent.eventIndex === location.eventIndex
-      ) {
-        this.state.selectedEvent = {
-          trackIndex: targetTrackIndex,
-          eventIndex: this.state.tracks[targetTrackIndex].events.length - 1,
-        };
-      }
+      remapEventSplice(this.state, location, {
+        trackIndex: targetTrackIndex,
+        eventIndex: this.state.tracks[targetTrackIndex].events.length - 1,
+      });
       return {
         ok: true,
         event: cloneEvent(event),
@@ -1165,8 +1213,9 @@ export class Timeline {
     }
     // 整批权威替换：作废进行中的编辑事务与候选草稿（合法输入才失效）；
     // 在途操作交给协调器停表并标记 settled，晚到结果永不写回新数据集
-    this.datasetEpoch += 1;
+    const epoch = ++this.datasetEpoch;
     this.commitCoordinator.invalidateOperations(this.editTransactions.handleDatasetReplaced());
+    if (this.destroyed || this.datasetEpoch !== epoch) return result;
     if (data.timeIndicatorPosition !== undefined) {
       this.setTimeIndicator(data.timeIndicatorPosition);
     }
@@ -1384,7 +1433,8 @@ export class Timeline {
   }
 
   public setTimeIndicator(seconds: number, applySnap = false): boolean {
-    if (typeof seconds !== "number" || isNaN(seconds)) {
+    if (this.destroyed) return false;
+    if (!Number.isFinite(seconds)) {
       this.logger.error(this.t("errorTimeIndicatorInvalid"));
       return false;
     }
@@ -1415,11 +1465,15 @@ export class Timeline {
    * - 使用节流的边界滚动而非每帧滚动
    */
   public setTimeIndicatorDuringDrag(seconds: number): void {
+    if (this.destroyed) return;
+    if (!Number.isFinite(seconds)) return;
     this.timeIndicatorController.setPositionDuringDrag(seconds);
     this.notifyChange("timeIndicator:drag");
   }
 
   public zoom(factor: number): void {
+    if (this.destroyed) return;
+    if (!Number.isFinite(factor) || factor <= 0) return;
     const result = this.viewportController.zoomByFactor(factor);
     this.notifyChange("zoom:change");
     this.setStatus(
@@ -1436,7 +1490,8 @@ export class Timeline {
   }
 
   public setZoomLevel(zoomLevel: number): boolean {
-    if (typeof zoomLevel !== "number" || isNaN(zoomLevel)) {
+    if (this.destroyed) return false;
+    if (!Number.isFinite(zoomLevel)) {
       this.logger.error(this.t("errorZoomLevelInvalid"));
       return false;
     }
@@ -1465,7 +1520,8 @@ export class Timeline {
   }
 
   public setEndTime(endTime: number): boolean {
-    if (typeof endTime !== "number" || isNaN(endTime)) {
+    if (this.destroyed) return false;
+    if (!Number.isFinite(endTime) || !Number.isFinite((endTime + this.config.endPaddingTime - this.config.startTime) * this.config.secondWidth)) {
       this.logger.error(this.t("errorEndTimeInvalid"));
       return false;
     }
@@ -1504,6 +1560,7 @@ export class Timeline {
   }
 
   public setStatus(text: string): void {
+    if (this.destroyed) return;
     this.stateManager.setStatus(
       text,
       this.callbacks.onStatusChange || undefined
@@ -1613,6 +1670,9 @@ export class Timeline {
     newStartTime: number,
     duration: number
   ): boolean {
+    if (this.destroyed) return false;
+    if (!Number.isInteger(toTrackIndex) || !this.state.tracks[fromTrackIndex]?.events[fromEventIndex] ||
+        !Number.isFinite(newStartTime) || !Number.isFinite(duration) || duration <= 0) return false;
     const newEndTime = newStartTime + duration;
     const maxAllowedEndTime = this.config.endTime + this.config.endPaddingTime;
     if (newStartTime < this.config.startTime || newEndTime > maxAllowedEndTime)
@@ -1642,6 +1702,7 @@ export class Timeline {
     eventIndex: number,
     splitTime: number
   ): void {
+    if (this.destroyed) return;
     const needsUpdate =
       !this.state.hoveredSplitLine ||
       this.state.hoveredSplitLine.trackIndex !== trackIndex ||
@@ -1654,6 +1715,7 @@ export class Timeline {
   }
 
   public hideSplitLine(): void {
+    if (this.destroyed) return;
     if (this.state.hoveredSplitLine) {
       this.state.hoveredSplitLine = null;
       this.notifyChange("interaction:splitLine");
@@ -1665,6 +1727,8 @@ export class Timeline {
     eventIndex: number,
     splitTime: number
   ): boolean {
+    if (this.destroyed) return false;
+    if (!Number.isInteger(trackIndex) || !Number.isInteger(eventIndex) || !Number.isFinite(splitTime)) return false;
     if (trackIndex < 0 || trackIndex >= this.state.tracks.length) return false;
     // W3：被编辑事务锁定的事件禁止 split
     const lockedEvent = this.state.tracks[trackIndex]?.events[eventIndex];
@@ -1724,8 +1788,10 @@ export class Timeline {
   }
 
   public setReadOnly(readOnly: boolean): void {
+    if (this.destroyed) return;
     this.config.readOnly = readOnly;
     if (readOnly) {
+      this.interactionManager.cancelGesture();
       // W3：切查看模式取消预览；已发出的保存继续结算（不假定服务器未写）
       if (this.editTransactions.active) {
         this.editTransactions.cancelAll("read-only mode enabled during preview");
@@ -1748,14 +1814,15 @@ export class Timeline {
     );
   }
   public highlightEvent(trackIndex: number, eventIndex: number): boolean {
-    if (trackIndex < 0 || trackIndex >= this.state.tracks.length) {
+    if (this.destroyed) return false;
+    if (!Number.isInteger(trackIndex) || trackIndex < 0 || trackIndex >= this.state.tracks.length) {
       this.logger.error(
         this.t("errorInvalidTrackIndexWithValue", { trackIndex })
       );
       return false;
     }
     const track = this.state.tracks[trackIndex];
-    if (eventIndex < 0 || eventIndex >= track.events.length) {
+    if (!Number.isInteger(eventIndex) || eventIndex < 0 || eventIndex >= track.events.length) {
       this.logger.error(
         this.t("errorInvalidEventIndexWithValue", { eventIndex })
       );
@@ -1773,6 +1840,7 @@ export class Timeline {
   }
 
   public clearHighlight(): void {
+    if (this.destroyed) return;
     if (this.state.highlightedEvent || this.state.selectedEvent) {
       this.state.highlightedEvent = null;
       this.state.selectedEvent = null;
@@ -1794,18 +1862,18 @@ export class Timeline {
   }
 
   public destroy(): Promise<void> {
-    // W3：销毁立即作废全部编辑事务与计时器；此后任何 resolve 不写状态、不通知
-    this.editTransactions.destroyAll();
-    this.commitCoordinator.destroy();
     if (this.destroyPromise) return this.destroyPromise;
+    // Abort listeners and plugin teardown can synchronously call back into the instance.
     this.destroyed = true;
+    this.destroyPromise = this.pluginManager.destroy();
+    this.commitCoordinator.destroy();
+    this.editTransactions.destroyAll();
     this.clearGuideLineCache();
     // 清除视口订阅与挂起通知，旧实例不再回调
     this.renderManager.getViewportManager().unsubscribeAll();
     this.interactionManager.destroy();
     this.renderManager.dispose();
-    this.destroyPromise = this.pluginManager.destroy();
-    this.setStatus(this.t("statusTimelineDestroyed"));
+    this.stateManager.setStatus(this.t("statusTimelineDestroyed"));
     return this.destroyPromise;
   }
 

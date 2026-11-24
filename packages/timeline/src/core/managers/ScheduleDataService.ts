@@ -1,3 +1,4 @@
+import { remapEventSplice } from "./eventPointers";
 import type {
   BusinessId,
   ScheduleDataFormat,
@@ -146,15 +147,22 @@ export class ScheduleDataService {
 
   public exportScheduleData(): ScheduleResult<ScheduleDataFormat> {
     const tracks: ScheduleTrackInput[] = [];
+    const trackIds = new Set<BusinessId>();
+    const eventIds = new Set<BusinessId>();
     for (let trackIndex = 0; trackIndex < this.state.tracks.length; trackIndex++) {
       const track = this.state.tracks[trackIndex];
       if (track.businessId === undefined) {
         return fail("missing_business_id", `track at index ${trackIndex} has no business id`, `tracks[${trackIndex}]`);
       }
+      if (trackIds.has(track.businessId)) return fail("duplicate_business_id", "duplicate resource business id", `tracks[${trackIndex}].businessId`);
+      trackIds.add(track.businessId);
       const events: ScheduleEventInput[] = [];
       for (let eventIndex = 0; eventIndex < track.events.length; eventIndex++) {
         const exported = this.exportEvent(track.events[eventIndex], trackIndex, eventIndex);
         if (!exported.ok) return exported;
+        const id = exported.value.businessId;
+        if (eventIds.has(id)) return fail("duplicate_business_id", "duplicate event business id", `tracks[${trackIndex}].events[${eventIndex}].businessId`);
+        eventIds.add(id);
         events.push(exported.value);
       }
       const customData = this.validateCustomData(track.customData, `tracks[${trackIndex}].customData`);
@@ -360,6 +368,7 @@ export class ScheduleDataService {
           this.state.tracks[existing.trackIndex].events.splice(existing.eventIndex, 1);
           targetTrack.events.push(runtimeEvent);
           eventIndex = targetTrack.events.length - 1;
+          remapEventSplice(this.state, existing, { trackIndex: targetTrackIndex, eventIndex });
         }
         // 跨轨移动时目标轨道的长度/位置同样变化，两侧都必须标脏，
         // 否则下一次 sync 用旧桶重建源轨道后该 business id 会从索引中消失

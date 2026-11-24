@@ -9,7 +9,7 @@ export class IdleHoverController {
   public handleMouseMove(ctx: MouseEventContext): InteractionState | null {
     const timeline = this.delegate.getTimeline();
     const { config, state } = timeline;
-    const { canvasX, canvasY, logicalX, logicalY } = ctx;
+    const { canvasX, canvasY, logicalX } = ctx;
     const canvas = timeline.getCanvas();
 
     const menuHandled = this.handleContextMenuHover(canvasX, canvasY);
@@ -19,7 +19,7 @@ export class IdleHoverController {
 
     const hitResult = timeline.getInteractionTarget(canvasX, canvasY);
 
-    if (logicalY >= config.timelineHeight && !config.readOnly) {
+    if (canvasY >= config.timelineHeight && !config.readOnly) {
       const contentHandled = this.handleContentHover(
         hitResult,
         logicalX,
@@ -30,6 +30,11 @@ export class IdleHoverController {
       }
     }
 
+    if (canvasY < config.timelineHeight && (state.hoveredSplitLine || state.hoveredResizeHandle)) {
+      state.hoveredResizeHandle = null;
+      timeline.hideSplitLine();
+      timeline.notifyChange("interaction:hover");
+    }
     const indicatorHandled = this.handleTimeIndicatorHover(canvasX, canvasY);
     if (indicatorHandled) {
       return null;

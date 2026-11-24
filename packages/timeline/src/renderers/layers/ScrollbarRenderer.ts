@@ -1,3 +1,4 @@
+import { scrollbarGeometry } from "../../utils/scrollbars";
 import type { Renderer, RenderContext, LayerType } from "../core/types";
 import { drawRoundedRect } from "../../utils";
 
@@ -22,27 +23,11 @@ export class ScrollbarRenderer implements Renderer {
     width: number,
     height: number
   ): void {
-    const contentWidth =
-      config.startPaddingTime +
-      (config.endTime + config.endPaddingTime - config.startTime) *
-        config.secondWidth *
-        state.zoomLevel;
-    const hasHorizontalScrollbar = contentWidth > width;
-    const horizontalScrollbarPadding = hasHorizontalScrollbar ? 13 : 0;
-
-    const contentHeight =
-      config.timelineHeight +
-      config.firstTrackTopMargin +
-      state.tracks.length * (config.trackHeight + config.trackMargin);
-    const availableHeight = height - horizontalScrollbarPadding;
-
-    if (contentHeight > availableHeight) {
+    const { y } = scrollbarGeometry(config, state, width, height);
+    if (y.maximum > 0 && y.track > 0) {
       const scrollbarWidth = 8;
       const scrollbarX = width - scrollbarWidth - 5;
-      const scrollbarY = config.timelineHeight;
-      const scrollbarTrackHeight =
-        height - config.timelineHeight - horizontalScrollbarPadding - 5;
-
+      const { origin: scrollbarY, track: scrollbarTrackHeight, handle: handleHeight, position: handleY } = y;
       ctx.fillStyle = config.colors.scrollbarTrack;
       drawRoundedRect(
         ctx,
@@ -52,15 +37,6 @@ export class ScrollbarRenderer implements Renderer {
         scrollbarTrackHeight,
         4
       );
-
-      const viewportRatio =
-        (height - horizontalScrollbarPadding - 5) / contentHeight;
-      const handleHeight = Math.max(30, scrollbarTrackHeight * viewportRatio);
-      const maxScrollY =
-        contentHeight - height + horizontalScrollbarPadding + 5;
-      const scrollRatio = state.scrollY / maxScrollY;
-      const handleY =
-        scrollbarY + (scrollbarTrackHeight - handleHeight) * scrollRatio;
 
       ctx.fillStyle = state.draggingScrollbar
         ? config.colors.scrollbarHandleHover
@@ -107,25 +83,11 @@ export class ScrollbarRenderer implements Renderer {
     width: number,
     height: number
   ): void {
-    const contentWidth =
-      config.startPaddingTime +
-      (config.endTime + config.endPaddingTime - config.startTime) *
-        config.secondWidth *
-        state.zoomLevel;
-    if (contentWidth <= width) return;
-
-    const contentHeight =
-      config.timelineHeight +
-      config.firstTrackTopMargin +
-      state.tracks.length * (config.trackHeight + config.trackMargin);
-    const hasVerticalScrollbar = contentHeight > height;
-    const verticalScrollbarPadding = hasVerticalScrollbar ? 13 : 0;
-
+    const { x } = scrollbarGeometry(config, state, width, height);
+    if (x.maximum <= 0 || x.track <= 0) return;
+    const { origin: scrollbarX, track: scrollbarTrackWidth, handle: handleWidth, position: handleX } = x;
     const scrollbarHeight = 8;
     const scrollbarY = height - scrollbarHeight - 5;
-    const scrollbarX = 0;
-    const scrollbarTrackWidth = width - verticalScrollbarPadding;
-
     ctx.fillStyle = config.colors.scrollbarTrack;
     drawRoundedRect(
       ctx,
@@ -135,13 +97,6 @@ export class ScrollbarRenderer implements Renderer {
       scrollbarHeight,
       4
     );
-
-    const viewportRatio = width / contentWidth;
-    const handleWidth = Math.max(30, scrollbarTrackWidth * viewportRatio);
-    const maxScrollX = contentWidth - width;
-    const scrollRatio = state.scrollX / maxScrollX;
-    const handleX =
-      scrollbarX + (scrollbarTrackWidth - handleWidth) * scrollRatio;
 
     ctx.fillStyle = state.draggingHorizontalScrollbar
       ? config.colors.scrollbarHandleHover

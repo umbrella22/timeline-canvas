@@ -1,3 +1,4 @@
+import { scrollbarGeometry } from "../../../utils/scrollbars";
 import { cloneEvent, formatTimeRange, getTimeX } from "../../../utils";
 import type { InteractionState, MouseEventContext } from "../InteractionState";
 import type { IdleStateDelegate } from "./IdleShared";
@@ -13,7 +14,7 @@ export class IdleMouseDownRouter {
     const canvas = timeline.getCanvas();
     const isReadOnly = config.readOnly;
 
-    if (ctx.originalEvent.button === 2) {
+    if (ctx.originalEvent.button !== 0) {
       return null;
     }
 
@@ -37,7 +38,7 @@ export class IdleMouseDownRouter {
       return indicatorState;
     }
 
-    if (logicalY < config.timelineHeight) {
+    if (canvasY < config.timelineHeight) {
       return null;
     }
 
@@ -172,63 +173,19 @@ export class IdleMouseDownRouter {
     const timeline = this.delegate.getTimeline();
     const { config, state } = timeline;
 
-    const contentHeight =
-      config.timelineHeight +
-      config.firstTrackTopMargin +
-      state.tracks.length * (config.trackHeight + config.trackMargin);
-    const availableHeight = timeline.getAvailableHeight();
-
-    if (contentHeight > availableHeight) {
-      const scrollbarWidth = 8;
-      const scrollbarX = canvasWidth - scrollbarWidth - 5;
-      const scrollbarY = config.timelineHeight;
-      const scrollbarTrackHeight = availableHeight - config.timelineHeight - 5;
-
-      if (
-        canvasX >= scrollbarX &&
-        canvasX <= scrollbarX + scrollbarWidth &&
-        canvasY >= scrollbarY &&
-        canvasY <= scrollbarY + scrollbarTrackHeight
-      ) {
-        state.draggingScrollbar = true;
-        const viewportRatio = availableHeight / contentHeight;
-        const handleHeight = Math.max(30, scrollbarTrackHeight * viewportRatio);
-        const maxScrollY = contentHeight - availableHeight;
-        const scrollRatio = state.scrollY / maxScrollY;
-        const handleY =
-          scrollbarY + (scrollbarTrackHeight - handleHeight) * scrollRatio;
-        state.scrollbarDragOffset = canvasY - handleY;
-
-        return this.delegate.createScrollingState();
-      }
-    }
-
-    const contentWidth = timeline.getContentWidthForZoom(state.zoomLevel);
-    if (contentWidth <= canvasWidth) {
-      return null;
-    }
-
-    const scrollbarHeight = 8;
-    const scrollbarY = canvasHeight - scrollbarHeight - 5;
-    const scrollbarTrackWidth = canvasWidth;
-
-    if (
-      canvasY >= scrollbarY &&
-      canvasY <= scrollbarY + scrollbarHeight &&
-      canvasX >= 0 &&
-      canvasX <= scrollbarTrackWidth
-    ) {
-      state.draggingHorizontalScrollbar = true;
-      const viewportRatio = canvasWidth / contentWidth;
-      const handleWidth = Math.max(30, scrollbarTrackWidth * viewportRatio);
-      const maxScrollX = contentWidth - canvasWidth;
-      const scrollRatio = state.scrollX / maxScrollX;
-      const handleX = (scrollbarTrackWidth - handleWidth) * scrollRatio;
-      state.horizontalScrollbarDragOffset = canvasX - handleX;
-
+    const { x, y } = scrollbarGeometry(config, state, canvasWidth, canvasHeight);
+    if (y.maximum > 0 && y.track > 0 && canvasX >= canvasWidth - 13 && canvasX <= canvasWidth - 5 &&
+        canvasY >= y.origin && canvasY <= y.origin + y.track) {
+      state.draggingScrollbar = true;
+      state.scrollbarDragOffset = canvasY - y.position;
       return this.delegate.createScrollingState();
     }
-
+    if (x.maximum > 0 && x.track > 0 && canvasY >= canvasHeight - 13 && canvasY <= canvasHeight - 5 &&
+        canvasX >= x.origin && canvasX <= x.origin + x.track) {
+      state.draggingHorizontalScrollbar = true;
+      state.horizontalScrollbarDragOffset = canvasX - x.position;
+      return this.delegate.createScrollingState();
+    }
     return null;
   }
 

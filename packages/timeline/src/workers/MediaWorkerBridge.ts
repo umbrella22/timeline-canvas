@@ -41,37 +41,29 @@ export class MediaWorkerBridge {
   private ensureWorker(): Worker {
     if (this.disposed) throw new Error("MediaWorkerBridge disposed");
     if (!this.worker) {
-      try {
-        this.worker = new Worker(
-          new URL("./media.worker.ts", import.meta.url),
-          { type: "module" }
-        );
-        this.worker.onmessage = (
-          e: MessageEvent<MediaTaskResult | MediaTaskError>
-        ) => {
-          this.handleWorkerMessage(e.data);
-        };
-        this.worker.onerror = (err) => {
-          // Worker 异常不导致主线程崩溃
-          console.error("[MediaWorkerBridge] Worker error:", err);
-        };
-      } catch (err) {
-        console.warn(
-          "[MediaWorkerBridge] Cannot create Worker, falling back to main thread:",
-          err
-        );
-        throw err;
-      }
+      const worker = new Worker(new URL("./media.worker.ts", import.meta.url), { type: "module" });
+      this.worker = worker;
+      worker.onmessage = (e: MessageEvent<MediaTaskResult | MediaTaskError>) => {
+        if (this.worker === worker) this.handleWorkerMessage(e.data);
+        else if ("bitmap" in e.data) e.data.bitmap.close?.();
+      };
+      const fail = (error: Error) => {
+        if (this.worker === worker) this.reset(error);
+      };
+      worker.onerror = e => fail(new Error(e.message || "Media worker failed"));
+      worker.onmessageerror = () => fail(new Error("Media worker message could not be decoded"));
     }
     return this.worker;
   }
 
   private handleWorkerMessage(data: MediaTaskResult | MediaTaskError): void {
-    this.activeTasks--;
-
     const taskId = data.taskId;
     const pending = this.pendingTasks.get(taskId);
-    if (!pending) return;
+    if (!pending) {
+      if ("bitmap" in data) data.bitmap.close?.();
+      return;
+    }
+    this.activeTasks--;
     this.pendingTasks.delete(taskId);
 
     if ("error" in data) {
@@ -103,16 +95,10 @@ export class MediaWorkerBridge {
 
       const request: MediaTaskRequest = { taskId, type, priority, payload };
 
-      if (priority === "high" || this.activeTasks < this.maxConcurrent) {
-        this.sendToWorker(request);
-      } else {
-        // 按优先级插入队列
-        if (priority === "normal") {
-          this.taskQueue.push(request);
-        } else {
-          this.taskQueue.unshift(request);
-        }
-      }
+      const rank = { high: 0, normal: 1, low: 2 };
+      const index = this.taskQueue.findIndex(queued => rank[queued.priority] > rank[priority]);
+      this.taskQueue.splice(index === -1 ? this.taskQueue.length : index, 0, request);
+      this.flushQueue();
     });
   }
 
@@ -158,22 +144,17 @@ export class MediaWorkerBridge {
   private sendToWorker(request: MediaTaskRequest): void {
     try {
       const worker = this.ensureWorker();
-      this.activeTasks++;
       const transferables: Transferable[] = [];
 
-      // Float32Array 通过 Transferable 零拷贝
-      if (
-        request.type === "waveform" &&
-        (request.payload as WaveformPayload).data
-      ) {
-        transferables.push(
-          (request.payload as WaveformPayload).data.buffer
-        );
+      if (request.type === "waveform") {
+        const payload = request.payload as WaveformPayload;
+        const data = new Float32Array(payload.data);
+        request = { ...request, payload: { ...payload, data } };
+        transferables.push(data.buffer);
       }
-
       worker.postMessage(request, transferables);
+      this.activeTasks++;
     } catch (err) {
-      this.activeTasks--;
       const pending = this.pendingTasks.get(request.taskId);
       if (pending) {
         pending.reject(err instanceof Error ? err : new Error(String(err)));
@@ -222,12 +203,16 @@ export class MediaWorkerBridge {
    */
   dispose(): void {
     this.disposed = true;
+    this.reset(new Error("Worker disposed"));
+  }
+
+  private reset(error: Error): void {
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
     for (const { reject } of this.pendingTasks.values()) {
-      reject(new Error("Worker disposed"));
+      reject(error);
     }
     this.pendingTasks.clear();
     this.taskQueue = [];

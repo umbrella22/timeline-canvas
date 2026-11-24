@@ -42,37 +42,57 @@ describe("Timeline integration", () => {
       queries.push(query);
       return query;
     });
-    const initializeBuffers = vi.spyOn(LayerBufferManager.prototype, "initialize");
-    const timeline = createTimeline({
+    const canvas = createMockCanvas("timelineCanvas", 200, 120);
+    const main = canvas.getContext("2d")!;
+    vi.spyOn(canvas, "getContext").mockReturnValue(main);
+    const drawImage = vi.mocked(main.drawImage);
+    const content = vi.fn();
+    const timeline = new Timeline(canvas.id, {
+      autoFitOnInit: false,
+      startTime: 0,
+      endTime: 100,
+      startPaddingTime: 0,
+      secondWidth: 10,
       timelineHeight: 20,
       firstTrackTopMargin: 0,
       trackHeight: 40,
+      renderEventContent: content,
     });
     timeline.loadData({ tracks: [{ events: [{ startTime: 2, endTime: 8, title: "Sharp text" }] }] });
-    const canvas = timeline.getCanvas();
     const hit = timeline.getEventAtPosition(50, 40);
     const zoom = timeline.state.zoomLevel;
 
     expect([canvas.width, canvas.height]).toEqual([200, 120]);
     expect(queries[0].media).toBe("(resolution: 1dppx)");
     for (const dpr of [2, 1.25, 1]) {
+      drawImage.mockClear();
+      content.mockClear();
       vi.stubGlobal("devicePixelRatio", dpr);
       queries.at(-1)!.dispatchEvent(new Event("change"));
       expect([canvas.width, canvas.height]).toEqual([200 * dpr, 120 * dpr]);
       expect([canvas.style.width, canvas.style.height]).toEqual(["200px", "120px"]);
-      expect(initializeBuffers).toHaveBeenLastCalledWith(200, 120, dpr);
+      const buffers = drawImage.mock.calls.slice(-5).map(([source]) => source as HTMLCanvasElement);
+      expect(new Set(buffers).size).toBe(5);
+      for (const buffer of buffers) {
+        expect([buffer.width, buffer.height]).toEqual([canvas.width, canvas.height]);
+      }
+      expect(content).toHaveBeenLastCalledWith(expect.objectContaining({
+        dpr, rect: { x: 20, y: 20, width: 60, height: 40 },
+      }));
       expect(timeline.getEventAtPosition(50, 40)).toEqual(hit);
       expect(timeline.state.zoomLevel).toBe(zoom);
       expect(queries.at(-1)!.media).toBe(`(resolution: ${dpr}dppx)`);
     }
 
     await timeline.destroy();
-    initializeBuffers.mockClear();
+    const initializeBuffers = vi.spyOn(LayerBufferManager.prototype, "initialize");
+    drawImage.mockClear();
     vi.stubGlobal("devicePixelRatio", 2);
     queries.at(-1)!.dispatchEvent(new Event("change"));
     window.dispatchEvent(new Event("resize"));
     expect([canvas.width, canvas.height]).toEqual([200, 120]);
     expect(initializeBuffers).not.toHaveBeenCalled();
+    expect(drawImage).not.toHaveBeenCalled();
   });
 
   it("refreshes DPR when the host explicitly resizes the canvas", async () => {

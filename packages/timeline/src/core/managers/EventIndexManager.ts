@@ -16,7 +16,12 @@ export class EventIndexManager {
   }
 
   public invalidateTrack(trackIndex: number): void {
-    this.dirtyTracks.add(trackIndex);
+    if (this.state.tracks[trackIndex]) {
+      this.dirtyTracks.add(trackIndex);
+    } else {
+      this.trackIndices.delete(trackIndex);
+      this.dirtyTracks.delete(trackIndex);
+    }
   }
 
   public invalidateAll(): void {

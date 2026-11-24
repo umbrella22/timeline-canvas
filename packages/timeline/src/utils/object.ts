@@ -7,7 +7,26 @@ function cloneCustomData(
     return structuredClone(customData);
   }
 
-  return clonePlainObject(customData);
+  // Without native structuredClone support, accept plain metadata and preserve cycles/aliases.
+  const seen = new WeakMap<object, unknown>();
+  function copy(value: unknown): unknown {
+    if (typeof value === "function" || typeof value === "symbol") throw new DOMException("Cannot clone customData", "DataCloneError");
+    if (value === null || typeof value !== "object") return value;
+    if (seen.has(value)) return seen.get(value);
+    if (Array.isArray(value) || isPlainObject(value)) {
+      const result: unknown[] | Record<string, unknown> = Array.isArray(value) ? [] : {};
+      if (Array.isArray(result)) result.length = (value as unknown[]).length;
+      seen.set(value, result);
+      for (const [key, item] of Object.entries(value)) {
+        Object.defineProperty(result, key, { value: copy(item), writable: true, enumerable: true, configurable: true });
+      }
+      return result;
+    }
+    if (value instanceof Date) return new Date(value.getTime());
+    if (value instanceof Float32Array) return new Float32Array(value);
+    throw new DOMException("Cannot clone customData in this environment", "DataCloneError");
+  }
+  return copy(customData) as Record<string, unknown>;
 }
 
 function cloneArray(values: unknown[], copyTypedArrays = false): unknown[] {

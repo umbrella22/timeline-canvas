@@ -66,6 +66,7 @@ const timeline = new Timeline("timelineCanvas", {
 - 工厂参数 `htmlTemplate` 的优先级高于 `contextMenuHtml`
 - 模板为空字符串时，当前实现会回退到 Canvas 菜单渲染
 - 当前内置插件只会把 `contextMenuHtml` 的字符串值当作模板使用
+- 模板按宿主提供的可信 HTML 处理，默认 Canvas 菜单按纯文本绘制菜单项名称。
 
 ## 渲染行为
 

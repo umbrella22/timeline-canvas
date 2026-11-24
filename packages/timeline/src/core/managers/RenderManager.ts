@@ -12,7 +12,6 @@ import { createRenderContext } from "../../renderers/core/types";
 import { LogColors, getLogger } from "./Logger";
 import { LayerBufferManager } from "./LayerBufferManager";
 
-const logger = getLogger("DirtyCheck");
 
 export class RenderManager {
   private canvas: HTMLCanvasElement;
@@ -54,6 +53,7 @@ export class RenderManager {
   private renderPipeline: RenderPipeline;
   private layerBufferManager: LayerBufferManager;
   private disposed = false;
+  private readonly logger;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -65,6 +65,7 @@ export class RenderManager {
     this.canvas = canvas;
     this.ctx = ctx;
     this.config = config;
+    this.logger = getLogger("DirtyCheck", config);
     this.state = state;
     this.pluginManager = pluginManager;
     this.dpr = window.devicePixelRatio || 1;
@@ -76,7 +77,7 @@ export class RenderManager {
     this.viewport = new ViewportManager(this.config, this.state);
 
     // 初始化 OffscreenCanvas 分层缓存管理器
-    this.layerBufferManager = new LayerBufferManager();
+    this.layerBufferManager = new LayerBufferManager(getLogger("LayerBuffer", config));
 
     // 初始化新的渲染管道
     this.renderPipeline = new RenderPipeline();
@@ -94,7 +95,7 @@ export class RenderManager {
     );
   }
 
-  public setCanvasSize(width: number, height: number): void {
+  public setCanvasSize(width: number, height: number, draw = true): void {
     if (this.disposed) return;
     const nextDpr = window.devicePixelRatio || 1;
     const actualWidth = Math.floor(width * nextDpr);
@@ -114,19 +115,17 @@ export class RenderManager {
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
     this.invalidateCache();
-    const contentHeight = this.getContentHeight();
-    const maxScrollY = Math.max(
-      0,
-      contentHeight - this.getCachedLogicalHeight()
-    );
-    this.state.scrollY = Math.max(0, Math.min(maxScrollY, this.state.scrollY));
     if (this.state.zoomLevel < this.config.minAutoFitZoom) {
       this.state.zoomLevel = this.config.minAutoFitZoom;
       this.state.scrollX = 0;
     }
+    const maxScrollX = this.computeMaxScrollX(this.state.zoomLevel);
+    const maxScrollY = this.computeMaxScrollY();
+    this.state.scrollX = Math.max(0, Math.min(maxScrollX, this.state.scrollX));
+    this.state.scrollY = Math.max(0, Math.min(maxScrollY, this.state.scrollY));
     // canvas resize 影响所有层，标记全部脏
     this.markAllDirty();
-    this.draw();
+    if (draw) this.draw();
   }
 
   public getCanvasLogicalWidth(): number {
@@ -186,11 +185,11 @@ export class RenderManager {
     const bufSize = this.layerBufferManager.getSize();
     if (
       !this.layerBufferManager.isInitialized() ||
-      bufSize.width !== width ||
-      bufSize.height !== height ||
+      bufSize.width !== this.canvas.width ||
+      bufSize.height !== this.canvas.height ||
       bufSize.dpr !== this.dpr
     ) {
-      this.layerBufferManager.initialize(width, height, this.dpr);
+      this.layerBufferManager.initialize(this.canvas.width, this.canvas.height, this.dpr);
     }
 
     // 1. 将脏 LayerType 映射到脏 BufferLayer
@@ -200,112 +199,32 @@ export class RenderManager {
       this.layerBufferManager.markDirtyFromLayers(this.dirtyLayers);
     }
 
-    // 2. 按需重绘各缓冲层（只重绘脏的）
+    this.layerBufferManager.redraw("background", (ctx) => {
+      const start = performance.now();
+      this.pluginManager.renderBackground(ctx, logicalCanvas, this.config, this.state);
+      this.lastLayerTimes.background = performance.now() - start;
+    });
 
-    // === background 层：插件背景 ===
-    if (this.layerBufferManager.isDirty("background")) {
-      const buf = this.layerBufferManager.getBuffer("background")!;
-      const t0 = performance.now();
-      buf.ctx.clearRect(0, 0, buf.canvas.width, buf.canvas.height);
-      buf.ctx.save();
-      buf.ctx.scale(this.dpr, this.dpr);
-      this.pluginManager.renderBackground(
-        buf.ctx as CanvasRenderingContext2D,
-        logicalCanvas,
-        this.config,
-        this.state
-      );
-      buf.ctx.restore();
-      this.layerBufferManager.clearDirty("background");
-      this.lastLayerTimes["background"] = performance.now() - t0;
-    }
-
-    // === main 层：tracks + timeline + guideLines + indicator + scrollbar ===
-    if (this.layerBufferManager.isDirty("main")) {
-      const buf = this.layerBufferManager.getBuffer("main")!;
-      buf.ctx.clearRect(0, 0, buf.canvas.width, buf.canvas.height);
-      buf.ctx.save();
-      buf.ctx.scale(this.dpr, this.dpr);
-
-      const renderContext = createRenderContext(
-        buf.ctx as CanvasRenderingContext2D,
-        this.canvas,
-        this.config,
-        this.state,
-        this.dpr,
-        this.pluginManager
-      );
-
-      // 只渲染 main 层包含的渲染器
-      this.renderPipeline.render(renderContext, {
-        forceFullRender: false,
-        dirtyLayers: new Set([
-          "tracks",
-          "timeline",
-          "guideLines",
-          "indicator",
-          "scrollbar",
-        ] as const),
+    this.layerBufferManager.redraw("main", (ctx) => {
+      const context = createRenderContext(ctx, this.canvas, this.config, this.state, this.dpr, this.pluginManager);
+      const stats = this.renderPipeline.render(context, {
+        dirtyLayers: new Set(["tracks", "timeline", "guideLines", "indicator", "scrollbar"]),
       });
+      Object.assign(this.lastLayerTimes, stats.layerTimes);
+    });
 
-      buf.ctx.restore();
-      this.layerBufferManager.clearDirty("main");
+    // Event media is drawn inline in the main/interaction buffers.
+    this.layerBufferManager.clearDirty("media");
+    this.layerBufferManager.redraw("interaction", (ctx) => {
+      const context = createRenderContext(ctx, this.canvas, this.config, this.state, this.dpr, this.pluginManager);
+      this.renderPipeline.render(context, { dirtyLayers: new Set(["interaction"]) });
+    });
 
-      // 更新性能统计
-      const stats = this.renderPipeline.getStats();
-      this.lastLayerTimes = { ...this.lastLayerTimes, ...stats.layerTimes };
-    }
-
-    // === media 层：由 EventMediaPlugin 通过事件钩子写入（阶段 2 实现）===
-    // 目前 media 渲染仍在 main 层内的 EventsRenderer 中完成
-    // 当 media buffer 脏时，暂时不做独立处理
-    if (this.layerBufferManager.isDirty("media")) {
-      // 阶段 2 将在此处接入 MediaWorkerBridge 的位图输出
-      this.layerBufferManager.clearDirty("media");
-    }
-
-    // === interaction 层：拖拽预览、resize handle ===
-    if (this.layerBufferManager.isDirty("interaction")) {
-      const buf = this.layerBufferManager.getBuffer("interaction")!;
-      buf.ctx.clearRect(0, 0, buf.canvas.width, buf.canvas.height);
-      buf.ctx.save();
-      buf.ctx.scale(this.dpr, this.dpr);
-
-      const renderContext = createRenderContext(
-        buf.ctx as CanvasRenderingContext2D,
-        this.canvas,
-        this.config,
-        this.state,
-        this.dpr,
-        this.pluginManager
-      );
-
-      this.renderPipeline.render(renderContext, {
-        forceFullRender: false,
-        dirtyLayers: new Set(["interaction"] as const),
-      });
-
-      buf.ctx.restore();
-      this.layerBufferManager.clearDirty("interaction");
-    }
-
-    // === overlay 层：tooltip、context menu、perf overlay ===
-    if (this.layerBufferManager.isDirty("overlay")) {
-      const buf = this.layerBufferManager.getBuffer("overlay")!;
-      const t0 = performance.now();
-      buf.ctx.clearRect(0, 0, buf.canvas.width, buf.canvas.height);
-      buf.ctx.save();
-      buf.ctx.scale(this.dpr, this.dpr);
-      this.pluginManager.renderOverlay(
-        buf.ctx as CanvasRenderingContext2D,
-        logicalCanvas,
-        this.config,
-        this.state
-      );
-      buf.ctx.restore();
-      this.layerBufferManager.clearDirty("overlay");
-      this.lastLayerTimes["overlay"] = performance.now() - t0;
-    }
+    this.layerBufferManager.redraw("overlay", (ctx) => {
+      const start = performance.now();
+      this.pluginManager.renderOverlay(ctx, logicalCanvas, this.config, this.state);
+      this.lastLayerTimes.overlay = performance.now() - start;
+    });
 
     // 3. 合成：将所有缓冲层按顺序 drawImage 到主 canvas
     this.layerBufferManager.compositeToMain(
@@ -376,7 +295,7 @@ export class RenderManager {
       | "interaction"
     >
   ): void {
-    logger.debugStyled(
+    this.logger.debugStyled(
       LogColors.dataUpdate,
       `✓ Marking layers dirty: [${layers.join(", ")}]`
     );
@@ -384,7 +303,7 @@ export class RenderManager {
   }
 
   public markAllDirty(): void {
-    logger.debugStyled(LogColors.dataUpdate, `✓ Marking ALL layers dirty`);
+    this.logger.debugStyled(LogColors.dataUpdate, `✓ Marking ALL layers dirty`);
     this.dirtyLayers = new Set([
       "background",
       "tracks",

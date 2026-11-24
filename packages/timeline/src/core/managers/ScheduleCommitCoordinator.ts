@@ -146,6 +146,7 @@ export class ScheduleCommitCoordinator {
     this.stopTimer(change.operationId);
     this.controller?.releaseForAccept(change.eventBusinessId);
     this.deps.notifySettled();
+    if (!this.deps.isAlive() || this.deps.getDatasetEpoch() !== datasetEpochAtAccept) return;
     const finalSnapshot = {
       resourceBusinessId: placement.resourceBusinessId,
       event: publish.event as TimelineEvent,

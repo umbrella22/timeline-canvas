@@ -1,7 +1,6 @@
 import type {
   BusinessId,
   LoadDataFormat,
-  SelectedEvent,
   TimelineConfig,
   TimelineEvent,
   TimelineState,
@@ -9,6 +8,8 @@ import type {
 } from "../../types";
 import { cloneEvent, fixFloatPrecision, translateTimelineConfig } from "../../utils";
 import { isValidBusinessId } from "./BusinessIdentityIndex";
+import { remapEventSplice } from "./eventPointers";
+import { cloneCustomData } from "../../utils/object";
 import type { Logger } from "./Logger";
 import type { EventIndexManager } from "./EventIndexManager";
 
@@ -79,10 +80,12 @@ export class EventMutationService {
     let startSec: number;
     let duration: number;
 
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return null;
     if (endTime > startTime && endTime <= maxAllowedEndTime) {
       startSec = startTime;
       duration = fixFloatPrecision(endTime - startTime);
     } else if (
+      endTime > 0 &&
       endTime <= this.config.endTime - this.config.startTime &&
       startTime + endTime <= maxAllowedEndTime
     ) {
@@ -118,7 +121,8 @@ export class EventMutationService {
     title: string,
     description = "",
     customData?: Record<string, unknown>,
-    readonly = false
+    readonly = false,
+    snapshotForCallback = false
   ): TimelineEvent | null {
     if (!this.isValidTrackIndex(trackIndex)) {
       return null;
@@ -144,9 +148,10 @@ export class EventMutationService {
       ...(customData ? { customData } : {}),
     };
 
+    const result = snapshotForCallback ? cloneEvent(event) : event;
     track.events.push(event);
     this.invalidateTrack(trackIndex);
-    return event;
+    return result;
   }
 
   public updateEvent(
@@ -180,6 +185,7 @@ export class EventMutationService {
     const sanitizedUpdates = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== undefined)
     );
+    if (updates.customData) sanitizedUpdates.customData = cloneCustomData(updates.customData);
     Object.assign(event, sanitizedUpdates);
     this.invalidateTrack(trackIndex);
 
@@ -238,21 +244,12 @@ export class EventMutationService {
       return null;
     }
 
-    const removedEvent = track.events[eventIndex];
-    const { captures, highlightCaptures } = this.captureTrackPointers(
-      trackIndex,
-      track.events
-    );
+    const removedEvent = cloneEvent(track.events[eventIndex]);
     track.events.splice(eventIndex, 1);
-    this.reassignPointersAfterRemoval(
-      track,
-      captures,
-      highlightCaptures,
-      removedEvent
-    );
+    remapEventSplice(this.state, { trackIndex, eventIndex });
     this.invalidateTrack(trackIndex);
 
-    return cloneEvent(removedEvent);
+    return removedEvent;
   }
 
   public loadData(data: LoadDataFormat): boolean {
@@ -381,94 +378,11 @@ export class EventMutationService {
     this.onMutate?.();
   }
 
-  /**
-   * 结构变更前捕获受影响轨道上各状态指针引用的事件对象，
-   * 变更后按对象身份重解析 index；事件已不存在时清空指针。
-   */
-  private captureTrackPointers(
-    trackIndex: number,
-    events: TimelineEvent[]
-  ): {
-    captures: Array<{ event: TimelineEvent | undefined; apply: (next: number | null) => void }>;
-    highlightCaptures: Array<{ item: SelectedEvent; event: TimelineEvent | undefined }>;
-  } {
-    const state = this.state;
-    const captures: Array<{
-      event: TimelineEvent | undefined;
-      apply: (next: number | null) => void;
-    }> = [];
-    const capture = <T extends { trackIndex: number; eventIndex: number }>(
-      pointer: T | null,
-      set: (value: T | null) => void
-    ): void => {
-      if (!pointer || pointer.trackIndex !== trackIndex) return;
-      captures.push({
-        event: events[pointer.eventIndex],
-        apply: (next) => {
-          if (next === null) {
-            set(null);
-          } else {
-            set({ ...pointer, eventIndex: next });
-          }
-        },
-      });
-    };
-
-    capture(state.selectedEvent, (v) => (state.selectedEvent = v));
-    capture(state.highlightedEvent, (v) => (state.highlightedEvent = v));
-    capture(state.contextMenuEvent, (v) => (state.contextMenuEvent = v));
-    capture(state.lastClickEvent, (v) => (state.lastClickEvent = v));
-    capture(state.hoveredResizeHandle, (v) => (state.hoveredResizeHandle = v));
-    capture(state.hoveredSplitLine, (v) => (state.hoveredSplitLine = v));
-    capture(state.draggingEvent, (v) => {
-      state.draggingEvent = v;
-      if (v && v.originalTrackIndex === trackIndex && v.originalEventIndex > v.eventIndex) {
-        v.originalEventIndex -= 1;
-      }
-    });
-    capture(state.resizingEvent, (v) => (state.resizingEvent = v));
-
-    const highlightCaptures = state.timeIndicatorHighlightedEvents
-      .filter((item) => item.trackIndex === trackIndex)
-      .map((item) => ({ item, event: events[item.eventIndex] }));
-
-    return { captures, highlightCaptures };
-  }
-
-  private reassignPointersAfterRemoval(
-    track: Track,
-    captures: Array<{ event: TimelineEvent | undefined; apply: (next: number | null) => void }>,
-    highlightCaptures: Array<{ item: SelectedEvent; event: TimelineEvent | undefined }>,
-    removedEvent: TimelineEvent
-  ): void {
-    for (const pointer of captures) {
-      if (!pointer.event || pointer.event === removedEvent) {
-        pointer.apply(null);
-        continue;
-      }
-      const next = track.events.indexOf(pointer.event);
-      pointer.apply(next === -1 ? null : next);
-    }
-
-    if (highlightCaptures.length === 0) return;
-    this.state.timeIndicatorHighlightedEvents =
-      this.state.timeIndicatorHighlightedEvents.flatMap((item) => {
-        const captured = highlightCaptures.find((entry) => entry.item === item);
-        if (!captured) return [item];
-        if (!captured.event || captured.event === removedEvent) {
-          return [];
-        }
-        const next = track.events.indexOf(captured.event);
-        if (next === -1) return [];
-        return [{ ...item, eventIndex: next }];
-      });
-  }
-
   private isValidTrackIndex(trackIndex: number): boolean {
-    return trackIndex >= 0 && trackIndex < this.state.tracks.length;
+    return Number.isInteger(trackIndex) && trackIndex >= 0 && trackIndex < this.state.tracks.length;
   }
 
   private isValidEventIndex(track: Track, eventIndex: number): boolean {
-    return eventIndex >= 0 && eventIndex < track.events.length;
+    return Number.isInteger(eventIndex) && eventIndex >= 0 && eventIndex < track.events.length;
   }
 }

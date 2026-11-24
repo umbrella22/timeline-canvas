@@ -71,6 +71,7 @@ interface ChangeHandler {
  * 批量变更上下文
  */
 interface BatchContext {
+  initialHighlights: TimelineState["timeIndicatorHighlightedEvents"];
   changes: Set<ChangeType>;
   dirtyLayers: Set<LayerType>;
   pendingNotifications: Array<() => void>;
@@ -101,11 +102,11 @@ export class ChangeScheduler {
   private batchContext: BatchContext | null = null;
 
   /** 是否正在批量操作中 */
-  private isBatching = false;
+  private batchDepth = 0;
 
   /** 当前是否处于批处理中；供嵌套调用方守卫，避免提前终止外层批次 */
   public get batching(): boolean {
-    return this.isBatching;
+    return this.batchDepth > 0;
   }
   private highlightChanged = false;
 
@@ -362,7 +363,7 @@ export class ChangeScheduler {
       return;
     }
 
-    if (this.isBatching && this.batchContext) {
+    if (this.batching && this.batchContext) {
       // 批量模式：收集变更
       this.batchContext.changes.add(change);
       for (const layer of handler.layers) {
@@ -395,14 +396,9 @@ export class ChangeScheduler {
    * 开始批量操作
    */
   public beginBatch(): void {
-    if (this.isBatching) {
-      logger.warn(
-        translateTimelineConfig(this.config, "warningAlreadyInBatchMode")
-      );
-      return;
-    }
-    this.isBatching = true;
+    if (++this.batchDepth > 1) return;
     this.batchContext = {
+      initialHighlights: this.state.timeIndicatorHighlightedEvents.slice(),
       changes: new Set(),
       dirtyLayers: new Set(),
       pendingNotifications: [],
@@ -414,13 +410,13 @@ export class ChangeScheduler {
    * 结束批量操作
    */
   public endBatch(): void {
-    if (!this.isBatching || !this.batchContext) {
+    if (!this.batching || !this.batchContext) {
       logger.warn(translateTimelineConfig(this.config, "warningNotInBatchMode"));
       return;
     }
 
+    if (--this.batchDepth > 0) return;
     const ctx = this.batchContext;
-    this.isBatching = false;
     this.batchContext = null;
 
     if (ctx.changes.size === 0) return;
@@ -429,6 +425,10 @@ export class ChangeScheduler {
     const uniqueDerives = [...new Set(ctx.pendingDerives)];
     for (const derive of uniqueDerives) {
       derive();
+    }
+
+    if (ctx.changes.has("timeIndicator:move")) {
+      this.highlightChanged = this.hasHighlightChanged(ctx.initialHighlights, this.state.timeIndicatorHighlightedEvents);
     }
 
     // 2. 标记脏层

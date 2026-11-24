@@ -40,8 +40,8 @@ export function getZoomBucket(zoomLevel: number): number {
  * - 提供命中率统计
  */
 export class MediaLRUCache {
-  private cache: Map<string, { bitmap: ImageBitmap; byteSize: number }> =
-    new Map();
+  private cache = new Map<string, ImageBitmap>();
+  private allocations = new Map<ImageBitmap, { bytes: number; references: number }>();
   private totalBytes = 0;
   private readonly maxBytes: number;
 
@@ -49,7 +49,7 @@ export class MediaLRUCache {
   private hits = 0;
   private misses = 0;
 
-  constructor(maxMB = 64) {
+  constructor(maxMB = 64, private readonly maxEntries = Infinity) {
     this.maxBytes = maxMB * 1024 * 1024;
   }
 
@@ -63,32 +63,54 @@ export class MediaLRUCache {
     this.cache.delete(key);
     this.cache.set(key, entry);
     this.hits++;
-    return entry.bitmap;
+    return entry;
   }
 
-  set(key: string, bitmap: ImageBitmap): void {
-    // 如果 key 已存在，先移除旧的
-    const existing = this.cache.get(key);
-    if (existing) {
-      existing.bitmap.close();
-      this.totalBytes -= existing.byteSize;
+  get size(): number {
+    return this.cache.size;
+  }
+
+  values(): IterableIterator<ImageBitmap> {
+    return this.cache.values();
+  }
+
+  /** Takes ownership, including closing an individual bitmap too large to retain. */
+  set(key: string, bitmap: ImageBitmap): boolean {
+    if (this.cache.get(key) === bitmap) {
       this.cache.delete(key);
+      this.cache.set(key, bitmap);
+      return true;
     }
-
-    const byteSize = bitmap.width * bitmap.height * 4; // RGBA
-
-    // 淘汰旧项直到有足够空间
-    while (this.totalBytes + byteSize > this.maxBytes && this.cache.size > 0) {
-      const first = this.cache.entries().next();
-      if (first.done) break;
-      const [oldKey, oldEntry] = first.value;
-      oldEntry.bitmap.close();
-      this.cache.delete(oldKey);
-      this.totalBytes -= oldEntry.byteSize;
+    const bytes = bitmap.width * bitmap.height * 4;
+    if (bytes > this.maxBytes || this.maxEntries < 1) {
+      bitmap.close();
+      return false;
     }
+    this.remove(key);
+    const allocation = this.allocations.get(bitmap);
+    if (allocation) {
+      allocation.references++;
+    } else {
+      this.allocations.set(bitmap, { bytes, references: 1 });
+      this.totalBytes += bytes;
+    }
+    this.cache.set(key, bitmap);
+    while (this.totalBytes > this.maxBytes || this.cache.size > this.maxEntries) {
+      this.remove(this.cache.keys().next().value!);
+    }
+    return true;
+  }
 
-    this.cache.set(key, { bitmap, byteSize });
-    this.totalBytes += byteSize;
+  private remove(key: string): void {
+    const bitmap = this.cache.get(key);
+    if (!bitmap) return;
+    this.cache.delete(key);
+    const allocation = this.allocations.get(bitmap)!;
+    if (--allocation.references === 0) {
+      this.allocations.delete(bitmap);
+      this.totalBytes -= allocation.bytes;
+      bitmap.close();
+    }
   }
 
   /**
@@ -103,16 +125,8 @@ export class MediaLRUCache {
    */
   invalidateEvent(eventId: number): void {
     const prefix = `${eventId}_`;
-    const keysToDelete: string[] = [];
-    for (const [key, entry] of this.cache) {
-      if (key.startsWith(prefix)) {
-        entry.bitmap.close();
-        this.totalBytes -= entry.byteSize;
-        keysToDelete.push(key);
-      }
-    }
-    for (const key of keysToDelete) {
-      this.cache.delete(key);
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) this.remove(key);
     }
   }
 
@@ -120,9 +134,8 @@ export class MediaLRUCache {
    * 清除所有缓存
    */
   clear(): void {
-    for (const entry of this.cache.values()) {
-      entry.bitmap.close();
-    }
+    for (const bitmap of this.allocations.keys()) bitmap.close();
+    this.allocations.clear();
     this.cache.clear();
     this.totalBytes = 0;
     this.hits = 0;

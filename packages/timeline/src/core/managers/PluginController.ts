@@ -22,7 +22,9 @@ export class PluginController {
   private readonly builtinThemes: PluginControllerOptions["builtinThemes"];
   private readonly onThemeChanged: () => void;
   private readonly onPluginVisualChange: () => void;
-  private currentThemePluginId: string | null = null;
+  private currentTheme: TimelinePlugin | null = null;
+  private themeQueue: Promise<unknown> = Promise.resolve();
+  private queuedThemeIds = new Map<string, number>();
 
   constructor(options: PluginControllerOptions) {
     this.pluginManager = options.pluginManager;
@@ -32,15 +34,7 @@ export class PluginController {
   }
 
   public loadInitialTheme(plugin: TimelinePlugin): void {
-    const pluginId = this.getPluginId(plugin);
-    void this.pluginManager.loadPlugin(plugin).then((ok) => {
-      if (!ok) {
-        return;
-      }
-
-      this.currentThemePluginId = pluginId;
-      this.onThemeChanged();
-    });
+    void this.switchThemePlugin(plugin);
   }
 
   public async usePlugin(plugin: TimelinePlugin): Promise<boolean> {
@@ -66,49 +60,76 @@ export class PluginController {
   }
 
   public async removePlugin(pluginId: string): Promise<boolean> {
-    const unloaded = await this.pluginManager.unloadPlugin(pluginId);
-    if (!unloaded) {
-      return false;
+    if (
+      this.queuedThemeIds.has(pluginId) ||
+      (this.currentTheme && this.getPluginId(this.currentTheme) === pluginId)
+    ) {
+      return this.enqueueTheme(pluginId, () => this.remove(pluginId));
     }
-
-    if (this.currentThemePluginId === pluginId) {
-      this.currentThemePluginId = null;
-      this.onThemeChanged();
-      return true;
-    }
-
-    this.onPluginVisualChange();
-    return true;
+    return this.remove(pluginId);
   }
 
-  public async setTheme(theme: "light" | "dark"): Promise<boolean> {
+  private async remove(pluginId: string): Promise<boolean> {
+    const removed = await this.pluginManager.unloadPlugin(pluginId);
+    if (this.currentTheme && this.getPluginId(this.currentTheme) === pluginId) {
+      // A dependency veto leaves the entry active. A failed teardown still detaches it.
+      if (removed || !this.hasLoadedId(pluginId)) {
+        this.currentTheme = null;
+        this.onThemeChanged();
+      }
+    } else if (removed) {
+      this.onPluginVisualChange();
+    }
+    return removed;
+  }
+
+  public setTheme(theme: "light" | "dark"): Promise<boolean> {
     return this.switchThemePlugin(this.builtinThemes[theme]);
   }
 
-  private async switchThemePlugin(plugin: TimelinePlugin): Promise<boolean> {
-    const nextThemePluginId = this.getPluginId(plugin);
-    if (this.currentThemePluginId === nextThemePluginId) {
-      return true;
-    }
+  private enqueueTheme(id: string, action: () => Promise<boolean>): Promise<boolean> {
+    this.queuedThemeIds.set(id, (this.queuedThemeIds.get(id) ?? 0) + 1);
+    const task = this.themeQueue.then(action).finally(() => {
+      const remaining = this.queuedThemeIds.get(id)! - 1;
+      if (remaining) this.queuedThemeIds.set(id, remaining);
+      else this.queuedThemeIds.delete(id);
+    });
+    this.themeQueue = task.catch(() => false);
+    return task;
+  }
 
-    if (this.currentThemePluginId) {
-      const unloaded = await this.pluginManager.unloadPlugin(
-        this.currentThemePluginId
-      );
-      if (!unloaded) {
+  private switchThemePlugin(plugin: TimelinePlugin): Promise<boolean> {
+    const id = this.getPluginId(plugin);
+    return this.enqueueTheme(id, async () => {
+      const previous = this.currentTheme;
+      if (previous) {
+        const previousId = this.getPluginId(previous);
+        if (previousId === id) return true;
+        if (!(await this.pluginManager.unloadPlugin(previousId))) {
+          if (!this.hasLoadedId(previousId)) await this.restoreTheme(previous);
+          return false;
+        }
+      }
+      this.currentTheme = null;
+      if (!(await this.pluginManager.loadPlugin(plugin))) {
+        await this.restoreTheme(previous);
         return false;
       }
-      this.currentThemePluginId = null;
-    }
+      this.currentTheme = plugin;
+      this.onThemeChanged();
+      return true;
+    });
+  }
 
-    const loaded = await this.pluginManager.loadPlugin(plugin);
-    if (!loaded) {
-      return false;
-    }
+  private async restoreTheme(previous: TimelinePlugin | null): Promise<void> {
+    this.currentTheme =
+      previous && (await this.pluginManager.loadPlugin(previous)) ? previous : null;
+    if (previous && !this.currentTheme) this.onThemeChanged();
+    else this.onPluginVisualChange();
+  }
 
-    this.currentThemePluginId = nextThemePluginId;
-    this.onThemeChanged();
-    return true;
+  private hasLoadedId(id: string): boolean {
+    return this.pluginManager.getLoadedPlugins().some((plugin) => this.getPluginId(plugin) === id);
   }
 
   private getPluginId(plugin: TimelinePlugin): string {

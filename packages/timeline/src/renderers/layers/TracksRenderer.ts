@@ -16,27 +16,13 @@ export class TracksRenderer implements Renderer {
       context;
     const trackStartX = config.startPaddingTime - state.scrollX;
     const eventsRenderer = this.eventsRenderer;
-    // M2：候选草稿挂在源轨道渲染通道上——源行被滚出视口时仍需渲染，
-    // 否则候选在目标行位置的显示会整体消失
-    const draftSourceTracks = new Set<number>();
-    for (const draft of state.editDrafts.values()) {
-      draftSourceTracks.add(draft.sourceTrackIndex);
-      draftSourceTracks.add(draft.targetTrackIndex);
-    }
+    const rowY = (index: number) => config.timelineHeight + config.firstTrackTopMargin
+      + index * (config.trackHeight + config.trackMargin) - state.scrollY;
+    const isVisible = (y: number) => y + config.trackHeight >= config.timelineHeight && y <= height;
 
     for (let i = 0; i < state.tracks.length; i++) {
-      const trackY =
-        config.timelineHeight +
-        config.firstTrackTopMargin +
-        i * (config.trackHeight + config.trackMargin) -
-        state.scrollY;
-
-      if (
-        trackY + config.trackHeight < config.timelineHeight ||
-        trackY > height
-      ) {
-        if (!draftSourceTracks.has(i)) continue;
-      }
+      const trackY = rowY(i);
+      if (!isVisible(trackY)) continue;
 
       let trackBgColor: string;
       const isHighlightedTrack =
@@ -74,8 +60,22 @@ export class TracksRenderer implements Renderer {
         canvas,
         pluginManager,
         width,
-        dpr
+        dpr,
+        "confirmed"
       );
+    }
+
+    // Draw draft bodies above every track. Media and content still receive confirmed source indices.
+    const sources = new Set<number>();
+    for (const draft of state.editDrafts.values()) {
+      if (state.tracks[draft.targetTrackIndex] && isVisible(rowY(draft.targetTrackIndex))) {
+        sources.add(draft.sourceTrackIndex);
+      }
+    }
+    for (const source of sources) {
+      if (state.tracks[source]) {
+        eventsRenderer.renderEvents(ctx, config, state, source, rowY(source), canvas, pluginManager, width, dpr, "drafts");
+      }
     }
   }
 

@@ -9,9 +9,10 @@ import type { CoreLayerHook, CoreRenderTarget } from "../../plugins/types";
 import { translateTimelineConfig } from "../../utils";
 import { LogColors, getLogger } from "../../core/managers/Logger";
 
+import { withPluginCanvas } from "./canvasScope";
+
 const logger = getLogger("RenderPipeline");
 
-let lastPipelineLogTime = 0;
 
 function isCoreRenderTarget(layer: LayerType): layer is CoreRenderTarget {
   return layer !== "background" && layer !== "overlay";
@@ -27,6 +28,7 @@ function isCoreRenderTarget(layer: LayerType): layer is CoreRenderTarget {
  * - 提供渲染器的注册和管理
  */
 export class RenderPipeline {
+  private lastPipelineLogTime = 0;
   private renderers: Map<LayerType, Renderer> = new Map();
   private renderOrder: LayerType[] = [
     "background",
@@ -78,10 +80,10 @@ export class RenderPipeline {
       skipPerfMeasure = false,
     } = options;
 
-    const shouldLog = startTime - lastPipelineLogTime >= 250;
+    const shouldLog = context.config.debug && startTime - this.lastPipelineLogTime >= 250;
     if (shouldLog) {
-      lastPipelineLogTime = startTime;
-      logger.debugStyled(
+      this.lastPipelineLogTime = startTime;
+      getLogger("RenderPipeline", context.config).debugStyled(
         LogColors.pipeline,
         `▶ Render Start`,
         `forceFullRender=${forceFullRender}`,
@@ -143,7 +145,7 @@ export class RenderPipeline {
 
     this.stats.totalTime = performance.now() - startTime;
     if (shouldLog) {
-      logger.debugStyled(
+      getLogger("RenderPipeline", context.config).debugStyled(
         LogColors.pipeline,
         `◀ Render End`,
         `rendered=${this.stats.renderedLayers}, skipped=${
@@ -179,23 +181,26 @@ export class RenderPipeline {
       const hook = hooks[i];
       const next = chain;
       chain = () => {
+        let open = true;
+        let continued = false;
+        const nextOnce = () => {
+          if (!open || continued) return;
+          continued = true;
+          next();
+        };
         try {
-          hook.handler(
-            context.ctx,
-            logicalCanvas,
-            context.config,
-            context.state,
-            next
+          withPluginCanvas(context.ctx, (ctx) =>
+            hook.handler(ctx, logicalCanvas, context.config, context.state, nextOnce)
           );
         } catch (error) {
           logger.error(
             `${translateTimelineConfig(context.config, "errorCoreLayerHook", {
               hook: hook.name,
-            })}:`,
-            error
+            })}:`, error
           );
-          // 钩子出错时降级执行默认渲染
-          next();
+          nextOnce();
+        } finally {
+          open = false;
         }
       };
     }

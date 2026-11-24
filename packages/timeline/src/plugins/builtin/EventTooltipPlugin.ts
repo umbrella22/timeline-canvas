@@ -1,4 +1,5 @@
 import { PluginType, TimelinePlugin, RenderLayer } from "../types";
+import { graphemes } from "../../renderers/core/graphemes";
 import { getLogger } from "../../core/managers/Logger";
 
 const logger = getLogger("EventTooltipPlugin");
@@ -31,8 +32,6 @@ interface TooltipState {
   title: string;
   x: number;
   y: number;
-  trackIndex: number;
-  eventIndex: number;
 }
 
 function getPluginData<T>(getData: (key: string) => unknown, key: string): T | undefined {
@@ -53,43 +52,6 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
     fontFamily = "Arial, sans-serif",
   } = options;
 
-  let tooltipState: TooltipState = {
-    visible: false,
-    title: "",
-    x: 0,
-    y: 0,
-    trackIndex: -1,
-    eventIndex: -1,
-  };
-
-  let hoverTimer: ReturnType<typeof setTimeout> | null = null;
-  let animationFrameId: number | null = null;
-  let pendingMouseEvent: MouseEvent | null = null;
-  let lastHoveredEvent: { trackIndex: number; eventIndex: number } | null = null;
-
-  const cancelPendingWork = () => {
-    if (hoverTimer) {
-      clearTimeout(hoverTimer);
-      hoverTimer = null;
-    }
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
-    pendingMouseEvent = null;
-    lastHoveredEvent = null;
-  };
-
-  // 用于检测文本是否被截断的辅助函数
-  function isTextTruncated(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    maxTextWidth: number,
-  ): boolean {
-    const textWidth = ctx.measureText(text).width;
-    return textWidth > maxTextWidth;
-  }
-
   return {
     metadata: {
       name: "event-tooltip",
@@ -104,86 +66,61 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
     activate(context) {
       const canvas = context.timeline.getCanvas();
 
-      // RAF 节流：避免高刷新率显示器下每帧触发多次 hit-test
-      // 鼠标移动事件处理（实际逻辑）
+      const tooltipState: TooltipState = { visible: false, title: "", x: 0, y: 0 };
+      let hovered: typeof context.state.tracks[number]["events"][number] | undefined;
+      let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+      let animationFrameId: number | null = null;
+      let pendingMouseEvent: MouseEvent | null = null;
+
+      const redrawOverlay = () => {
+        context.timeline.markDirty(["overlay"]);
+        context.timeline.draw();
+      };
+      const clearTooltip = () => {
+        if (hoverTimer !== null) clearTimeout(hoverTimer);
+        hoverTimer = null;
+        hovered = undefined;
+        if (tooltipState.visible) {
+          tooltipState.visible = false;
+          redrawOverlay();
+        }
+      };
       const processMouseMove = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
-        const config = context.config;
-        const state = context.state;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const hit = context.timeline.getEventAtPosition(x, y);
+        const event = hit && context.state.tracks[hit.trackIndex]?.events[hit.eventIndex];
+        if (!event) { clearTooltip(); return; }
 
-        // 检测是否悬停在事件块上
-        const hoveredEvent = context.timeline.getEventAtPosition(canvasX, canvasY);
-
-        if (hoveredEvent) {
-          const { trackIndex, eventIndex } = hoveredEvent;
-          const event = state.tracks[trackIndex]?.events[eventIndex];
-
-          if (!event) {
-            clearTooltip();
-            return;
-          }
-
-          // 检查是否是同一个事件
-          const isSameEvent =
-            lastHoveredEvent &&
-            lastHoveredEvent.trackIndex === trackIndex &&
-            lastHoveredEvent.eventIndex === eventIndex;
-
-          if (isSameEvent && tooltipState.visible) {
-            // 更新位置
-            tooltipState.x = canvasX;
-            tooltipState.y = canvasY;
-            context.timeline.draw();
-            return;
-          }
-
-          // 新的事件
-          lastHoveredEvent = { trackIndex, eventIndex };
-
-          // 清除之前的定时器
-          if (hoverTimer) {
-            clearTimeout(hoverTimer);
-            hoverTimer = null;
-          }
-
-          // 计算事件块宽度和文本是否截断
-          const eventWidth = event.duration * config.secondWidth * state.zoomLevel;
-          const textPadding = 10;
-          const maxTextWidth = eventWidth - textPadding * 2;
-
-          // 创建临时 canvas 上下文来测量文本
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return;
-
-          const textStyle = config.eventTextStyle;
-          const titleFontSize =
-            textStyle.titleFontSize === "auto"
-              ? Math.max(10, Math.min(14, config.trackHeight * 0.175))
-              : textStyle.titleFontSize;
-
-          ctx.font = `${textStyle.titleFontWeight} ${titleFontSize}px ${textStyle.titleFontFamily}`;
-
-          // 只有文本被截断时才显示 tooltip
-          if (isTextTruncated(ctx, event.title, maxTextWidth)) {
-            hoverTimer = setTimeout(() => {
-              tooltipState = {
-                visible: true,
-                title: event.title,
-                x: canvasX,
-                y: canvasY,
-                trackIndex,
-                eventIndex,
-              };
-              context.timeline.draw();
-            }, showDelay);
-          } else {
-            clearTooltip();
-          }
-        } else {
-          clearTooltip();
+        const moved = tooltipState.x !== x || tooltipState.y !== y;
+        tooltipState.x = x;
+        tooltipState.y = y;
+        if (event === hovered && event.title === tooltipState.title) {
+          if (moved && tooltipState.visible) redrawOverlay();
+          return;
         }
+        clearTooltip();
+        const { config, state } = context;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const style = config.eventTextStyle;
+        const fontSize = style.titleFontSize === "auto"
+          ? Math.max(10, Math.min(14, config.trackHeight * 0.175)) : style.titleFontSize;
+        ctx.save();
+        try {
+          ctx.font = `${style.titleFontWeight} ${fontSize}px ${style.titleFontFamily}`;
+          if (ctx.measureText(event.title).width <= event.duration * config.secondWidth * state.zoomLevel - 20) return;
+        } finally {
+          ctx.restore();
+        }
+        hovered = event;
+        tooltipState.title = event.title;
+        hoverTimer = setTimeout(() => {
+          hoverTimer = null;
+          tooltipState.visible = true;
+          redrawOverlay();
+        }, showDelay);
       };
 
       // RAF 节流的 mousemove handler
@@ -200,33 +137,24 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
         }
       };
 
-      const clearTooltip = () => {
-        if (hoverTimer) {
-          clearTimeout(hoverTimer);
-          hoverTimer = null;
-        }
-        lastHoveredEvent = null;
-        if (tooltipState.visible) {
-          tooltipState.visible = false;
-          context.timeline.draw();
-        }
+      const cancelFrame = () => {
+        if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+        pendingMouseEvent = null;
       };
-
       const handleMouseLeave = () => {
-        cancelPendingWork();
-        if (tooltipState.visible) {
-          tooltipState.visible = false;
-          context.timeline.draw();
-        }
+        cancelFrame();
+        clearTooltip();
       };
-
-      // 注册事件监听
       canvas.addEventListener("mousemove", handleMouseMove);
       canvas.addEventListener("mouseleave", handleMouseLeave);
-
-      // 存储事件处理函数引用以便清理
-      context.api.setData("tooltipMouseMoveHandler", handleMouseMove);
-      context.api.setData("tooltipMouseLeaveHandler", handleMouseLeave);
+      context.api.setData("tooltipCleanup", () => {
+        canvas.removeEventListener("mousemove", handleMouseMove);
+        canvas.removeEventListener("mouseleave", handleMouseLeave);
+        cancelFrame();
+        if (hoverTimer !== null) clearTimeout(hoverTimer);
+        getPluginData<HTMLElement>(context.api.getData, "tooltipContainer")?.remove();
+      });
 
       // 注册渲染层
       const layer: RenderLayer = {
@@ -254,7 +182,7 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
           ctx.font = `${fontSize}px ${fontFamily}`;
 
           // 计算文本换行
-          const words = tooltipState.title.split("");
+          const words = graphemes(tooltipState.title);
           const lines: string[] = [];
           let currentLine = "";
 
@@ -307,6 +235,8 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
             // 验证 htmlTemplate 返回有效内容
             const testContent = htmlTemplate(tooltipState.title);
             if (!testContent || testContent.trim() === "") {
+              const previous = getPluginData<HTMLElement>(context.api.getData, "tooltipContainer");
+              if (previous) previous.style.display = "none";
               logger.warn(context.timeline.t("warningEmptyTooltipTemplateFallback"));
             } else {
               let container =
@@ -404,46 +334,12 @@ export function EventTooltipPlugin(options: EventTooltipPluginOptions = {}): Tim
     },
 
     deactivate(context) {
-      // 清理事件监听
-      const canvas = context.timeline.getCanvas();
-      const handleMouseMove = getPluginData<(event: MouseEvent) => void>(
-        context.api.getData,
-        "tooltipMouseMoveHandler",
-      );
-      const handleMouseLeave = getPluginData<() => void>(
-        context.api.getData,
-        "tooltipMouseLeaveHandler",
-      );
-
-      if (handleMouseMove) {
-        canvas.removeEventListener("mousemove", handleMouseMove);
-      }
-      if (handleMouseLeave) {
-        canvas.removeEventListener("mouseleave", handleMouseLeave);
-      }
-
-      cancelPendingWork();
-      tooltipState.visible = false;
-
-      // 注销渲染层
       context.api.unregisterRenderLayer("event-tooltip-overlay");
-
-      // 清理 HTML 容器
-      const container = getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
-      if (container && container.parentElement) {
-        container.parentElement.removeChild(container);
-      }
+      getPluginData<() => void>(context.api.getData, "tooltipCleanup")?.();
+      context.api.setData("tooltipCleanup", undefined);
     },
-
     destroy(context) {
-      // 清理 HTML 容器
-      const container = getPluginData<HTMLElement>(context.api.getData, "tooltipContainer") || null;
-      if (container && container.parentElement) {
-        container.parentElement.removeChild(container);
-      }
-
-      cancelPendingWork();
-      tooltipState.visible = false;
+      getPluginData<() => void>(context.api.getData, "tooltipCleanup")?.();
     },
   };
 }

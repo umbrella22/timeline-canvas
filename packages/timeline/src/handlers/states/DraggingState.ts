@@ -21,6 +21,9 @@ import {
 } from "./gestureAbort";
 import { getLogger } from "../../core/managers/Logger";
 
+import { LegacyGesture } from "./legacyGesture";
+import { remapEventSplice } from "../../core/managers/eventPointers";
+
 const logger = getLogger("DraggingState");
 
 /**
@@ -39,7 +42,13 @@ export class DraggingState extends BaseState {
     super(timeline);
   }
 
+  private legacy?: LegacyGesture;
+
   onEnter(): void {
+    const p = this.timeline.state.draggingEvent;
+    if (p && (!this.timeline.editTransactions.active || p.originBusinessId === undefined)) {
+      this.legacy = new LegacyGesture(this.timeline, { trackIndex: p.trackIndex, eventIndex: p.eventIndex });
+    }
     this.timeline.beginIndexBatch();
   }
 
@@ -149,6 +158,7 @@ export class DraggingState extends BaseState {
     );
 
     // 计算新的时间位置
+    if (!state.draggingEvent || state.tracks[trackIndex]?.events[eventIndex] !== event) return this.createIdleState();
     const currentMouseX = logicalX;
     const originalMouseX = state.draggingEvent.startX;
     const deltaPixels = currentMouseX - originalMouseX;
@@ -161,50 +171,8 @@ export class DraggingState extends BaseState {
         (config.trackHeight + config.trackMargin)
     );
 
-    // M2 编辑协议：候选校验 + 草稿更新；不修改确认事实，不自动创建产线。
-    // 协议激活且事件带业务身份时绝不落入 legacy 事实施改路径——即使宿主在
-    // setStatus 等同步回调中重入变更 API 使事务失效，也只终止手势
-    if (this.timeline.editTransactions.active && event.businessId !== undefined) {
-      const transaction = this.timeline.editTransactions.getTransaction(event.businessId);
-      if (!transaction || transaction.state !== "preview") {
-        this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
-        return abortGesture(this.timeline, "draggingEvent", "events:move");
-      }
-      if (targetTrackIndex >= state.tracks.length) targetTrackIndex = state.tracks.length - 1;
-      if (targetTrackIndex < 0) targetTrackIndex = 0;
-      const newEndTime = fixFloatPrecision(newStartTime + event.duration);
-      const validation = this.timeline.validateScheduleEditCandidate({
-        eventBusinessId: event.businessId,
-        fromTrackIndex: trackIndex,
-        fromEventIndex: eventIndex,
-        toTrackIndex: targetTrackIndex,
-        startTime: newStartTime,
-        endTime: newEndTime,
-      });
-      if (validation.allowed) {
-        const targetResource = state.tracks[targetTrackIndex].businessId;
-        if (targetResource !== undefined) {
-          this.timeline.editTransactions.updateDraft(
-            event.businessId,
-            { resourceBusinessId: targetResource, startTime: newStartTime, endTime: newEndTime },
-            targetTrackIndex,
-          );
-        }
-      } else {
-        this.timeline.editTransactions.markCandidateInvalid(event.businessId);
-        this.timeline.setStatus(`${validation.code}: ${validation.reason}`);
-      }
-      if (state.draggingEvent) {
-        state.draggingEvent.currentMouseX = logicalX;
-        state.draggingEvent.currentMouseY = logicalY;
-        state.draggingEvent.canMove = validation.allowed;
-      }
-      this.timeline.notifyChange("events:move");
-      return null;
-    }
-
     // 自动添加轨道
-    if (config.autoAddTrack && targetTrackIndex >= state.tracks.length) {
+    if (!(this.timeline.editTransactions.active && event.businessId !== undefined) && config.autoAddTrack && targetTrackIndex >= state.tracks.length) {
       const newTrack: Track = { id: state.tracks.length, events: [] };
       state.tracks.push(newTrack);
       this.timeline.setStatus(
@@ -308,10 +276,51 @@ export class DraggingState extends BaseState {
       }
     }
 
+    // M2 编辑协议：候选校验 + 草稿更新；不修改确认事实，不自动创建产线。
+    // 协议激活且事件带业务身份时绝不落入 legacy 事实施改路径——即使宿主在
+    // setStatus 等同步回调中重入变更 API 使事务失效，也只终止手势
+    if (this.timeline.editTransactions.active && event.businessId !== undefined) {
+      const transaction = this.timeline.editTransactions.getTransaction(event.businessId);
+      if (!transaction || transaction.state !== "preview") {
+        this.timeline.setStatus("busy: event is locked by an in-flight edit operation");
+        return abortGesture(this.timeline, "draggingEvent", "events:move");
+      }
+      const newEndTime = fixFloatPrecision(newStartTime + event.duration);
+      const validation = this.timeline.validateScheduleEditCandidate({
+        eventBusinessId: event.businessId,
+        fromTrackIndex: trackIndex,
+        fromEventIndex: eventIndex,
+        toTrackIndex: targetTrackIndex,
+        startTime: newStartTime,
+        endTime: newEndTime,
+      });
+      if (this.timeline.editTransactions.getTransaction(event.businessId) !== transaction) return this.createIdleState();
+      if (validation.allowed) {
+        const targetResource = state.tracks[targetTrackIndex].businessId;
+        if (targetResource !== undefined) {
+          this.timeline.editTransactions.updateDraft(
+            event.businessId,
+            { resourceBusinessId: targetResource, startTime: newStartTime, endTime: newEndTime },
+            targetTrackIndex,
+          );
+        }
+      } else {
+        this.timeline.editTransactions.markCandidateInvalid(event.businessId);
+        this.timeline.setStatus(`${validation.code}: ${validation.reason}`);
+      }
+      if (state.draggingEvent) {
+        state.draggingEvent.currentMouseX = logicalX;
+        state.draggingEvent.currentMouseY = logicalY;
+        state.draggingEvent.canMove = validation.allowed;
+      }
+      this.timeline.notifyChange("events:move");
+      return null;
+    }
+
     // 限制在时间范围内
     newStartTime = Math.max(
       config.startTime,
-      Math.min(config.endTime - event.duration, newStartTime)
+      Math.min(config.endTime + config.endPaddingTime - event.duration, newStartTime)
     );
 
     // 设置拖拽时间参考线
@@ -331,7 +340,7 @@ export class DraggingState extends BaseState {
       event.duration
     );
 
-    if (canMove) {
+    if (canMove && state.draggingEvent && state.tracks[trackIndex]?.events[eventIndex] === event) {
       event.startTime = newStartTime;
       event.endTime = fixFloatPrecision(newStartTime + event.duration);
       this.timeline.invalidateIndexTrack(trackIndex);
@@ -344,32 +353,17 @@ export class DraggingState extends BaseState {
         )[0];
         state.tracks[targetTrackIndex].events.push(eventToMove);
 
-        state.draggingEvent.trackIndex = targetTrackIndex;
-        state.draggingEvent.eventIndex =
-          state.tracks[targetTrackIndex].events.length - 1;
+        remapEventSplice(state, { trackIndex, eventIndex }, {
+          trackIndex: targetTrackIndex,
+          eventIndex: state.tracks[targetTrackIndex].events.length - 1,
+        });
         state.selectedTrack = targetTrackIndex;
-
-        if (state.selectedEvent && state.selectedEvent.trackIndex === trackIndex) {
-          if (state.selectedEvent.eventIndex === eventIndex) {
-            // 被选中的事件就是被拖拽的事件，跟随移动
-            state.selectedEvent = {
-              trackIndex: targetTrackIndex,
-              eventIndex: state.tracks[targetTrackIndex].events.length - 1,
-            } as SelectedEvent;
-          } else if (state.selectedEvent.eventIndex > eventIndex) {
-            // splice 导致源轨道后续事件索引前移，需修正
-            state.selectedEvent = {
-              ...state.selectedEvent,
-              eventIndex: state.selectedEvent.eventIndex - 1,
-            } as SelectedEvent;
-          }
-        }
-
         this.timeline.invalidateIndexTrack(targetTrackIndex);
         this.timeline.invalidateIndexTrack(trackIndex);
         this.timeline.invalidateBusinessIndexTrack(targetTrackIndex);
         this.timeline.invalidateBusinessIndexTrack(trackIndex);
       }
+      this.legacy?.record(targetTrackIndex);
     }
 
     if (state.draggingEvent) {
@@ -389,7 +383,7 @@ export class DraggingState extends BaseState {
       return this.createIdleState();
     }
 
-    const { trackIndex, eventIndex, originalTrackIndex, originalEventIndex } =
+    const { trackIndex, eventIndex, originalTrackIndex } =
       state.draggingEvent;
 
     // 验证轨道索引是否有效
@@ -424,10 +418,7 @@ export class DraggingState extends BaseState {
         "events:move",
       );
     }
-    const wasSelected =
-      state.selectedEvent &&
-      state.selectedEvent.trackIndex === originalTrackIndex &&
-      state.selectedEvent.eventIndex === originalEventIndex;
+
 
     // M2 编辑协议：preview 事务落点提交（校验失败/业务拒绝已由 cancelPreview 清理并通知）；
     // 协议激活且事件带业务身份时绝不回落 legacy 结算：pending/待核对事务的真实拖拽
@@ -466,10 +457,6 @@ export class DraggingState extends BaseState {
           end: this.timeline.formatTime(event.endTime),
         })
       );
-
-      if (wasSelected) {
-        state.selectedEvent = { trackIndex, eventIndex } as SelectedEvent;
-      }
 
       if (this.timeline.callbacks.onEventMove) {
         // M2 回调扩展：oldEvent 与源/目标资源业务身份；旧字段保持不变
@@ -518,6 +505,7 @@ export class DraggingState extends BaseState {
   }
 
   handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    this.legacy?.rollback();
     // M2 编辑协议：预览取消（尚无副作用），清空候选草稿
     return cancelAllPreviewsAndAbort(
       this.timeline,

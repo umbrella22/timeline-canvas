@@ -9,25 +9,22 @@ import type {
   CoreLayerHook,
   PerformanceProvider,
 } from "../../plugins/types";
+import { PluginType } from "../../plugins/types";
+import { withPluginCanvas } from "../../renderers/core/canvasScope";
 import type { TimelineConfig, TimelineState } from "../../types";
 import { translateTimelineConfig } from "../../utils";
 import { ErrorHandler } from "./ErrorHandler";
 import { getLogger } from "./Logger";
 
 export class PluginManager {
-  private pluginResources: Map<string, PluginResources> = new Map();
   private pluginMetadata: Map<string, TimelinePlugin["metadata"]> = new Map();
   private plugins: Map<
     string,
     { plugin: TimelinePlugin; context: PluginContext; active: boolean }
   > = new Map();
   private eventHandlers: Map<string, RegisteredEventHandler[]> = new Map();
-  private renderLayers: Map<string, RenderLayer> = new Map();
-  private renderLayerOwners: Map<string, string> = new Map();
-  private renderLayerOrder: Map<string, number> = new Map();
-  private coreLayerHooks: Map<string, CoreLayerHook> = new Map();
-  private coreLayerHookOwners: Map<string, string> = new Map();
-  private coreLayerHookOrder: Map<string, number> = new Map();
+  private renderLayers = new NamedRegistrations<RenderLayer>();
+  private coreLayerHooks = new NamedRegistrations<CoreLayerHook>();
   private pluginData: Map<string, Map<string, unknown>> = new Map();
   private performanceProvider: PerformanceProvider | undefined;
   private performanceProviderOwner: string | undefined;
@@ -73,7 +70,16 @@ export class PluginManager {
       );
     }
 
-    this.pluginMetadata.set(pluginId, plugin.metadata);
+    this.pluginMetadata.set(pluginId, {
+      ...plugin.metadata,
+      dependencies: plugin.metadata.dependencies?.slice(),
+    });
+    // Themes can mutate the palette in-place before activation fails.
+    const { config } = this.baseContext;
+    const previousColors = plugin.metadata.type === PluginType.THEME ? config.colors : undefined;
+    if (previousColors) {
+      config.colors = { ...previousColors, eventColors: previousColors.eventColors.slice() };
+    }
     const ctx = this.createPluginContext(pluginId);
     let initStarted = false;
     let activateStarted = false;
@@ -105,11 +111,17 @@ export class PluginManager {
       if (!loaded) {
         await this.rollbackFailedLoad(pluginId, plugin, ctx, initStarted, activateStarted);
         this.cleanupPluginResources(pluginId);
+        if (previousColors) config.colors = previousColors;
       }
     }
   }
 
   unloadPlugin(pluginId: string): Promise<boolean> {
+    if (this.hasDependentOn(pluginId)) return Promise.resolve(false);
+    return this.detachPlugin(pluginId);
+  }
+
+  private detachPlugin(pluginId: string): Promise<boolean> {
     const pending = this.pendingUnloads.get(pluginId);
     if (pending) return pending;
     const entry = this.plugins.get(pluginId);
@@ -158,11 +170,15 @@ export class PluginManager {
   }
 
   private async disposePlugins(): Promise<void> {
-    // Dependencies are loaded first, so unload dependents before their providers.
-    for (const pluginId of [...this.plugins.keys()].reverse()) {
-      await this.unloadPlugin(pluginId);
-    }
     await Promise.allSettled([...this.pendingLoads.values(), ...this.pendingUnloads.values()]);
+    // A later version can become the sole provider for an earlier name-only dependent.
+    while (this.plugins.size) {
+      const ids = [...this.plugins.keys()].reverse();
+      const next = ids.find((id) => !this.hasDependentOn(id));
+      // Version substitutions can form a dependency cycle. Destruction must still release all resources.
+      await this.detachPlugin(next ?? ids[0]);
+    }
+    await Promise.allSettled(this.pendingUnloads.values());
   }
 
   private async rollbackFailedLoad(
@@ -209,17 +225,30 @@ export class PluginManager {
   private createPluginContext(pluginId: string): PluginContext {
     const store = new Map<string, unknown>();
     this.pluginData.set(pluginId, store);
-    this.pluginResources.set(pluginId, this.createPluginResources());
+    const current = () => this.pluginData.get(pluginId) === store;
+    const priority = this.getPluginPriority(pluginId);
 
     const api: PluginAPI = {
-      registerRenderLayer: (layer: RenderLayer) => this.registerRenderLayer(pluginId, layer),
-      unregisterRenderLayer: (name: string) => this.unregisterRenderLayer(pluginId, name),
-      registerCoreLayerHook: (hook: CoreLayerHook) => this.registerCoreLayerHook(pluginId, hook),
-      unregisterCoreLayerHook: (name: string) => this.unregisterCoreLayerHook(pluginId, name),
-      registerEventHandler: (event: string, handler: PluginEventHandler) =>
-        this.registerEventHandler(pluginId, event, handler),
-      unregisterEventHandler: (event: string, handler: PluginEventHandler) =>
-        this.unregisterEventHandler(pluginId, event, handler),
+      registerRenderLayer: (layer) => {
+        if (current())
+          this.renderLayers.set(pluginId, layer, priority, this.nextRegistrationOrder());
+      },
+      unregisterRenderLayer: (name) => {
+        if (current()) this.renderLayers.remove(pluginId, name);
+      },
+      registerCoreLayerHook: (hook) => {
+        if (current())
+          this.coreLayerHooks.set(pluginId, hook, priority, this.nextRegistrationOrder());
+      },
+      unregisterCoreLayerHook: (name) => {
+        if (current()) this.coreLayerHooks.remove(pluginId, name);
+      },
+      registerEventHandler: (event: string, handler: PluginEventHandler) => {
+        if (current()) this.registerEventHandler(pluginId, event, handler);
+      },
+      unregisterEventHandler: (event: string, handler: PluginEventHandler) => {
+        if (current()) this.unregisterEventHandler(pluginId, event, handler);
+      },
       showNotification: (message: string, type: "info" | "warning" | "error" = "info") => {
         const pluginLogger = getLogger(`plugin:${pluginId}`);
         switch (type) {
@@ -236,6 +265,7 @@ export class PluginManager {
       getData: (key: string) => store.get(key),
       setData: (key: string, value: unknown) => store.set(key, value),
       setPerformanceProvider: (provider: PerformanceProvider) => {
+        if (!current()) return;
         this.performanceProvider = provider;
         this.performanceProviderOwner = pluginId;
       },
@@ -251,7 +281,8 @@ export class PluginManager {
   }
 
   private registerEventHandler(pluginId: string, event: string, handler: PluginEventHandler): void {
-    const list = this.eventHandlers.get(event) || [];
+    // Copy on registration: in-progress emits and validations keep their dispatch snapshot.
+    const list = this.eventHandlers.get(event)?.slice() ?? [];
     list.push({
       pluginId,
       handler,
@@ -265,11 +296,6 @@ export class PluginManager {
       return a.order - b.order;
     });
     this.eventHandlers.set(event, list);
-
-    const resources = this.getPluginResources(pluginId);
-    const handlers = resources.eventHandlers.get(event) ?? new Set();
-    handlers.add(handler);
-    resources.eventHandlers.set(event, handlers);
   }
 
   private unregisterEventHandler(
@@ -289,104 +315,23 @@ export class PluginManager {
     } else {
       this.eventHandlers.set(event, nextList);
     }
-
-    const resources = this.pluginResources.get(pluginId);
-    const handlers = resources?.eventHandlers.get(event);
-    if (!handlers) return;
-    handlers.delete(handler);
-    if (handlers.size === 0) {
-      resources?.eventHandlers.delete(event);
-    }
   }
 
-  private registerRenderLayer(pluginId: string, layer: RenderLayer): void {
-    this.reassignRenderLayerOwner(layer.name, pluginId);
-    this.renderLayers.set(layer.name, layer);
-    this.renderLayerOwners.set(layer.name, pluginId);
-    this.renderLayerOrder.set(layer.name, this.nextRegistrationOrder());
-    this.getPluginResources(pluginId).renderLayers.add(layer.name);
-  }
-
-  private unregisterRenderLayer(pluginId: string, name: string): void {
-    if (this.renderLayerOwners.get(name) !== pluginId) {
-      return;
-    }
-    this.renderLayers.delete(name);
-    this.renderLayerOwners.delete(name);
-    this.renderLayerOrder.delete(name);
-    this.pluginResources.get(pluginId)?.renderLayers.delete(name);
-  }
-
-  private registerCoreLayerHook(pluginId: string, hook: CoreLayerHook): void {
-    this.reassignCoreLayerHookOwner(hook.name, pluginId);
-    this.coreLayerHooks.set(hook.name, hook);
-    this.coreLayerHookOwners.set(hook.name, pluginId);
-    this.coreLayerHookOrder.set(hook.name, this.nextRegistrationOrder());
-    this.getPluginResources(pluginId).coreLayerHooks.add(hook.name);
-  }
-
-  private unregisterCoreLayerHook(pluginId: string, name: string): void {
-    if (this.coreLayerHookOwners.get(name) !== pluginId) {
-      return;
-    }
-    this.coreLayerHooks.delete(name);
-    this.coreLayerHookOwners.delete(name);
-    this.coreLayerHookOrder.delete(name);
-    this.pluginResources.get(pluginId)?.coreLayerHooks.delete(name);
-  }
-
-  /**
-   * 获取指定核心渲染层的所有钩子
-   */
   getCoreLayerHooks(target: CoreRenderTarget): CoreLayerHook[] {
-    return Array.from(this.coreLayerHooks.entries())
-      .filter(([, hook]) => hook.target === target)
-      .sort(([nameA], [nameB]) => this.compareOwnedResources(nameA, nameB))
-      .map(([, hook]) => hook);
+    return this.coreLayerHooks.matching((hook) => hook.target === target);
   }
 
-  /**
-   * 检查指定核心渲染层是否有钩子注册
-   */
   hasCoreLayerHooks(target: CoreRenderTarget): boolean {
-    for (const hook of this.coreLayerHooks.values()) {
-      if (hook.target === target) return true;
-    }
-    return false;
+    return this.getCoreLayerHooks(target).length > 0;
   }
 
   private cleanupPluginResources(pluginId: string): void {
-    const resources = this.pluginResources.get(pluginId);
-
-    if (resources) {
-      for (const [event, handlers] of resources.eventHandlers) {
-        const list = this.eventHandlers.get(event);
-        if (!list) continue;
-
-        const nextList = list.filter((entry) => {
-          return !(entry.pluginId === pluginId && handlers.has(entry.handler));
-        });
-
-        if (nextList.length === 0) {
-          this.eventHandlers.delete(event);
-        } else {
-          this.eventHandlers.set(event, nextList);
-        }
-      }
-
-      for (const name of resources.renderLayers) {
-        if (this.renderLayerOwners.get(name) !== pluginId) continue;
-        this.renderLayers.delete(name);
-        this.renderLayerOwners.delete(name);
-        this.renderLayerOrder.delete(name);
-      }
-
-      for (const name of resources.coreLayerHooks) {
-        if (this.coreLayerHookOwners.get(name) !== pluginId) continue;
-        this.coreLayerHooks.delete(name);
-        this.coreLayerHookOwners.delete(name);
-        this.coreLayerHookOrder.delete(name);
-      }
+    this.renderLayers.removeOwner(pluginId);
+    this.coreLayerHooks.removeOwner(pluginId);
+    for (const [event, handlers] of this.eventHandlers) {
+      const remaining = handlers.filter((entry) => entry.pluginId !== pluginId);
+      if (remaining.length) this.eventHandlers.set(event, remaining);
+      else this.eventHandlers.delete(event);
     }
 
     if (this.performanceProviderOwner === pluginId) {
@@ -397,7 +342,6 @@ export class PluginManager {
     this.pluginData.get(pluginId)?.clear();
     this.pluginData.delete(pluginId);
     this.pluginMetadata.delete(pluginId);
-    this.pluginResources.delete(pluginId);
   }
 
   /** 已知键按 PluginEventMap tuple 强类型发射；自定义扩展走 unknown 边界 */
@@ -408,7 +352,13 @@ export class PluginManager {
     if (!list || list.length === 0) return;
     for (const entry of list) {
       try {
-        entry.handler(...args);
+        if (event === "render:event:media") {
+          withPluginCanvas(args[0] as CanvasRenderingContext2D, (ctx) =>
+            entry.handler(ctx, ...args.slice(1)),
+          );
+        } else {
+          entry.handler(...args);
+        }
       } catch (error) {
         this.errorHandler.debugIf(
           this.baseContext.config.debug,
@@ -421,7 +371,10 @@ export class PluginManager {
     }
   }
 
-  validateEvent<K extends keyof PluginEventMap & string>(event: K, ...args: PluginEventMap[K]): boolean;
+  validateEvent<K extends keyof PluginEventMap & string>(
+    event: K,
+    ...args: PluginEventMap[K]
+  ): boolean;
   validateEvent(event: string, ...args: unknown[]): boolean;
   validateEvent(event: string, ...args: unknown[]): boolean {
     const list = this.eventHandlers.get(event);
@@ -450,9 +403,7 @@ export class PluginManager {
     config: TimelineConfig,
     state: TimelineState,
   ): void {
-    for (const layer of this.layersByPosition("background")) {
-      layer.render(ctx, canvas, config, state);
-    }
+    this.renderLayersAt("background", ctx, canvas, config, state);
   }
 
   renderOverlay(
@@ -461,16 +412,27 @@ export class PluginManager {
     config: TimelineConfig,
     state: TimelineState,
   ): void {
-    for (const layer of this.layersByPosition("overlay")) {
-      layer.render(ctx, canvas, config, state);
-    }
+    this.renderLayersAt("overlay", ctx, canvas, config, state);
   }
 
-  private layersByPosition(pos: "background" | "overlay"): RenderLayer[] {
-    return Array.from(this.renderLayers.entries())
-      .filter(([, layer]) => layer.position === pos)
-      .sort(([nameA], [nameB]) => this.compareOwnedResources(nameA, nameB))
-      .map(([, layer]) => layer);
+  private renderLayersAt(
+    position: RenderLayer["position"],
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    config: TimelineConfig,
+    state: TimelineState,
+  ): void {
+    for (const layer of this.renderLayers.matching((item) => item.position === position)) {
+      try {
+        withPluginCanvas(ctx, (scoped) => layer.render(scoped, canvas, config, state));
+      } catch (error) {
+        this.errorHandler.debugIf(
+          config.debug,
+          translateTimelineConfig(config, "errorRenderLayer", { layer: layer.name }),
+          error,
+        );
+      }
+    }
   }
 
   getLoadedPlugins(): TimelinePlugin[] {
@@ -494,54 +456,31 @@ export class PluginManager {
     if (this.performanceProvider) this.performanceProvider.endMeasurement(name);
   }
 
-  private createPluginResources(): PluginResources {
-    return {
-      eventHandlers: new Map(),
-      renderLayers: new Set(),
-      coreLayerHooks: new Set(),
-    };
-  }
-
-  private getPluginResources(pluginId: string): PluginResources {
-    let resources = this.pluginResources.get(pluginId);
-    if (resources) {
-      return resources;
+  private dependencyAvailable(dependency: string, excluding?: string): boolean {
+    for (const [id, { plugin }] of this.plugins) {
+      if (id !== excluding && (id === dependency || plugin.metadata.name === dependency))
+        return true;
     }
-
-    resources = this.createPluginResources();
-    this.pluginResources.set(pluginId, resources);
-    return resources;
-  }
-
-  private reassignRenderLayerOwner(name: string, pluginId: string): void {
-    const previousOwner = this.renderLayerOwners.get(name);
-    if (!previousOwner || previousOwner === pluginId) {
-      return;
-    }
-
-    this.pluginResources.get(previousOwner)?.renderLayers.delete(name);
-  }
-
-  private reassignCoreLayerHookOwner(name: string, pluginId: string): void {
-    const previousOwner = this.coreLayerHookOwners.get(name);
-    if (!previousOwner || previousOwner === pluginId) {
-      return;
-    }
-
-    this.pluginResources.get(previousOwner)?.coreLayerHooks.delete(name);
+    return false;
   }
 
   private areDependenciesLoaded(dependencies?: string[]): boolean {
-    if (!dependencies || dependencies.length === 0) {
-      return true;
-    }
+    return dependencies?.every((dep) => this.dependencyAvailable(dep)) ?? true;
+  }
 
-    return dependencies.every((dependency) => {
-      if (this.plugins.has(dependency)) {
+  private hasDependentOn(pluginId: string): boolean {
+    // Metadata spans init/activate, active use, and deactivate/destroy, including their awaits.
+    const name = this.pluginMetadata.get(pluginId)?.name;
+    for (const [id, metadata] of this.pluginMetadata) {
+      if (
+        id !== pluginId &&
+        metadata.dependencies?.some(
+          (dep) => (dep === pluginId || dep === name) && !this.dependencyAvailable(dep, pluginId),
+        )
+      )
         return true;
-      }
-      return this.isPluginLoaded(dependency);
-    });
+    }
+    return false;
   }
 
   private getPluginPriority(pluginId: string): number {
@@ -553,20 +492,6 @@ export class PluginManager {
     this.registrationOrder += 1;
     return current;
   }
-
-  private compareOwnedResources(nameA: string, nameB: string): number {
-    const ownerA = this.renderLayerOwners.get(nameA) ?? this.coreLayerHookOwners.get(nameA);
-    const ownerB = this.renderLayerOwners.get(nameB) ?? this.coreLayerHookOwners.get(nameB);
-    const priorityA = ownerA ? this.getPluginPriority(ownerA) : 0;
-    const priorityB = ownerB ? this.getPluginPriority(ownerB) : 0;
-    if (priorityB !== priorityA) {
-      return priorityB - priorityA;
-    }
-
-    const orderA = this.renderLayerOrder.get(nameA) ?? this.coreLayerHookOrder.get(nameA) ?? 0;
-    const orderB = this.renderLayerOrder.get(nameB) ?? this.coreLayerHookOrder.get(nameB) ?? 0;
-    return orderA - orderB;
-  }
 }
 
 interface RegisteredEventHandler {
@@ -576,8 +501,44 @@ interface RegisteredEventHandler {
   order: number;
 }
 
-interface PluginResources {
-  eventHandlers: Map<string, Set<PluginEventHandler>>;
-  renderLayers: Set<string>;
-  coreLayerHooks: Set<string>;
+interface Registration<T> {
+  owner: string;
+  resource: T;
+  priority: number;
+  order: number;
+}
+
+/** Last registration wins per name. Unloading a replacement reveals the last live owner. */
+class NamedRegistrations<T extends { name: string }> {
+  private entries = new Map<string, Registration<T>[]>();
+
+  set(owner: string, resource: T, priority: number, order: number): void {
+    this.remove(owner, resource.name);
+    const stack = this.entries.get(resource.name) ?? [];
+    stack.push({ owner, resource, priority, order });
+    this.entries.set(resource.name, stack);
+  }
+
+  remove(owner: string, name: string): void {
+    const stack = this.entries.get(name);
+    if (!stack) return;
+    const index = stack.findIndex((registration) => registration.owner === owner);
+    if (index >= 0) stack.splice(index, 1);
+    if (stack.length === 0) this.entries.delete(name);
+  }
+
+  removeOwner(owner: string): void {
+    for (const name of this.entries.keys()) this.remove(owner, name);
+  }
+
+  matching(predicate: (resource: T) => boolean): T[] {
+    const matches: Registration<T>[] = [];
+    for (const stack of this.entries.values()) {
+      const active = stack[stack.length - 1];
+      if (predicate(active.resource)) matches.push(active);
+    }
+    return matches
+      .sort((a, b) => b.priority - a.priority || a.order - b.order)
+      .map((r) => r.resource);
+  }
 }

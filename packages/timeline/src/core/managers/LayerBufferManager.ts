@@ -1,6 +1,5 @@
-import { getLogger, LogColors } from "./Logger";
+import { getLogger, LogColors, type Logger } from "./Logger";
 
-const logger = getLogger("LayerBuffer");
 
 /**
  * 缓冲层 ID，将 8 个 LayerType 合并为 5 个缓冲层
@@ -59,7 +58,8 @@ interface LayerBuffer {
  */
 function createLayerCanvas(
   width: number,
-  height: number
+  height: number,
+  logger: Logger
 ): {
   canvas: OffscreenCanvas | HTMLCanvasElement;
   ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -92,6 +92,8 @@ function createLayerCanvas(
  * - Worker 就绪：OffscreenCanvas 可转让给 Worker
  */
 export class LayerBufferManager {
+  constructor(private readonly logger = getLogger("LayerBuffer")) {}
+
   private buffers: Map<BufferLayerId, LayerBuffer> = new Map();
   private width = 0;
   private height = 0;
@@ -100,17 +102,15 @@ export class LayerBufferManager {
   /**
    * 初始化/resize 时调用
    */
-  initialize(width: number, height: number, dpr: number): void {
-    this.width = width;
-    this.height = height;
+  initialize(physicalW: number, physicalH: number, dpr: number): void {
+    this.width = physicalW;
+    this.height = physicalH;
     this.dpr = dpr;
-    const physicalW = Math.max(1, Math.floor(width * dpr));
-    const physicalH = Math.max(1, Math.floor(height * dpr));
 
     for (const id of COMPOSITE_ORDER) {
       const existing = this.buffers.get(id);
       if (!existing) {
-        const { canvas, ctx } = createLayerCanvas(physicalW, physicalH);
+        const { canvas, ctx } = createLayerCanvas(physicalW, physicalH, this.logger);
         this.buffers.set(id, { canvas, ctx, dirty: true });
       } else {
         // resize existing buffer
@@ -120,7 +120,7 @@ export class LayerBufferManager {
       }
     }
 
-    logger.debugStyled(
+    this.logger.debugStyled(
       LogColors.pipeline,
       `LayerBufferManager initialized: ${physicalW}x${physicalH} (dpr=${dpr})`
     );
@@ -171,6 +171,23 @@ export class LayerBufferManager {
     if (buf) buf.dirty = false;
   }
 
+  /** Clear once in backing pixels, then render in logical pixels. */
+  redraw(id: BufferLayerId, draw: (ctx: CanvasRenderingContext2D) => void): void {
+    const buffer = this.buffers.get(id);
+    if (!buffer?.dirty) return;
+    const ctx = buffer.ctx;
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, buffer.canvas.width, buffer.canvas.height);
+      ctx.scale(this.dpr, this.dpr);
+      draw(ctx as CanvasRenderingContext2D);
+      buffer.dirty = false;
+    } finally {
+      ctx.restore();
+    }
+  }
+
   /**
    * 将所有缓冲层按合成顺序 drawImage 到主 canvas
    */
@@ -179,16 +196,18 @@ export class LayerBufferManager {
     canvasWidth: number,
     canvasHeight: number
   ): void {
+    if (!canvasWidth || !canvasHeight) return;
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    for (const id of COMPOSITE_ORDER) {
-      const buf = this.buffers.get(id);
-      if (buf) {
-        ctx.drawImage(buf.canvas, 0, 0);
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      for (const id of COMPOSITE_ORDER) {
+        const buf = this.buffers.get(id);
+        if (buf) ctx.drawImage(buf.canvas, 0, 0);
       }
+    } finally {
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   /**

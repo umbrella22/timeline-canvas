@@ -66,6 +66,7 @@ Notes:
 - The factory `htmlTemplate` takes precedence over `contextMenuHtml`
 - If the template is empty, the plugin falls back to canvas rendering
 - Only string-valued `contextMenuHtml` is treated as a template by the current implementation
+- The template is trusted host markup. Default canvas menu labels are drawn as plain text.
 
 ## Runtime behavior
 

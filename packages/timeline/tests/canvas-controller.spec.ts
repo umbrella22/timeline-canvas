@@ -198,7 +198,7 @@ describe("CanvasController", () => {
     height = 190;
     resizeCallback?.([], {} as ResizeObserver);
 
-    expect(renderManager.setCanvasSize).toHaveBeenCalledWith(360, 190);
+    expect(renderManager.setCanvasSize).toHaveBeenCalledWith(360, 190, false);
     expect(onCanvasResize).toHaveBeenCalledTimes(1);
 
     controller.destroy();

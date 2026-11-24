@@ -11,6 +11,7 @@ export interface CanvasEventListeners {
   pointerup: (event: PointerEvent) => void;
   pointercancel: (event: PointerEvent) => void;
   lostpointercapture: (event: PointerEvent) => void;
+  blur?: () => void;
   contextmenu: (event: MouseEvent) => void;
   wheel: (event: WheelEvent) => void;
 }
@@ -59,6 +60,7 @@ export class CanvasController {
     }
 
     this.eventListeners = listeners;
+    window.addEventListener("blur", this.handleWindowBlur);
     this.canvas.addEventListener("mousedown", listeners.mousedown);
     this.canvas.addEventListener("mousemove", listeners.mousemove);
     this.canvas.addEventListener("mouseup", listeners.mouseup);
@@ -109,6 +111,7 @@ export class CanvasController {
     this.resizeObserver = null;
     this.resolutionQuery?.removeEventListener("change", this.handleResolutionChange);
     this.resolutionQuery = null;
+    window.removeEventListener("blur", this.handleWindowBlur);
     window.removeEventListener("resize", this.handleWindowResize);
 
     if (!this.eventListeners) {
@@ -150,6 +153,7 @@ export class CanvasController {
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (
       event.pointerType === "mouse" ||
+      event.button !== 0 ||
       this.activePointerId !== null ||
       !event.isPrimary
     ) {
@@ -216,6 +220,13 @@ export class CanvasController {
     this.resizeObserver.observe(container);
   }
 
+  private readonly handleWindowBlur = (): void => {
+    const pointerId = this.activePointerId;
+    this.activePointerId = null;
+    if (pointerId !== null && this.canvas.hasPointerCapture(pointerId)) this.canvas.releasePointerCapture(pointerId);
+    this.eventListeners?.blur?.();
+  };
+
   private readonly handleWindowResize = (): void => {
     this.syncCanvasSize(true);
   };
@@ -262,9 +273,12 @@ export class CanvasController {
       return;
     }
 
-    this.setCanvasSize(width, height);
     if (notify) {
+      this.renderManager.setCanvasSize(width, height, false);
+      this.pixelRatio = window.devicePixelRatio || 1;
       this.adjustCanvasSize();
+    } else {
+      this.setCanvasSize(width, height);
     }
   }
 }

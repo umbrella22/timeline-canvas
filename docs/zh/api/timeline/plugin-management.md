@@ -91,6 +91,8 @@ await timeline.removePlugin("theme-light@1.0.0");
 `${plugin.metadata.name}@${plugin.metadata.version}`
 ```
 
+依赖可以指定精确的 `name@version`，也可以用 `name` 匹配任一已加载版本。当依赖方仍在初始化、运行或卸载时，手动移除最后一个匹配版本会返回 `false`。先卸载依赖方即可移除该版本。
+
 ## setTheme(theme: "light" | "dark"): Promise<boolean>
 
 切换内置亮色/暗色主题。
@@ -104,10 +106,9 @@ await timeline.setTheme("dark");
 await timeline.setTheme("light");
 ```
 
-说明：
+构造时的初始主题、`setTheme()`、`usePlugin(theme)` 以及对当前或已排队主题的移除按调用顺序执行。切换成功时先卸载旧主题，再激活新主题并触发 `theme:change`。轮到当前已激活的主题时直接返回 `true`。
 
-- `setTheme()` 内部会在 `LightThemePlugin` 和 `DarkThemePlugin` 之间切换
-- 切换主题时会卸载旧主题并触发 `theme:change`
+如果依赖方仍需要当前主题，切换返回 `false`，当前主题继续生效。新主题激活失败时，管理器清理本次注册、恢复调色板，并尝试重新激活旧主题，切换返回 `false`。如果旧主题也未能重新激活，`getLoadedPlugins()` 中没有活动主题，后续仍可切换。
 
 ## 构造时指定主题
 

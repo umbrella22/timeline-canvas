@@ -1,3 +1,4 @@
+import { LegacyGesture } from "./legacyGesture";
 import {
   BaseState,
   type InteractionState,
@@ -29,7 +30,13 @@ export class ResizingState extends BaseState {
     super(timeline);
   }
 
+  private legacy?: LegacyGesture;
+
   onEnter(): void {
+    const p = this.timeline.state.resizingEvent;
+    if (p && (!this.timeline.editTransactions.active || p.originBusinessId === undefined)) {
+      this.legacy = new LegacyGesture(this.timeline, { trackIndex: p.trackIndex, eventIndex: p.eventIndex });
+    }
     this.timeline.beginIndexBatch();
   }
 
@@ -98,6 +105,18 @@ export class ResizingState extends BaseState {
       );
     }
 
+    const originalEnd = fixFloatPrecision(originalStartTime + originalDuration);
+    const isLeft = edge === "left";
+    const rawEdge = (isLeft ? originalStartTime : originalEnd) + deltaTime;
+    const rawDuration = isLeft ? originalEnd - rawEdge : rawEdge - originalStartTime;
+    state.guideLines = this.timeline.calculateGuideLines(trackIndex, eventIndex, trackIndex,
+      isLeft ? rawEdge : originalStartTime, rawDuration > 0 ? rawDuration : originalDuration);
+    const guide = this.timeline.snapEdgeToGuideLines(rawEdge);
+    const grid = getSnapInterval(state.zoomLevel, config.snapInterval, config.snapToSeconds,
+      config.secondPrecisionZoomThreshold, config.scale, config.scaleSplitCount);
+    const snapped = guide ?? (state.snapEnabled ? snapToInterval(rawEdge, grid) : rawEdge);
+    let startTime = isLeft ? fixFloatPrecision(Math.max(config.startTime, snapped)) : originalStartTime;
+    let endTime = isLeft ? originalEnd : fixFloatPrecision(Math.max(originalStartTime + config.minEventDuration, snapped));
     // M2 编辑协议：动作开始即捕获 before；候选以草稿更新，不改确认事实
     if (this.timeline.editTransactions.active && event.businessId !== undefined) {
       const existingTransaction = this.timeline.editTransactions.getTransaction(event.businessId);
@@ -118,28 +137,22 @@ export class ResizingState extends BaseState {
           return abortGesture(this.timeline, "resizingEvent", "events:update");
         }
       }
-      const isLeftEdge = edge === "left";
-      const originalEndTime = fixFloatPrecision(originalStartTime + originalDuration);
-      const candidateStart = isLeftEdge
-        ? fixFloatPrecision(Math.max(config.startTime, originalStartTime + deltaTime))
-        : originalStartTime;
-      const candidateEnd = isLeftEdge
-        ? originalEndTime
-        : fixFloatPrecision(originalStartTime + Math.max(config.minEventDuration, originalDuration + deltaTime));
+      const transaction = this.timeline.editTransactions.getTransaction(event.businessId);
       const validation = this.timeline.validateScheduleEditCandidate({
         eventBusinessId: event.businessId,
         fromTrackIndex: trackIndex,
         fromEventIndex: eventIndex,
         toTrackIndex: trackIndex,
-        startTime: candidateStart,
-        endTime: candidateEnd,
+        startTime,
+        endTime,
       });
+      if (this.timeline.editTransactions.getTransaction(event.businessId) !== transaction) return this.createIdleState();
       if (validation.allowed) {
         const resource = state.tracks[trackIndex].businessId;
         if (resource !== undefined) {
           this.timeline.editTransactions.updateDraft(
             event.businessId,
-            { resourceBusinessId: resource, startTime: candidateStart, endTime: candidateEnd },
+            { resourceBusinessId: resource, startTime, endTime },
             trackIndex,
           );
         }
@@ -151,157 +164,16 @@ export class ResizingState extends BaseState {
       return null;
     }
 
-    if (edge === "left") {
-      // 调整左边缘
-      let newStartTime = originalStartTime + deltaTime;
-      const originalEndTime = fixFloatPrecision(
-        originalStartTime + originalDuration
-      );
-
-      // 计算辅助线（以当前新 startTime 和不变的 endTime 计算）
-      const currentDuration = originalEndTime - newStartTime;
-      state.guideLines = this.timeline.calculateGuideLines(
-        trackIndex,
-        eventIndex,
-        trackIndex,
-        newStartTime,
-        currentDuration > 0 ? currentDuration : originalDuration
-      );
-
-      // 辅助线吸附（仅检查左边缘）
-      const guideSnap = this.timeline.snapEdgeToGuideLines(newStartTime);
-      if (guideSnap !== null) {
-        newStartTime = guideSnap;
-      } else if (state.snapEnabled) {
-        // 网格吸附
-        const snapIntervalSeconds = getSnapInterval(
-          state.zoomLevel,
-          config.snapInterval,
-          config.snapToSeconds,
-          config.secondPrecisionZoomThreshold,
-          config.scale,
-          config.scaleSplitCount
-        );
-        newStartTime = snapToInterval(newStartTime, snapIntervalSeconds);
-      }
-
-      newStartTime = fixFloatPrecision(
-        Math.max(config.startTime, newStartTime)
-      );
-      newStartTime = fixFloatPrecision(
-        Math.min(newStartTime, originalEndTime - config.minEventDuration)
-      );
-
-      const newDuration = fixFloatPrecision(originalEndTime - newStartTime);
-
-      // 检查是否与其他事件重叠
-      let canResize = true;
-      for (let i = 0; i < state.tracks[trackIndex].events.length; i++) {
-        if (i === eventIndex) continue;
-        const otherEvent = state.tracks[trackIndex].events[i];
-        const otherStart = otherEvent.startTime;
-        const otherEnd = otherStart + otherEvent.duration;
-
-        if (newStartTime < otherEnd && originalEndTime > otherStart) {
-          canResize = false;
-          break;
-        }
-      }
-
-      if (canResize) {
-        const ok = this.timeline.canMoveEvent(
-          trackIndex,
-          eventIndex,
-          trackIndex,
-          newStartTime,
-          newDuration
-        );
-        if (!ok) {
-          this.timeline.notifyChange("events:update");
-          return null;
-        }
-
-        event.startTime = newStartTime;
-        event.duration = fixFloatPrecision(newDuration);
-        event.endTime = originalEndTime;
-        this.timeline.invalidateIndexTrack(trackIndex);
-      }
-    } else {
-      // 调整右边缘
-      let newDuration = originalDuration + deltaTime;
-      let newEndTime = originalStartTime + newDuration;
-
-      // 计算辅助线
-      state.guideLines = this.timeline.calculateGuideLines(
-        trackIndex,
-        eventIndex,
-        trackIndex,
-        originalStartTime,
-        newDuration > 0 ? newDuration : originalDuration
-      );
-
-      // 辅助线吸附（仅检查右边缘）
-      const guideSnap = this.timeline.snapEdgeToGuideLines(newEndTime);
-      if (guideSnap !== null) {
-        newDuration = fixFloatPrecision(guideSnap - originalStartTime);
-      } else if (state.snapEnabled) {
-        // 网格吸附
-        const snapIntervalSeconds = getSnapInterval(
-          state.zoomLevel,
-          config.snapInterval,
-          config.snapToSeconds,
-          config.secondPrecisionZoomThreshold,
-          config.scale,
-          config.scaleSplitCount
-        );
-        const snappedEndTime = snapToInterval(newEndTime, snapIntervalSeconds);
-        newDuration = fixFloatPrecision(snappedEndTime - originalStartTime);
-      } else {
-        newDuration = fixFloatPrecision(newDuration);
-      }
-
-      newEndTime = originalStartTime + newDuration;
-
-      // 限制范围
-      newDuration = fixFloatPrecision(
-        Math.max(config.minEventDuration, newDuration)
-      );
-      newDuration = fixFloatPrecision(
-        Math.min(newDuration, config.endTime - originalStartTime)
-      );
-      newEndTime = originalStartTime + newDuration;
-
-      // 检查是否与其他事件重叠
-      let canResize = true;
-      for (let i = 0; i < state.tracks[trackIndex].events.length; i++) {
-        if (i === eventIndex) continue;
-        const otherEvent = state.tracks[trackIndex].events[i];
-        const otherStart = otherEvent.startTime;
-        const otherEnd = otherStart + otherEvent.duration;
-
-        if (originalStartTime < otherEnd && newEndTime > otherStart) {
-          canResize = false;
-          break;
-        }
-      }
-
-      if (canResize) {
-        const ok = this.timeline.canMoveEvent(
-          trackIndex,
-          eventIndex,
-          trackIndex,
-          originalStartTime,
-          newDuration
-        );
-        if (!ok) {
-          this.timeline.notifyChange("events:update");
-          return null;
-        }
-
-        event.duration = fixFloatPrecision(newDuration);
-        event.endTime = fixFloatPrecision(originalStartTime + newDuration);
-        this.timeline.invalidateIndexTrack(trackIndex);
-      }
+    if (isLeft) startTime = Math.min(startTime, originalEnd - config.minEventDuration);
+    else endTime = Math.min(endTime, config.endTime + config.endPaddingTime);
+    const duration = fixFloatPrecision(endTime - startTime);
+    if (duration >= config.minEventDuration && this.timeline.canMoveEvent(trackIndex, eventIndex, trackIndex, startTime, duration) &&
+        state.resizingEvent && state.tracks[trackIndex]?.events[eventIndex] === event) {
+      event.startTime = startTime;
+      event.duration = duration;
+      event.endTime = endTime;
+      this.legacy?.record(trackIndex);
+      this.timeline.invalidateIndexTrack(trackIndex);
     }
 
     this.timeline.notifyChange("events:update");
@@ -378,7 +250,10 @@ export class ResizingState extends BaseState {
       return abortGesture(this.timeline, "resizingEvent", "events:update");
     }
 
-    const oldEventSnapshot = state.resizingEvent?.oldEvent;
+    if (event.startTime === state.resizingEvent.originalStartTime && event.duration === state.resizingEvent.originalDuration) {
+      return abortGesture(this.timeline, "resizingEvent", "events:update");
+    }
+    const oldEventSnapshot = state.resizingEvent.oldEvent;
     state.resizingEvent = null;
     this.timeline.setStatus(
       this.timeline.t("statusEventResized", { title: event.title })
@@ -399,6 +274,7 @@ export class ResizingState extends BaseState {
   }
 
   handleCancel(_ctx: MouseEventContext): InteractionState | null {
+    this.legacy?.rollback();
     // M2 编辑协议：预览取消（尚无副作用）
     return cancelAllPreviewsAndAbort(
       this.timeline,

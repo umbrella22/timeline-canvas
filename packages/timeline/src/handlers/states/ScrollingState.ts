@@ -1,3 +1,4 @@
+import { scrollbarGeometry, scrollFromHandle } from "../../utils/scrollbars";
 import {
   BaseState,
   type InteractionState,
@@ -22,60 +23,14 @@ export class ScrollingState extends BaseState {
     const config = this.timeline.config;
     const state = this.timeline.state;
 
-    // 垂直滚动条拖拽
+    const { x, y } = scrollbarGeometry(config, state, canvasWidth, canvasHeight);
     if (state.draggingScrollbar) {
-      const contentHeight =
-        config.timelineHeight +
-        config.firstTrackTopMargin +
-        state.tracks.length * (config.trackHeight + config.trackMargin);
-      const contentWidth =
-        config.startPaddingTime +
-        (config.endTime + config.endPaddingTime - config.startTime) *
-          config.secondWidth *
-          state.zoomLevel;
-      const hasHorizontalScrollbar = contentWidth > canvasWidth;
-      const horizontalScrollbarPadding = hasHorizontalScrollbar ? 13 : 0;
-      const availableHeight = canvasHeight - horizontalScrollbarPadding;
-      const scrollbarTrackHeight = availableHeight - config.timelineHeight - 5;
-      const viewportRatio = availableHeight / contentHeight;
-      const handleHeight = Math.max(30, scrollbarTrackHeight * viewportRatio);
-      const maxScrollY = Math.max(0, contentHeight - availableHeight);
-
-      const handleY =
-        canvasY - config.timelineHeight - state.scrollbarDragOffset;
-      const scrollRatio = handleY / (scrollbarTrackHeight - handleHeight);
-      state.scrollY = Math.max(
-        0,
-        Math.min(maxScrollY, scrollRatio * maxScrollY)
-      );
-
+      state.scrollY = scrollFromHandle(y, canvasY, state.scrollbarDragOffset, state.scrollY);
       this.timeline.notifyChange("scroll:y");
-      return null;
-    }
-
-    // 水平滚动条拖拽
-    if (state.draggingHorizontalScrollbar) {
-      const hContentWidth =
-        config.startPaddingTime +
-        (config.endTime + config.endPaddingTime - config.startTime) *
-          config.secondWidth *
-          state.zoomLevel;
-      const scrollbarTrackWidth = canvasWidth;
-      const viewportRatio = canvasWidth / hContentWidth;
-      const handleWidth = Math.max(30, scrollbarTrackWidth * viewportRatio);
-      const maxScrollX = Math.max(0, hContentWidth - canvasWidth);
-
-      const handleX = canvasX - state.horizontalScrollbarDragOffset;
-      const scrollRatio = handleX / (scrollbarTrackWidth - handleWidth);
-      state.scrollX = Math.max(
-        0,
-        Math.min(maxScrollX, scrollRatio * maxScrollX)
-      );
-
+    } else if (state.draggingHorizontalScrollbar) {
+      state.scrollX = scrollFromHandle(x, canvasX, state.horizontalScrollbarDragOffset, state.scrollX);
       this.timeline.notifyChange("scroll:x");
-      return null;
     }
-
     return null;
   }
 

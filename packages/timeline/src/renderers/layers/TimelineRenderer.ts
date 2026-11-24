@@ -1,6 +1,24 @@
 import type { Renderer, RenderContext, LayerType } from "../core/types";
 import type { TimelineConfig, TimelineState } from "../../types";
 
+// More than one tick per CSS pixel cannot add detail. Sample the entire visible
+// interval on an aligned coarser grid and stop when doubles can no longer advance.
+function* visibleTicks(start: number, end: number, interval: number, width: number): Generator<number> {
+  if (!(interval > 0) || !Number.isFinite(interval) || end < start) return;
+  const budget = Math.min(8192, Math.max(1, Math.ceil(width)));
+  const stride = Math.max(1, Math.ceil((end - start) / interval / budget));
+  const step = interval * stride;
+  const first = Math.floor(start / step) * step;
+  if (!Number.isFinite(first) || !Number.isFinite(end)) return;
+  let previous = -Infinity;
+  for (let index = 0; index <= budget + 1; index++) {
+    const seconds = first + index * step;
+    if (!(seconds > previous && seconds <= end)) break;
+    yield seconds;
+    previous = seconds;
+  }
+}
+
 /**
  * 时间轴渲染器 - 绘制时间刻度和标签
  *
@@ -126,8 +144,6 @@ export class TimelineRenderer implements Renderer {
     width: number
   ): void {
     const h = config.timelineHeight;
-    const firstMainTick =
-      Math.floor(visibleStartSeconds / scale) * scale;
     const minLabelSpacing = 80;
     let lastLabelX = -minLabelSpacing;
 
@@ -137,11 +153,7 @@ export class TimelineRenderer implements Renderer {
     ctx.font = "12px Arial";
     ctx.textBaseline = "top";
 
-    for (
-      let seconds = firstMainTick;
-      seconds <= visibleEndSeconds;
-      seconds += scale
-    ) {
+    for (const seconds of visibleTicks(visibleStartSeconds, visibleEndSeconds, scale, width)) {
       const x = this.timeToX(seconds, config, state);
 
       if (x >= -50 && x <= width + 50) {
@@ -187,20 +199,14 @@ export class TimelineRenderer implements Renderer {
     width: number
   ): void {
     const h = config.timelineHeight;
-    const firstSubTick =
-      Math.floor(visibleStartSeconds / subInterval) * subInterval;
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = config.colors.timelineSubGrid;
 
-    for (
-      let seconds = firstSubTick;
-      seconds <= visibleEndSeconds;
-      seconds += subInterval
-    ) {
+    for (const seconds of visibleTicks(visibleStartSeconds, visibleEndSeconds, subInterval, width)) {
       // 跳过主刻度位置（浮点容差判断）
       const ratio = seconds / scale;
-      if (Math.abs(ratio - Math.round(ratio)) < 1e-9) continue;
+      if (scale * config.secondWidth * state.zoomLevel >= 1 && Math.abs(ratio - Math.round(ratio)) < 1e-9) continue;
 
       const x = this.timeToX(seconds, config, state);
 
@@ -291,8 +297,6 @@ export class TimelineRenderer implements Renderer {
   ): void {
     const h = config.timelineHeight;
     const mainInterval = zoomConfig.main;
-    const firstMainTick =
-      Math.floor(visibleStartSeconds / mainInterval) * mainInterval;
     const minLabelSpacing = 80;
     let lastLabelX = -minLabelSpacing;
 
@@ -302,11 +306,7 @@ export class TimelineRenderer implements Renderer {
     ctx.font = "12px Arial";
     ctx.textBaseline = "top";
 
-    for (
-      let seconds = firstMainTick;
-      seconds <= visibleEndSeconds;
-      seconds += mainInterval
-    ) {
+    for (const seconds of visibleTicks(visibleStartSeconds, visibleEndSeconds, mainInterval, width)) {
       const x = this.timeToX(seconds, config, state);
 
       if (x >= -50 && x <= width + 50) {
@@ -353,17 +353,11 @@ export class TimelineRenderer implements Renderer {
     const h = config.timelineHeight;
     const subInterval = zoomConfig.sub;
     const mainInterval = zoomConfig.main;
-    const firstSubTick =
-      Math.floor(visibleStartSeconds / subInterval) * subInterval;
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = config.colors.timelineSubGrid;
 
-    for (
-      let seconds = firstSubTick;
-      seconds <= visibleEndSeconds;
-      seconds += subInterval
-    ) {
+    for (const seconds of visibleTicks(visibleStartSeconds, visibleEndSeconds, subInterval, width)) {
       if (seconds % mainInterval === 0) continue; // 跳过主刻度位置
 
       const x = this.timeToX(seconds, config, state);
@@ -394,18 +388,12 @@ export class TimelineRenderer implements Renderer {
   ): void {
     const h = config.timelineHeight;
     const microInterval = zoomConfig.sub / 2;
-    const firstMicroTick =
-      Math.floor(visibleStartSeconds / microInterval) * microInterval;
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = config.colors.timelineSubGrid;
     ctx.globalAlpha = 0.3;
 
-    for (
-      let seconds = firstMicroTick;
-      seconds <= visibleEndSeconds;
-      seconds += microInterval
-    ) {
+    for (const seconds of visibleTicks(visibleStartSeconds, visibleEndSeconds, microInterval, width)) {
       if (seconds % zoomConfig.sub === 0) continue; // 跳过次刻度位置
 
       const x = this.timeToX(seconds, config, state);

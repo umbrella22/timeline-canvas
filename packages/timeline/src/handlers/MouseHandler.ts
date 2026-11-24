@@ -2,8 +2,6 @@ import { type InteractionState, IdleState } from "./states";
 import type { TimelineInteractionAPI } from "./TimelineInteractionAPI";
 import { LogColors, getLogger } from "../core/managers/Logger";
 
-const logger = getLogger("StateMachine");
-
 /**
  * MouseHandler - 鼠标事件处理器(重构为状态模式)
  *
@@ -25,6 +23,8 @@ export class MouseHandler {
   /** requestAnimationFrame ID,用于节流 */
   private rafId: number | null = null;
 
+  private readonly logger;
+  private primaryButtonReported = false;
   /** 待处理的鼠标移动事件 */
   private pendingMouseMove: MouseEvent | null = null;
 
@@ -32,6 +32,7 @@ export class MouseHandler {
   private lastInputEvent: MouseEvent | null = null;
 
   constructor(private timeline: TimelineInteractionAPI) {
+    this.logger = getLogger("StateMachine", timeline.config);
     // 初始状态为空闲状态
     this.currentState = new IdleState(timeline);
   }
@@ -55,7 +56,7 @@ export class MouseHandler {
 
     // 调用旧状态的退出钩子
     if (oldState.onExit) {
-      logger.debugStyled(LogColors.stateExit, `◁ Exit: ${oldState.name}`);
+      this.logger.debugStyled(LogColors.stateExit, `◁ Exit: ${oldState.name}`);
       oldState.onExit(newState);
     }
 
@@ -64,12 +65,12 @@ export class MouseHandler {
 
     // 调用新状态的进入钩子
     if (newState.onEnter) {
-      logger.debugStyled(LogColors.stateEnter, `▷ Enter: ${newState.name}`);
+      this.logger.debugStyled(LogColors.stateEnter, `▷ Enter: ${newState.name}`);
       newState.onEnter(oldState);
     }
 
     // 调试日志
-    logger.debugStyled(
+    this.logger.debugStyled(
       LogColors.stateTransition,
       `⟳ Transition: ${oldState.name} → ${newState.name}`
     );
@@ -98,6 +99,8 @@ export class MouseHandler {
    * 处理鼠标按下事件
    */
   public handleMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return;
+    this.primaryButtonReported = (e.buttons & 1) !== 0;
     this.lastInputEvent = e;
     const ctx = this.createContext(e);
     const newState = this.currentState.handleMouseDown(ctx);
@@ -108,6 +111,10 @@ export class MouseHandler {
    * 处理鼠标移动事件(使用 RAF 节流)
    */
   public handleMouseMove(e: MouseEvent): void {
+    if (this.primaryButtonReported && (e.buttons & 1) === 0 && this.currentState.name !== "Idle") {
+      this.handleCancel(e);
+      return;
+    }
     // 如果已经有pending的RAF,只更新事件
     if (this.rafId !== null) {
       this.pendingMouseMove = e;
@@ -139,6 +146,7 @@ export class MouseHandler {
    * 处理鼠标抬起事件
    */
   public handleMouseUp(e?: MouseEvent): void {
+    this.primaryButtonReported = false;
     const pendingMouseMove = this.takePendingMouseMove();
     if (pendingMouseMove) {
       this.handleMouseMoveImpl(pendingMouseMove);
@@ -159,6 +167,7 @@ export class MouseHandler {
    * 取消当前指针交互,丢弃尚未绘制的移动并释放状态资源
    */
   public handleCancel(e?: MouseEvent): void {
+    this.primaryButtonReported = false;
     this.takePendingMouseMove();
     const event = e ?? this.lastInputEvent;
     if (!event) {

@@ -105,7 +105,8 @@ describe("ViewportController", () => {
       zoomLevel: 2,
       percentage: 200,
     });
-    expect(state.scrollX).toBe(300);
+    // The default left padding (0.5px) is fixed in screen coordinates.
+    expect(state.scrollX).toBe(299.5);
   });
 
   it("设置结束时间时会裁剪时间指示器与水平滚动，并报告溢出事件", () => {

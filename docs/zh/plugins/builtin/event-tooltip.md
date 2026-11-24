@@ -26,7 +26,11 @@ await timeline.usePlugin(
     borderColor: "#555",
     fontSize: 12,
     fontFamily: "Arial, sans-serif",
-    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+    htmlTemplate: (title) => {
+      const label = document.createElement("strong");
+      label.textContent = title;
+      return label.outerHTML;
+    },
   })
 );
 ```
@@ -37,6 +41,8 @@ await timeline.usePlugin(
 - 默认延迟 `300ms`
 - 使用 `mousemove` + `requestAnimationFrame` 节流来做命中检测
 - HTML 模式下，如果 `htmlTemplate(title)` 返回空字符串，会回退到 Canvas 模式
+- 延时显示、移动和隐藏 tooltip 都会触发覆盖层重绘，静止的时间轴也能及时更新。
+- `htmlTemplate` 的返回值按可信 HTML 处理。外部标题可像示例一样通过 `textContent` 插入。
 
 ## 适合的场景
 

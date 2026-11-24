@@ -89,7 +89,9 @@ export class BusinessIdentityIndex {
     const oldEventIds = this.trackEventIds.get(trackIndex);
     if (oldEventIds) {
       for (const businessId of oldEventIds.keys()) {
-        this.eventLocations.delete(businessId);
+        if (this.eventLocations.get(businessId)?.trackIndex === trackIndex) {
+          this.eventLocations.delete(businessId);
+        }
       }
     }
     const oldTrackId = this.trackIdsByIndex.get(trackIndex);

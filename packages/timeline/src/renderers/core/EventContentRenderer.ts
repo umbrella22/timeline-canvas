@@ -9,6 +9,8 @@ import type {
 } from "../../types";
 import { getLogger } from "../../core/managers/Logger";
 
+import { withPluginCanvas } from "./canvasScope";
+
 const logger = getLogger("EventContentRenderer");
 
 /** 水平滚动条占位高度，与 ViewportManager.H_SCROLLBAR_PADDING 保持一致 */
@@ -58,59 +60,41 @@ export function drawEventContent(args: DrawEventContentArgs): void {
 
   const clipRect = computeClipRect(args);
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-  ctx.clip();
+  try {
+    ctx.beginPath();
+    ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+    ctx.clip();
+    if (!renderEventContent) {
+      drawDefaultContent(ctx);
+      return;
+    }
 
-  let defaultDrawn = false;
-  const drawDefaultOnce = (): void => {
-    if (defaultDrawn) return;
-    defaultDrawn = true;
-    drawDefaultContent(ctx);
-  };
-
-  const draftState = ((): { commitState: "idle" | "preview" | "pending" | "reconciliation_required"; operationId?: string } => {
-    const draft =
-      args.event.businessId !== undefined ? args.state.editDrafts.get(args.event.businessId) : undefined;
-    if (!draft) return { commitState: "idle" };
-    return { commitState: draft.commitState, operationId: draft.operationId };
-  })();
-
-  if (renderEventContent) {
+    let open = true;
+    let defaultDrawn = false;
+    const drawDefaultOnce = () => {
+      if (!open || defaultDrawn) return;
+      defaultDrawn = true;
+      drawDefaultContent(ctx);
+    };
+    const draft = event.businessId === undefined ? undefined : args.state.editDrafts.get(event.businessId);
     try {
-      renderEventContent({
-        ctx,
-        canvas,
-        config,
-        state: args.state,
-        event,
-        track,
-        trackIndex,
-        eventIndex,
-        rect,
-        clipRect,
-        phase,
-        selected,
-        highlighted,
-        readonly: Boolean(event.readonly) || config.readOnly,
-        dpr,
-        // M2：候选草稿存在时按其提交状态展示（pending/待核对）
-        commitState: draftState.commitState,
-        ...(draftState.operationId ? { operationId: draftState.operationId } : {}),
+      withPluginCanvas(ctx, (scoped) => renderEventContent({
+        ctx: scoped, canvas, config, state: args.state, event, track, trackIndex, eventIndex,
+        rect, clipRect, phase, selected, highlighted, readonly: Boolean(event.readonly) || config.readOnly,
+        dpr, commitState: draft?.commitState ?? "idle",
+        ...(draft?.operationId ? { operationId: draft.operationId } : {}),
         drawDefaultContent: drawDefaultOnce,
-      });
+      }));
     } catch (error) {
       const detail = error instanceof Error ? error.message : "unknown error";
-      logger.error(
-        `[render] custom event content failed (code=event_content_error); falling back to default content (${detail})`
-      );
+      logger.error(`[render] custom event content failed (code=event_content_error); falling back to default content (${detail})`);
       drawDefaultOnce();
+    } finally {
+      open = false;
     }
-  } else {
-    drawDefaultOnce();
+  } finally {
+    ctx.restore();
   }
-
-  ctx.restore();
 }
 
 /**

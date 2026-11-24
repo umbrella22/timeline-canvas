@@ -28,6 +28,7 @@ export type {
   Track,
   TimelineColors,
   EventTextStyle,
+  EventBlockStyle,
   ContextMenuItem,
   ContextMenuStyle,
   ContextMenuData,
@@ -82,3 +83,5 @@ export {
   translateTimelineMessage,
   translateTimelineConfig,
 } from "./utils";
+
+export type { TimelineMessageKey } from "./utils/i18n";
