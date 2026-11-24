@@ -25,6 +25,11 @@
   ],
   "author": "sky <https://github.com/umbrella22>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umbrella22/timeline-canvas.git",
+    "directory": "packages/timeline"
+  },
   "packageManager": "pnpm@10.34.5",
   "devDependencies": {
     "@types/node": "^26.6.2",

@@ -3,6 +3,11 @@
   "type": "module",
   "version": "2.3.1",
   "description": "MCP server for timeline-canvas repo — semantic analysis and engineering quality tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umbrella22/timeline-canvas.git",
+    "directory": "packages/mcp-service"
+  },
   "bin": {
     "timeline-canvas-mcp": "./bin/timeline-canvas-mcp.js"
   },

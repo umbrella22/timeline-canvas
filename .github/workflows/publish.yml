@@ -1,0 +1,100 @@
+name: Publish npm packages
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24.20.0"
+
+jobs:
+  pack:
+    if: github.event.created
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Check release tag against the timeline-canvas version
+        working-directory: packages/timeline
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Expected tag v$version for timeline-canvas, got $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --if-present typecheck
+      - run: pnpm test:run
+      - run: pnpm build
+
+      - name: Pack the three release packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          npm pack --pack-destination "$RUNNER_TEMP/release" \
+            ./packages/timeline ./packages/mcp-service ./packages/user-mcp-service
+
+      - name: Verify MCP packages against the release build
+        run: |
+          export TIMELINE_CANVAS_TARBALL="$RUNNER_TEMP/release/timeline-canvas-${GITHUB_REF_NAME#v}.tgz"
+          pnpm -r --if-present test:package
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: npm-packages
+          path: ${{ runner.temp }}/release/*.tgz
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: npmjs
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: npm-packages
+          path: ${{ runner.temp }}/release
+
+      - name: Publish new package versions using OIDC
+        shell: bash
+        run: |
+          registry=https://registry.npmjs.org
+          for tarball in "$RUNNER_TEMP"/release/*.tgz; do
+            package_version=$(tar -xOzf "$tarball" package/package.json | jq -er '.name + "/" + .version')
+            status=$(curl --silent --show-error --retry 3 --max-time 30 --output /dev/null \
+              --write-out '%{http_code}' "$registry/$package_version")
+            case "$status" in
+              200)
+                echo "Skipping $package_version (already published)"
+                ;;
+              404)
+                npm publish "$tarball" --registry="$registry" --access public --provenance --ignore-scripts
+                ;;
+              *)
+                echo "::error::Registry check for $package_version returned HTTP $status"
+                exit 1
+                ;;
+            esac
+          done

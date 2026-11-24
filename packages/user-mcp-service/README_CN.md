@@ -13,7 +13,7 @@
 
 ## 从 npm 安装和启动
 
-当前包版本为 `timeline-canvas-user-mcp@0.1.0`。使用 npm 当前版本连接目标应用工作区：
+当前包版本为 `timeline-canvas-user-mcp@0.1.2`。使用 npm 当前版本连接目标应用工作区：
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -39,7 +39,7 @@ server 恰好暴露三个工具：
 - CI 使用 Node.js 24.20.0
 - 用户项目已安装 `timeline-canvas`
 
-模板只使用公开 API，已经过 `timeline-canvas@1.4.1` 和当前版本 `timeline-canvas@1.5.0` 验证。每个成功响应都包含 `project` 对象，其中有 `installedVersion`、`testedVersion` 和 `compatibility`；`testedVersion` 为 `1.5.0`。已安装版本为 `1.4.1` 或 `1.5.0` 时，兼容状态为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed`。
+模板只使用公开 API，已经过 `timeline-canvas` 的 `1.4.1`、`1.5.0`、`1.6.0` 和 `1.6.1` 验证。每个成功响应都包含 `project` 对象，其中有 `installedVersion`、`testedVersion` 和 `compatibility`；`testedVersion` 为 `1.6.1`。已安装版本为 `1.4.1`、`1.5.0`、`1.6.0` 或 `1.6.1` 时，兼容状态为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed`。
 
 每个生成或调整后的插件仍需使用 `timeline_user_validate_plugin`，根据应用实际安装的公开声明进行校验。`tested-version` 只表示模板已经过对应版本验证，不能替代对应用插件源码的校验。
 
@@ -76,7 +76,7 @@ MCP 客户端可通过绝对路径运行构建后的 launcher。`MCP_WORKSPACE_R
 
 ## 安装本地打包产物
 
-构建并打包 `0.1.0`：
+构建并打包 `0.1.2`：
 
 ```bash
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
@@ -87,7 +87,7 @@ pnpm -C /path/to/timeline-canvas/packages/user-mcp-service pack
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 然后配置已安装的可执行文件：

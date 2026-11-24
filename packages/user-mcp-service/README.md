@@ -13,7 +13,7 @@ Enable only the server needed for the current workspace by default. Neither pack
 
 ## Install and Run from npm
 
-The package version is `timeline-canvas-user-mcp@0.1.0`. Run the current npm release against the target application workspace:
+The package version is `timeline-canvas-user-mcp@0.1.2`. Run the current npm release against the target application workspace:
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -39,7 +39,7 @@ All three tools are read-only. Guide and generation results return proposed file
 - CI uses Node.js 24.20.0
 - The user project installs `timeline-canvas`
 
-The templates use only public APIs and have been verified against `timeline-canvas@1.4.1` and `timeline-canvas@1.5.0`, the current release. Every successful response includes a `project` object with `installedVersion`, `testedVersion`, and `compatibility`; `testedVersion` is `1.5.0`. Compatibility is `tested-version` for installed version `1.4.1` or `1.5.0`, `unverified-version` for any other installed version, and `not-installed` when the package cannot be resolved.
+The templates use only public APIs and have been verified against `timeline-canvas` versions `1.4.1`, `1.5.0`, `1.6.0`, and `1.6.1`. Every successful response includes a `project` object with `installedVersion`, `testedVersion`, and `compatibility`; `testedVersion` is `1.6.1`. Compatibility is `tested-version` for installed version `1.4.1`, `1.5.0`, `1.6.0`, or `1.6.1`, `unverified-version` for any other installed version, and `not-installed` when the package cannot be resolved.
 
 Run `timeline_user_validate_plugin` for each generated or adapted plugin against the application's installed public declarations. A `tested-version` result describes template verification and does not replace validation of the application's plugin code.
 
@@ -76,7 +76,7 @@ The root command `pnpm mcp:user` is intended for running the server from the sou
 
 ## Install a Local Package Tarball
 
-Build and pack version `0.1.0`:
+Build and pack version `0.1.2`:
 
 ```bash
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
@@ -87,7 +87,7 @@ Install the resulting tarball in the user project:
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 Then configure the installed executable:

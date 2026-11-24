@@ -15,7 +15,7 @@ title: 用户 MCP 服务
 
 ## 包状态与环境要求
 
-用户 MCP 当前版本为 `timeline-canvas-user-mcp@0.1.0`。通过 npm 启动：
+用户 MCP 当前版本为 `timeline-canvas-user-mcp@0.1.2`。通过 npm 启动：
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -29,14 +29,14 @@ MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mc
 - CI 使用 Node.js 24.20.0
 - 用户应用已安装 `timeline-canvas`
 
-模板只使用公开 API，已经过 `timeline-canvas@1.4.1` 和当前版本 `timeline-canvas@1.5.0` 验证。每个成功工具响应都包含 `project` 对象：
+模板只使用公开 API，已经过 `timeline-canvas` 的 `1.4.1`、`1.5.0`、`1.6.0` 和 `1.6.1` 验证。每个成功工具响应都包含 `project` 对象：
 
 | 字段 | 含义 |
 |---|---|
 | `root` | 解析后的用户项目根目录 |
 | `installedVersion` | 从用户项目已安装的 `timeline-canvas` 解析出的版本，未安装时为 `null` |
-| `testedVersion` | 当前模板测试目标，`1.5.0` |
-| `compatibility` | 已安装 `1.4.1` 或 `1.5.0` 时为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed` |
+| `testedVersion` | 当前模板测试目标，`1.6.1` |
+| `compatibility` | 已安装 `1.4.1`、`1.5.0`、`1.6.0` 或 `1.6.1` 时为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed` |
 
 每个生成或调整后的插件都需要使用 `timeline_user_validate_plugin`，根据用户项目实际安装的公开声明进行校验。`tested-version` 记录已知模板验证情况，不代表应用插件源码已经通过校验。
 
@@ -110,11 +110,11 @@ pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service pack
 ```
 
-包目录中会生成 `timeline-canvas-user-mcp-0.1.0.tgz`。将它安装到用户项目：
+包目录中会生成 `timeline-canvas-user-mcp-0.1.2.tgz`。将它安装到用户项目：
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 将 MCP 客户端指向安装后的可执行文件：
@@ -205,7 +205,7 @@ npm 包客户端可以使用：
 }
 ```
 
-响应包含 `files: [{ path, content }]`、usage、notes、已安装库版本、模板 `testedVersion` 和兼容状态。模板只使用公开 API，已经过 `timeline-canvas@1.4.1` 和 `timeline-canvas@1.5.0` 验证；当前 `testedVersion` 为 `1.5.0`。agent 审核后应用返回源码。
+响应包含 `files: [{ path, content }]`、usage、notes、已安装库版本、模板 `testedVersion` 和兼容状态。模板只使用公开 API，已经过 `timeline-canvas` 的 `1.4.1`、`1.5.0`、`1.6.0` 和 `1.6.1` 验证；当前 `testedVersion` 为 `1.6.1`。agent 审核后应用返回源码。
 
 ## `timeline_user_validate_plugin`
 

@@ -15,7 +15,7 @@ Enable only the server needed for the current workspace by default. The servers 
 
 ## Package Status and Requirements
 
-The current user MCP package is `timeline-canvas-user-mcp@0.1.0`. Start it from npm with:
+The current user MCP package is `timeline-canvas-user-mcp@0.1.2`. Start it from npm with:
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -29,14 +29,14 @@ Runtime requirements match the repository:
 - CI uses Node.js 24.20.0
 - The user application installs `timeline-canvas`
 
-The templates use only public APIs and have been verified against `timeline-canvas@1.4.1` and the current `timeline-canvas@1.5.0` release. Every successful tool response includes a `project` object:
+The templates use only public APIs and have been verified against `timeline-canvas` versions `1.4.1`, `1.5.0`, `1.6.0`, and `1.6.1`. Every successful tool response includes a `project` object:
 
 | Field | Meaning |
 |---|---|
 | `root` | Resolved user-project root |
 | `installedVersion` | Version resolved from the user project's installed `timeline-canvas`, or `null` |
-| `testedVersion` | Current template test target, `1.5.0` |
-| `compatibility` | `tested-version` for installed `1.4.1` or `1.5.0`; `unverified-version` for any other installed version; `not-installed` when the package cannot be resolved |
+| `testedVersion` | Current template test target, `1.6.1` |
+| `compatibility` | `tested-version` for installed `1.4.1`, `1.5.0`, `1.6.0`, or `1.6.1`; `unverified-version` for any other installed version; `not-installed` when the package cannot be resolved |
 
 Run `timeline_user_validate_plugin` for every generated or adapted plugin against the user project's installed public declarations. `tested-version` records known template verification and does not validate the application's plugin code.
 
@@ -110,11 +110,11 @@ pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service pack
 ```
 
-The package directory receives `timeline-canvas-user-mcp-0.1.0.tgz`. Install that file into the user project:
+The package directory receives `timeline-canvas-user-mcp-0.1.2.tgz`. Install that file into the user project:
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 Point the MCP client at the installed executable:
@@ -205,7 +205,7 @@ Example:
 }
 ```
 
-The response contains `files: [{ path, content }]`, usage, notes, the installed library version, the template `testedVersion`, and a compatibility status. The templates use only public APIs and are tested against `timeline-canvas@1.4.1` and `timeline-canvas@1.5.0`; the current `testedVersion` is `1.5.0`. The agent applies the returned source after review.
+The response contains `files: [{ path, content }]`, usage, notes, the installed library version, the template `testedVersion`, and a compatibility status. The templates use only public APIs and are tested against `timeline-canvas` versions `1.4.1`, `1.5.0`, `1.6.0`, and `1.6.1`; the current `testedVersion` is `1.6.1`. The agent applies the returned source after review.
 
 ## `timeline_user_validate_plugin`
 

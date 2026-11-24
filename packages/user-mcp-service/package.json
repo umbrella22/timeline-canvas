@@ -2,6 +2,11 @@
   "name": "timeline-canvas-user-mcp",
   "version": "0.1.1",
   "description": "MCP tools for integrating timeline-canvas and developing external plugins",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umbrella22/timeline-canvas.git",
+    "directory": "packages/user-mcp-service"
+  },
   "license": "MIT",
   "bin": {
     "timeline-canvas-user-mcp": "./bin/timeline-canvas-user-mcp.js"
