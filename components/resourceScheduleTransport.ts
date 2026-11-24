@@ -5,6 +5,7 @@
  *  - 2xx 且 JSON 为 {accepted:true} / {accepted:true, placement} → 原样返回（accepted）
  *  - 2xx/4xx 且 JSON 为 {accepted:false, code?, reason}          → 原样返回（明确拒绝）
  *  - 网络断开 / 5xx / 非法 JSON / 其他结构                        → throw（核心按结果未知处理）
+ *  - 调用方 signal 中止                                          → fetch 抛 AbortError（结果未知）
  *
  * 只发送 operationId、eventBusinessId、action、after placement；不发送
  * 整个 TimelineEvent / media / customData。生产 URL 与认证由接入方配置。
@@ -19,7 +20,8 @@ export interface ScheduleSavePayload {
 }
 
 export interface ScheduleTransport {
-  save(payload: ScheduleSavePayload, mode: string): Promise<ScheduleCommitResult>;
+  /** signal 来自 scheduleEditing.onBeforeCommit，用于在提交超时/实例销毁时中止在途请求 */
+  save(payload: ScheduleSavePayload, mode: string, signal?: AbortSignal): Promise<ScheduleCommitResult>;
   fetchAuthoritative(businessId: string): Promise<{
     businessId: string;
     resourceBusinessId: string;
@@ -73,11 +75,12 @@ export function createScheduleTransport(baseUrl: string): ScheduleTransport {
   };
 
   return {
-    async save(payload, mode) {
+    async save(payload, mode, signal) {
       const response = await fetch(`${normalized}/api/schedule/save?mode=${encodeURIComponent(mode)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal,
       });
       if (response.status >= 500) {
         throw new Error(`server error ${response.status}`);

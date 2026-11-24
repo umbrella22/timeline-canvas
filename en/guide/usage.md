@@ -75,7 +75,7 @@ timeline.loadData({
         },
       ],
     },
-    { events: [{ startTime: 1800, endTime: 1800, title: "Requirements Review" }] },
+    { events: [{ startTime: 1800, endTime: 2700, title: "Requirements Review" }] },
   ],
 });
 ```

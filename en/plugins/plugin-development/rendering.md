@@ -46,6 +46,14 @@ Notes:
 * Skip `next()` to fully replace that core layer
 * Multiple hooks form a middleware-style chain
 
+### Callback state and registration names
+
+Background layers, overlay layers and `render:event:media` handlers each receive a scoped 2D context. The renderer restores transforms, styles and clips after each callback, even if its `save()` and `restore()` calls are unbalanced. An exception in one layer allows the remaining callbacks and frame composition to continue. Pixels already drawn remain on the surface. Draw synchronously with the supplied `ctx`.
+
+A core hook can set a transform or clip around `next()`. The continuation runs at most once and expires when the hook returns. An exception before `next()` continues the chain after restoring the hook’s drawing state. An exception after `next()` preserves the single downstream draw.
+
+Layer names and hook names use separate registries. Within each registry, the last registration for a name supplies the active callback. Each plugin can unregister its own entry. Removing an override, including rollback after failed activation, reveals the most recent registration still present under that name. Distinct active names run by descending plugin priority, then by registration order.
+
 ## RenderLayer example
 
 ```ts
@@ -118,3 +126,5 @@ const timeline = new Timeline("canvas", {
 ```
 
 Constraints: context data is read-only; the order is background → media hook → custom/default content → selection border/handles and other decorations; a throwing callback is logged with a fixed error code and falls back to the default content (the media hook is not drawn twice) and rendering recovers on the next frame; the callback must not change the core hit rectangle or bypass readOnly.
+
+For a scheduling draft, `rect` locates the candidate on its target track. The media handler and content callback receive the confirmed event and its source indices, including when that source track has scrolled out of view. `commitState` distinguishes preview, pending and reconciliation.

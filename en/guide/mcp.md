@@ -275,7 +275,7 @@ Below are common workflows you’ll likely use most in Copilot Chat.
 
 ## Tool List
 
-Below is the full set of tools exposed by MCP server v2.0 in this repo (8 tools). All return values are plain text.
+Below is the full set of tools exposed by MCP server v2.0 in this repo (10 tools). All return values are plain text.
 
 > **Compared to v1.0**: Removed 6 tools that overlapped with VS Code built-ins (`timeline_search`, `timeline_read_excerpt`, `timeline_repo_map`, `timeline_trace_entrypoints`, `timeline_run_repo_script`, `timeline_run_mcp_script`) and added 5 semantic analysis tools.
 

@@ -87,6 +87,8 @@ Plugin IDs use this format:
 `${plugin.metadata.name}@${plugin.metadata.version}`
 ```
 
+A dependency can name an exact `name@version` or any loaded version of `name`. Manual removal returns `false` while the plugin is the last matching provider for a dependent. This also applies during the dependent’s activation and teardown. Remove the dependent first.
+
 ## setTheme(theme: "light" | "dark"): Promise<boolean>
 
 Switches between the built-in light and dark themes.
@@ -100,11 +102,9 @@ await timeline.setTheme("dark");
 await timeline.setTheme("light");
 ```
 
-Notes:
+The constructor’s initial theme, `setTheme()`, `usePlugin(theme)` and removal of a current or queued theme run in invocation order. A successful switch unloads the previous theme, activates the requested theme and emits `theme:change`. Selecting the active theme returns `true` immediately when its turn arrives.
 
-* `setTheme()` switches between `LightThemePlugin` and `DarkThemePlugin`
-* The old theme is unloaded before the new one is loaded
-* A successful switch triggers `theme:change`
+If a dependent still requires the active theme, the switch returns `false` and the theme remains active. If activation fails, the manager cleans up the attempted registrations, restores the palette and tries to reactivate the previous theme. The switch returns `false`. If reactivation also fails, `getLoadedPlugins()` shows no active theme and a subsequent switch can select one.
 
 ## Set a theme at construction time
 

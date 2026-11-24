@@ -116,3 +116,5 @@ Known keys and payloads:
 
 * `render:event:media`: `(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)` (11-tuple, matching `EventsRenderer`; during drags the visible representation of the dragged event is emitted once by `InteractionRenderer`)
 * `validate:event:move`: a single payload object `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`
+
+Each `emitEvent()` and `validateEvent()` call uses the handler list captured at dispatch start. Registrations or removals inside a handler take effect for the next dispatch, including a nested dispatch.

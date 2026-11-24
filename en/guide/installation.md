@@ -54,7 +54,7 @@ export default defineConfig({
 });
 ```
 
-Build, test and lint commands use `vp pack`, `vp test` and `vp lint`. Test APIs are imported from `vite-plus/test`. Vite+ supplies the build, test, lint and formatting tools, so standalone tsdown, Vitest and Oxlint dependencies are unnecessary. The direct `vite` dependency is an alias to the matching Vite+ core package. The V8 coverage provider remains a separate dependency matching the bundled Vitest version.
+Build, test and lint commands use `vp pack`, `vp test` and `vp lint`. Test APIs are imported from `vite-plus/test`. Vite+ supplies the build, test, lint and formatting tools, so standalone tsdown, Vitest and Oxlint dependencies are unnecessary. The workspace declares no `vite` alias to Vite+ core: `vp pack` / `vp build` run on `@voidzero-dev/vite-plus-core` through `vite-plus`, while the bundled Vitest resolves its own upstream `vite`. The V8 coverage provider remains a separate dependency matching the bundled Vitest version.
 
 ## Package Outputs
 

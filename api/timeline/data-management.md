@@ -61,6 +61,7 @@ addEvent(
 
 说明：
 
+* 注册 `onEventAdd` 时，库会在写入前克隆回调快照。`customData` 含函数等不可克隆值时，调用抛出 `DataCloneError`，事件数量和回调次数均保持原值。
 * `trackIndex` 必须是现有轨道索引
 * 公开签名的第三个参数语义是 `endTime`
 * 当前实现兼容某些“传时长”的场景，但为了避免歧义，文档建议始终传真实结束时间
@@ -101,7 +102,7 @@ timeline.deleteEvent(0, 1);
 说明：
 
 * 删除成功后会触发 `events:delete`
-* 若启用了 `autoRemoveEmptyLastTrack`，最后一条空轨道可能被自动移除
+* 启用 `autoRemoveEmptyLastTrack` 时，库会从尾部清理空轨，遇到有排程预约的轨道即停止。发生自动删轨时，`onTrackRemove` 先于 `onEventDelete` 触发。
 
 ## addTrack(): void
 
@@ -211,7 +212,7 @@ if (!result.ok) {
 
 ### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
 
-导出与内存隔离的严格快照：不含数值 id、选中态、滚动或缓存；`customData` 深拷贝；`waveform.data` 的 `Float32Array` 转为 `number[]`。存在没有业务身份的事件/轨道时返回 `missing_business_id`，不悄悄生成身份。颜色等于调色板默认值时不导出（重新加载会推导出同一颜色）。
+导出与内存隔离的严格快照：不含数值 id、选中态、滚动或缓存；`customData` 深拷贝；`waveform.data` 的 `Float32Array` 转为 `number[]`。存在没有业务身份的事件/轨道时返回 `missing_business_id`，不悄悄生成身份。旧数据中重复的资源或事件身份会返回 `duplicate_business_id`，并给出重复项的路径。颜色等于调色板默认值时不导出（重新加载会推导出同一颜色）。
 
 ### getEventByBusinessId(id) / getTrackByBusinessId(id)
 

@@ -675,6 +675,7 @@ const timeline = new Timeline("timelineCanvas", {
 * 工厂参数 `htmlTemplate` 的优先级高于 `contextMenuHtml`
 * 模板为空字符串时，当前实现会回退到 Canvas 菜单渲染
 * 当前内置插件只会把 `contextMenuHtml` 的字符串值当作模板使用
+* 模板按宿主提供的可信 HTML 处理，默认 Canvas 菜单按纯文本绘制菜单项名称。
 
 ## 渲染行为
 
@@ -720,7 +721,11 @@ await timeline.usePlugin(
     borderColor: "#555",
     fontSize: 12,
     fontFamily: "Arial, sans-serif",
-    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+    htmlTemplate: (title) => {
+      const label = document.createElement("strong");
+      label.textContent = title;
+      return label.outerHTML;
+    },
   })
 );
 ```
@@ -731,6 +736,8 @@ await timeline.usePlugin(
 * 默认延迟 `300ms`
 * 使用 `mousemove` + `requestAnimationFrame` 节流来做命中检测
 * HTML 模式下，如果 `htmlTemplate(title)` 返回空字符串，会回退到 Canvas 模式
+* 延时显示、移动和隐藏 tooltip 都会触发覆盖层重绘，静止的时间轴也能及时更新。
+* `htmlTemplate` 的返回值按可信 HTML 处理。外部标题可像示例一样通过 `textContent` 插入。
 
 ## 适合的场景
 
@@ -943,19 +950,18 @@ timeline.loadData({
 ## media 字段结构
 
 ```ts
-interface TimelineEvent["media"] {
-  images?: Array<{
-    src: string;
-    fit?: "cover" | "contain" | "stretch";
-    opacity?: number;
-  }>;
-  waveform?: {
-    data: Float32Array | number[];
-    color?: string;
-    backgroundColor?: string;
-    opacity?: number;
-  };
-}
+type EventMedia = NonNullable<TimelineEvent["media"]>;
+
+// 等价于：
+// {
+//   images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
+//   waveform?: {
+//     data: Float32Array | number[];
+//     color?: string;
+//     backgroundColor?: string;
+//     opacity?: number;
+//   };
+// }
 ```
 
 ## 混合渲染示例
@@ -992,7 +998,9 @@ timeline.loadData({
 
 ## 当前实现细节
 
-* 图片会通过 `fetch()` 异步加载并缓存为 `ImageBitmap`
+* 同一插件实例在本次激活期间按 `src` 复用进行中的请求和已解码位图，跨事件、upsert 和整批重载均可复用。`fit` 与 `opacity` 在绘制时应用。图片内容更新时可在 `src` 中加入版本。
+* 图片缓存最多保留 256 个来源、64 MiB 估算 RGBA 数据，优先淘汰最久未绘制的图片。单图超过字节预算时按比例缩小。卸载会取消请求，关闭缓存以及迟到的位图。
+* 网络、HTTP 或解码失败后，插件最多在 1 秒和 2 秒后各触发一次重绘，只重试当时仍需绘制的来源。之后的绘制可在指数退避期结束后重试，最长等待 30 秒。
 * 波形数据会缓存为 `Float32Array`
 * 在支持 `OffscreenCanvas` 的环境下，波形会尽量预渲染为位图
 * 图片和波形都会被裁剪在事件块内部
@@ -1255,6 +1263,7 @@ addEvent(
 
 说明：
 
+* 注册 `onEventAdd` 时，库会在写入前克隆回调快照。`customData` 含函数等不可克隆值时，调用抛出 `DataCloneError`，事件数量和回调次数均保持原值。
 * `trackIndex` 必须是现有轨道索引
 * 公开签名的第三个参数语义是 `endTime`
 * 当前实现兼容某些“传时长”的场景，但为了避免歧义，文档建议始终传真实结束时间
@@ -1295,7 +1304,7 @@ timeline.deleteEvent(0, 1);
 说明：
 
 * 删除成功后会触发 `events:delete`
-* 若启用了 `autoRemoveEmptyLastTrack`，最后一条空轨道可能被自动移除
+* 启用 `autoRemoveEmptyLastTrack` 时，库会从尾部清理空轨，遇到有排程预约的轨道即停止。发生自动删轨时，`onTrackRemove` 先于 `onEventDelete` 触发。
 
 ## addTrack(): void
 
@@ -1405,7 +1414,7 @@ if (!result.ok) {
 
 ### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
 
-导出与内存隔离的严格快照：不含数值 id、选中态、滚动或缓存；`customData` 深拷贝；`waveform.data` 的 `Float32Array` 转为 `number[]`。存在没有业务身份的事件/轨道时返回 `missing_business_id`，不悄悄生成身份。颜色等于调色板默认值时不导出（重新加载会推导出同一颜色）。
+导出与内存隔离的严格快照：不含数值 id、选中态、滚动或缓存；`customData` 深拷贝；`waveform.data` 的 `Float32Array` 转为 `number[]`。存在没有业务身份的事件/轨道时返回 `missing_business_id`，不悄悄生成身份。旧数据中重复的资源或事件身份会返回 `duplicate_business_id`，并给出重复项的路径。颜色等于调色板默认值时不导出（重新加载会推导出同一颜色）。
 
 ### getEventByBusinessId(id) / getTrackByBusinessId(id)
 
@@ -1640,7 +1649,7 @@ timeline.notifyChange("config:readOnly");
 
 ### endChangeBatch(): void
 
-把多次状态变更合并到一次重绘中。
+批次可以嵌套。最外层 `endChangeBatch()` 统一重绘，并在时间指示器高亮发生变化时发送一次最终结果。
 
 ```ts
 timeline.beginChangeBatch();
@@ -1858,7 +1867,7 @@ await timeline.usePlugin(ContextMenuPlugin());
 
 * 返回 `true` 表示插件成功加载或主题切换成功
 * 非主题插件若重复加载，当前实现会返回 `false`
-* 主题插件会走专门的 `switchTheme()` 流程
+* 主题插件会走专门的 `setTheme()` 流程（内部为私有的 `switchThemePlugin`）
 * 如果插件声明了 `metadata.dependencies`，加载前会先检查依赖是否存在
 
 ## getLoadedPlugins(): TimelinePlugin\[]
@@ -1898,6 +1907,8 @@ await timeline.removePlugin("theme-light@1.0.0");
 `${plugin.metadata.name}@${plugin.metadata.version}`
 ```
 
+依赖可以指定精确的 `name@version`，也可以用 `name` 匹配任一已加载版本。当依赖方仍在初始化、运行或卸载时，手动移除最后一个匹配版本会返回 `false`。先卸载依赖方即可移除该版本。
+
 ## setTheme(theme: "light" | "dark"): Promise<boolean>
 
 切换内置亮色/暗色主题。
@@ -1911,10 +1922,9 @@ await timeline.setTheme("dark");
 await timeline.setTheme("light");
 ```
 
-说明：
+构造时的初始主题、`setTheme()`、`usePlugin(theme)` 以及对当前或已排队主题的移除按调用顺序执行。切换成功时先卸载旧主题，再激活新主题并触发 `theme:change`。轮到当前已激活的主题时直接返回 `true`。
 
-* `setTheme()` 内部会在 `LightThemePlugin` 和 `DarkThemePlugin` 之间切换
-* 切换主题时会卸载旧主题并触发 `theme:change`
+如果依赖方仍需要当前主题，切换返回 `false`，当前主题继续生效。新主题激活失败时，管理器清理本次注册、恢复调色板，并尝试重新激活旧主题，切换返回 `false`。如果旧主题也未能重新激活，`getLoadedPlugins()` 中没有活动主题，后续仍可切换。
 
 ## 构造时指定主题
 
@@ -2261,7 +2271,9 @@ type BusinessId = string | number;
 
 type ScheduleErrorCode =
   | "invalid_input" | "duplicate_business_id" | "not_found"
-  | "missing_business_id" | "destroyed";
+  | "missing_business_id" | "destroyed"
+  // M2 编辑协议新增
+  | "busy" | "reconciliation_required" | "invalid_server_result" | "stale_operation";
 
 interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
 type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };
@@ -2464,7 +2476,7 @@ export default defineConfig({
 });
 ```
 
-构建、测试和检查分别使用 `vp pack`、`vp test`、`vp lint`，测试 API 从 `vite-plus/test` 导入。Vite+ 已提供构建、测试、检查和格式化工具，因此不再独立依赖 tsdown、Vitest、Oxlint。直接声明的 `vite` 是对应版本 Vite+ 核心包的别名。V8 覆盖率插件仍需单独安装，并与内置 Vitest 保持版本一致。
+构建、测试和检查分别使用 `vp pack`、`vp test`、`vp lint`，测试 API 从 `vite-plus/test` 导入。Vite+ 已提供构建、测试、检查和格式化工具，因此不再独立依赖 tsdown、Vitest、Oxlint。本工作区不声明指向 Vite+ 核心包的 `vite` 别名：`vp pack` / `vp build` 通过 `vite-plus` 运行在 `@voidzero-dev/vite-plus-core` 上，内置 Vitest 则自行解析上游 `vite`。V8 覆盖率插件仍需单独安装，并与内置 Vitest 保持版本一致。
 
 ## 包输出
 
@@ -2767,7 +2779,7 @@ pnpm -C packages/mcp-service start
 
 ## 工具列表
 
-下面列出本仓库 MCP server v2.0 暴露的全部工具（8 个）。返回值统一为文本（text）。
+下面列出本仓库 MCP server v2.0 暴露的全部工具（10 个）。返回值统一为文本（text）。
 
 > **与 v1.0 的区别**：删除了 6 个与 VS Code 内置工具重叠的工具（`timeline_search`、`timeline_read_excerpt`、`timeline_repo_map`、`timeline_trace_entrypoints`、`timeline_run_repo_script`、`timeline_run_mcp_script`），新增 5 个语义分析工具。
 
@@ -3046,30 +3058,6 @@ pnpm -C packages/mcp-service start
 
 
 ---
-url: /timeline-canvas/guide/resource-scheduling.md
----
-
-import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
-
-<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
-  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>资源排程查看</h1>
-
-  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
-    固定左栏显示产线名称/状态/利用率，任务显示工单号、数量、完成百分比与告警。
-    查看模式可点击工单查看详情；增量刷新与视口订阅保持业务身份稳定。
-    「启用异步提交」后进入 M2 编辑协议（需先启动 <code>node scripts/schedule-demo-server.mjs</code>）：
-    拖动/拉伸产生候选 → 同步校验 → onBeforeCommit 提交 → 服务器接受/拒绝/修正；
-    写后断连等未知结果进入「保存结果待确认」（画布内琥珀色“待核对”角标），同任务锁定，
-    需「查询权威恢复」经 reconcileScheduleEvent 解除。演示服务器只权威管理时间窗/产线，
-    恢复时内容字段取自本地已确认事实。导出与查询始终只含已确认事实。
-  </p>
-
-  <ResourceScheduleHost lang="zh" />
-</main>
-
-
-
----
 url: /timeline-canvas/guide/usage.md
 ---
 
@@ -3150,7 +3138,7 @@ timeline.loadData({
         },
       ],
     },
-    { events: [{ startTime: 1800, endTime: 1800, title: "需求评审" }] },
+    { events: [{ startTime: 1800, endTime: 2700, title: "需求评审" }] },
   ],
 });
 ```
@@ -3367,7 +3355,7 @@ url: /timeline-canvas/guide/user-mcp.md
 
 ## 包状态与环境要求
 
-用户 MCP 当前版本为 `timeline-canvas-user-mcp@0.1.0`。通过 npm 启动：
+用户 MCP 当前版本为 `timeline-canvas-user-mcp@0.1.2`。通过 npm 启动：
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -3381,14 +3369,14 @@ MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mc
 * CI 使用 Node.js 24.20.0
 * 用户应用已安装 `timeline-canvas`
 
-模板只使用公开 API，已经过 `timeline-canvas@1.4.1` 和当前版本 `timeline-canvas@1.5.0` 验证。每个成功工具响应都包含 `project` 对象：
+模板只使用公开 API，已经过 `timeline-canvas` 的 `1.4.1`、`1.5.0`、`1.6.0` 和 `1.6.1` 验证。每个成功工具响应都包含 `project` 对象：
 
 | 字段 | 含义 |
 |---|---|
 | `root` | 解析后的用户项目根目录 |
 | `installedVersion` | 从用户项目已安装的 `timeline-canvas` 解析出的版本，未安装时为 `null` |
-| `testedVersion` | 当前模板测试目标，`1.5.0` |
-| `compatibility` | 已安装 `1.4.1` 或 `1.5.0` 时为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed` |
+| `testedVersion` | 当前模板测试目标，`1.6.1` |
+| `compatibility` | 已安装 `1.4.1`、`1.5.0`、`1.6.0` 或 `1.6.1` 时为 `tested-version`；其他已安装版本为 `unverified-version`；无法解析依赖时为 `not-installed` |
 
 每个生成或调整后的插件都需要使用 `timeline_user_validate_plugin`，根据用户项目实际安装的公开声明进行校验。`tested-version` 记录已知模板验证情况，不代表应用插件源码已经通过校验。
 
@@ -3462,11 +3450,11 @@ pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service pack
 ```
 
-包目录中会生成 `timeline-canvas-user-mcp-0.1.0.tgz`。将它安装到用户项目：
+包目录中会生成 `timeline-canvas-user-mcp-0.1.2.tgz`。将它安装到用户项目：
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 将 MCP 客户端指向安装后的可执行文件：
@@ -3557,7 +3545,7 @@ npm 包客户端可以使用：
 }
 ```
 
-响应包含 `files: [{ path, content }]`、usage、notes、已安装库版本、模板 `testedVersion` 和兼容状态。模板只使用公开 API，已经过 `timeline-canvas@1.4.1` 和 `timeline-canvas@1.5.0` 验证；当前 `testedVersion` 为 `1.5.0`。agent 审核后应用返回源码。
+响应包含 `files: [{ path, content }]`、usage、notes、已安装库版本、模板 `testedVersion` 和兼容状态。模板只使用公开 API，已经过 `timeline-canvas` 的 `1.4.1`、`1.5.0`、`1.6.0` 和 `1.6.1` 验证；当前 `testedVersion` 为 `1.6.1`。agent 审核后应用返回源码。
 
 ## `timeline_user_validate_plugin`
 
@@ -3618,10 +3606,10 @@ url: /timeline-canvas/index.md
 
 
 ---
-url: /timeline-canvas/playground.md
+url: /timeline-canvas/playground/media-timeline.md
 ---
 
-import TimelinePlayground from "../public/components/TimelinePlayground";
+import TimelinePlayground from "../../public/components/TimelinePlayground";
 
 <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
   <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>演练场 · 媒体时间轴</h1>
@@ -3635,17 +3623,25 @@ import TimelinePlayground from "../public/components/TimelinePlayground";
 url: /timeline-canvas/playground/schedule.md
 ---
 
-import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+import { ResourceSchedule } from "../../public/components/ResourceSchedule";
 
 <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
   <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>演练场 · 排产时间轴</h1>
 
   <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
-    「启用异步提交」需先启动 <code>node scripts/schedule-demo-server.mjs</code>；
-    编辑协议与恢复流程详见<a href="/timeline-canvas/guide/resource-scheduling">资源排程查看</a>。
+    固定左栏显示产线名称/状态/利用率，任务显示工单号、数量、完成百分比与告警。
+    查看模式可点击工单查看详情；增量刷新与视口订阅保持业务身份稳定。
   </p>
 
-  <ResourceScheduleHost lang="zh" />
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    「启用异步提交」需先启动 <code>node scripts/schedule-demo-server.mjs</code>，随后进入 M2 编辑协议：
+    拖动/拉伸产生候选 → 同步校验 → onBeforeCommit 提交 → 服务器接受/拒绝/修正；
+    写后断连等未知结果进入「保存结果待确认」（画布内琥珀色“待核对”角标），同任务锁定，
+    需「查询权威恢复」经 reconcileScheduleEvent 解除。演示服务器只权威管理时间窗/产线，
+    恢复时内容字段取自本地已确认事实。导出与查询始终只含已确认事实。
+  </p>
+
+  <ResourceSchedule lang="zh" />
 </main>
 
 
@@ -3659,9 +3655,17 @@ url: /timeline-canvas/plugins/plugin-development/advanced.md
 ```javascript
 // 使用共享数据或公开方法进行通信
 const SharedStorePlugin = () => ({
+  metadata: {
+    name: "shared-store",
+    version: "1.0.0",
+    description: "在插件之间共享消息",
+    type: PluginType.EXTENSION,
+  },
+  // 只有 init / activate / deactivate / destroy 是生命周期钩子
   activate(context) {
     context.api.setData("shared:messages", []);
   },
+  // 其余方法只是普通自定义方法，不是钩子：在工厂返回的对象上显式调用
   pushMessage(context, message) {
     const list = context.api.getData("shared:messages") || [];
     list.push(message);
@@ -3673,11 +3677,26 @@ const SharedStorePlugin = () => ({
 ## 插件链式调用
 
 ```javascript
-// 通过插件优先级保证执行顺序
+// 通过插件优先级保证激活顺序
+const performValidation = (payload) => {
+  // ...校验逻辑
+  return { allowed: true };
+};
+
 const ValidationPlugin = () => ({
-  metadata: { priority: PluginPriority.HIGH },
-  validateEventMove(payload) {
-    return this.performValidation(payload);
+  metadata: {
+    // name / version / description / type 为必填，仅 priority 可选
+    name: "validation",
+    version: "1.0.0",
+    description: "在提交前校验事件移动",
+    type: PluginType.EVENT_HANDLER,
+    priority: PluginPriority.HIGH,
+  },
+  activate(context) {
+    // 插件是普通对象字面量，没有 `this`：改为在插件 API 上注册处理器
+    context.api.registerEventHandler("validate:event:move", (payload) =>
+      performValidation(payload)
+    );
   },
 });
 ```
@@ -3686,15 +3705,21 @@ const ValidationPlugin = () => ({
 
 ```javascript
 // 条件加载
-const ConditionalPlugin = () => ({
+const ConditionalPlugin = (options = {}) => ({
+  metadata: {
+    name: "conditional",
+    version: "1.0.0",
+    description: "由宿主决定是否加载额外插件",
+    type: PluginType.EXTENSION,
+  },
   init(context) {
-    // 检查条件
-    if (context.timeline.config.enableAdvancedFeatures) {
-      // 动态加载高级功能插件
-      import("./advanced-plugin.js").then((module) => {
-        context.timeline.usePlugin(module.default);
-      });
-    }
+    // 开关由调用方传入：TimelineConfig 没有 `enableAdvancedFeatures` 字段
+    if (!options.enableAdvancedFeatures) return;
+
+    // 动态加载高级功能插件
+    import("./advanced-plugin.js").then((module) => {
+      context.timeline.usePlugin(module.default);
+    });
   },
 });
 ```
@@ -3706,15 +3731,21 @@ const ConditionalPlugin = () => ({
 ```javascript
 // 添加调试信息
 const DebugPlugin = () => ({
+  metadata: {
+    name: "debug",
+    version: "1.0.0",
+    description: "输出插件调试信息",
+    type: PluginType.TOOL,
+  },
   activate(context) {
-    if (context.timeline.config.debug) {
-      console.log("插件调试模式已启用");
+    if (!context.timeline.config.debug) return;
 
-      // 注册调试事件
-      context.api.registerEventHandler("debug:info", (info) => {
-        console.log("调试信息:", info);
-      });
-    }
+    console.log("插件调试模式已启用");
+
+    // 注册调试事件
+    context.api.registerEventHandler("debug:info", (info) => {
+      console.log("调试信息:", info);
+    });
   },
 });
 ```
@@ -4267,6 +4298,8 @@ context.api.registerEventHandler("my:custom:event", (payload: unknown) => payloa
 * `render:event:media`：`(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)`（11 元组，与 `EventsRenderer` 的发射一致；拖动帧中拖动事件的可见表示由 `InteractionRenderer` 发射一次）
 * `validate:event:move`：单个载荷对象 `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`
 
+每次 `emitEvent()` 和 `validateEvent()` 按分发开始时的处理器列表执行。回调中的注册或注销从下一次分发起生效，嵌套分发也会读取更新后的列表。
+
 
 
 ---
@@ -4638,6 +4671,14 @@ interface CoreLayerHook {
 * 不调用 `next()` 表示完全接管该核心层
 * 多个 hook 会形成一条中间件链
 
+### 回调绘图状态与注册名称
+
+每个背景层、覆盖层和 `render:event:media` 处理器都有本次回调专用的 2D 上下文。回调返回时，渲染器恢复变换、样式和裁剪，即使 `save()` 与 `restore()` 次数不匹配。某个图层抛错后，其余回调和当前帧合成继续执行，已画出的像素保留。绘制应在回调内同步使用传入的 `ctx`。
+
+核心层 hook 可以在 `next()` 外包裹变换或裁剪。每次回调的 `next()` 最多执行一次，回调返回即失效。在调用 `next()` 前抛错时，渲染器恢复当前 hook 的绘图状态，继续后续链。在调用后抛错时，后续绘制只保留已执行的一次。
+
+图层和 hook 使用独立的名称表。在各自表内，同名项以最后一次注册为准。每个插件可注销自己的条目。覆盖项卸载或激活失败回滚时，恢复该名称下最近一次仍然有效的注册。不同名称之间按插件优先级降序执行，同优先级按注册顺序执行。
+
 ## RenderLayer 示例
 
 ```ts
@@ -4710,5 +4751,7 @@ const timeline = new Timeline("canvas", {
 ```
 
 约束：所有上下文数据只读；绘制顺序为 背景 → 媒体 hook → 自定义/默认内容 → 选中边框/手柄等交互装饰；回调抛异常时以固定错误码记录并回退默认内容（不会重复绘制媒体），下一帧即可恢复；不允许通过该回调改变核心命中矩形或绕过 readOnly。
+
+排程草稿的 `rect` 位于目标轨候选位置。媒体处理器和内容回调收到已确认事件及其源轨下标，即使源轨已经滚出视口。`commitState` 区分预览、等待确认和待核对状态。
 
 

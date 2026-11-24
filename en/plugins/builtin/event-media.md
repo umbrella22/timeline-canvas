@@ -40,19 +40,18 @@ timeline.loadData({
 ## `media` field
 
 ```ts
-interface TimelineEvent["media"] {
-  images?: Array<{
-    src: string;
-    fit?: "cover" | "contain" | "stretch";
-    opacity?: number;
-  }>;
-  waveform?: {
-    data: Float32Array | number[];
-    color?: string;
-    backgroundColor?: string;
-    opacity?: number;
-  };
-}
+type EventMedia = NonNullable<TimelineEvent["media"]>;
+
+// equivalent to:
+// {
+//   images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
+//   waveform?: {
+//     data: Float32Array | number[];
+//     color?: string;
+//     backgroundColor?: string;
+//     opacity?: number;
+//   };
+// }
 ```
 
 ## Mixed-media example
@@ -89,7 +88,9 @@ timeline.loadData({
 
 ## Implementation details
 
-* Images are fetched asynchronously and cached as `ImageBitmap`
+* Within one plugin activation, the same `src` shares one in-flight fetch and one decoded bitmap across events, upserts and reloads. `fit` and `opacity` apply at draw time. Use a versioned `src` when the image bytes change.
+* The decoded image cache retains up to 256 sources and 64 MiB of estimated RGBA data. It evicts the least recently drawn source first. Oversized images are scaled proportionally to fit the byte budget. Unloading aborts pending requests and closes retained or late-arriving bitmaps.
+* A failed fetch, HTTP response or decode schedules up to two redraws, after 1 and 2 seconds. Each retries the source only if it is still drawn. Later draws may retry after an exponential cooldown capped at 30 seconds.
 * Waveform data is cached as `Float32Array`
 * When available, the plugin pre-renders waveforms with `OffscreenCanvas`
 * Images and waveforms are clipped to the event block bounds

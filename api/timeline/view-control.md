@@ -176,7 +176,7 @@ timeline.notifyChange("config:readOnly");
 
 ### endChangeBatch(): void
 
-把多次状态变更合并到一次重绘中。
+批次可以嵌套。最外层 `endChangeBatch()` 统一重绘，并在时间指示器高亮发生变化时发送一次最终结果。
 
 ```ts
 timeline.beginChangeBatch();

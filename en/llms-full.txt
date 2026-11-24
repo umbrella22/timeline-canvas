@@ -675,6 +675,7 @@ Notes:
 * The factory `htmlTemplate` takes precedence over `contextMenuHtml`
 * If the template is empty, the plugin falls back to canvas rendering
 * Only string-valued `contextMenuHtml` is treated as a template by the current implementation
+* The template is trusted host markup. Default canvas menu labels are drawn as plain text.
 
 ## Runtime behavior
 
@@ -718,7 +719,11 @@ await timeline.usePlugin(
     borderColor: "#555",
     fontSize: 12,
     fontFamily: "Arial, sans-serif",
-    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+    htmlTemplate: (title) => {
+      const label = document.createElement("strong");
+      label.textContent = title;
+      return label.outerHTML;
+    },
   })
 );
 ```
@@ -729,6 +734,8 @@ await timeline.usePlugin(
 * The default delay is `300ms`
 * Hover hit-testing is throttled with `mousemove` plus `requestAnimationFrame`
 * In HTML mode, an empty `htmlTemplate(title)` result falls back to canvas rendering
+* Showing, moving or hiding a tooltip invalidates the overlay so the change appears on an otherwise idle timeline.
+* `htmlTemplate` returns trusted markup. Insert external titles with `textContent` as in the example.
 
 ## Good fit for
 
@@ -941,19 +948,18 @@ timeline.loadData({
 ## `media` field
 
 ```ts
-interface TimelineEvent["media"] {
-  images?: Array<{
-    src: string;
-    fit?: "cover" | "contain" | "stretch";
-    opacity?: number;
-  }>;
-  waveform?: {
-    data: Float32Array | number[];
-    color?: string;
-    backgroundColor?: string;
-    opacity?: number;
-  };
-}
+type EventMedia = NonNullable<TimelineEvent["media"]>;
+
+// equivalent to:
+// {
+//   images?: Array<{ src: string; fit?: "cover" | "contain" | "stretch"; opacity?: number }>;
+//   waveform?: {
+//     data: Float32Array | number[];
+//     color?: string;
+//     backgroundColor?: string;
+//     opacity?: number;
+//   };
+// }
 ```
 
 ## Mixed-media example
@@ -990,7 +996,9 @@ timeline.loadData({
 
 ## Implementation details
 
-* Images are fetched asynchronously and cached as `ImageBitmap`
+* Within one plugin activation, the same `src` shares one in-flight fetch and one decoded bitmap across events, upserts and reloads. `fit` and `opacity` apply at draw time. Use a versioned `src` when the image bytes change.
+* The decoded image cache retains up to 256 sources and 64 MiB of estimated RGBA data. It evicts the least recently drawn source first. Oversized images are scaled proportionally to fit the byte budget. Unloading aborts pending requests and closes retained or late-arriving bitmaps.
+* A failed fetch, HTTP response or decode schedules up to two redraws, after 1 and 2 seconds. Each retries the source only if it is still drawn. Later draws may retry after an exponential cooldown capped at 30 seconds.
 * Waveform data is cached as `Float32Array`
 * When available, the plugin pre-renders waveforms with `OffscreenCanvas`
 * Images and waveforms are clipped to the event block bounds
@@ -1253,6 +1261,7 @@ addEvent(
 
 Notes:
 
+* With `onEventAdd` registered, the library clones the callback snapshot before insertion. An uncloneable `customData` value such as a function raises `DataCloneError` before the event is added or the callback runs.
 * `trackIndex` must refer to an existing track
 * In the public API, the third argument is documented as `endTime`
 * The current implementation tolerates some duration-like inputs, but you should pass a real end time for clarity
@@ -1293,7 +1302,7 @@ timeline.deleteEvent(0, 1);
 Notes:
 
 * A successful delete triggers `events:delete`
-* If `autoRemoveEmptyLastTrack` is enabled, the final empty track may be removed automatically
+* With `autoRemoveEmptyLastTrack` enabled, cleanup removes trailing empty tracks up to the first reserved track. Automatic removal invokes `onTrackRemove` before `onEventDelete`.
 
 ## addTrack(): void
 
@@ -1384,18 +1393,44 @@ The new methods revolve around the optional `businessId` (`string | number`): st
 
 Strict schedule import: the whole batch is validated first and published atomically in one shot; on failure nothing is written and previous tracks/selection/indexes stay intact. Every track and event must carry a `businessId`; empty `tracks` yields `invalid_input`, duplicate identities yield `duplicate_business_id`, out-of-window times yield `invalid_input` with `path` pointing at the field. A successful import clears selection (same as `loadData`); use `upsertScheduleEvents` / `updateEventByBusinessId` for refreshes that must preserve selection.
 
+```ts
+const result = timeline.loadScheduleData({
+  tracks: [
+    {
+      businessId: "A1",
+      customData: { name: "Line A1", status: "Running", utilization: 22.2 },
+      events: [
+        { businessId: "A1-WO-00001", startTime: 28800, endTime: 32400, title: "Work order 1" },
+      ],
+    },
+  ],
+});
+if (!result.ok) {
+  console.log(result.error.code, result.error.path); // safe: never contains the raw payload
+}
+```
+
 ### exportScheduleData(): ScheduleResult<ScheduleDataFormat>
 
-Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated.
+Exports an isolated strict snapshot: no numeric ids, selection, scrolling or caches; `customData` is deep-copied; `Float32Array` waveform data becomes `number[]`. Events or tracks without a business identity produce `missing_business_id` — identities are never fabricated. Duplicate resource or event identities in legacy data produce `duplicate_business_id` with the path of the duplicate. Colors equal to the palette default are not exported (reloading derives the same color again).
 
-### Queries, patch, upsert, delete, highlight, track metadata
+### getEventByBusinessId(id) / getTrackByBusinessId(id)
 
-* `getEventByBusinessId(id)` / `getTrackByBusinessId(id)` return isolated snapshots (`null` when unknown).
-* `updateEventByBusinessId(id, patch)` validates merged times and recomputes duration; `customData` is replaced wholesale; `id` / `businessId` / `duration` cannot be patched.
-* `upsertScheduleEvents(items)` replaces complete business events; existing identities are replaced or moved atomically after whole-batch validation.
+Look up by business identity; returns a snapshot isolated from memory (`customData` deep-copied). Unknown identities return `null`.
+
+### updateEventByBusinessId(id, patch): ScheduleResult<void>
+
+Merging patch: start/end are validated after the merge and duration is recomputed; `customData` is replaced wholesale at the top level (no deep merge); `id` / `businessId` / `duration` cannot be patched. Unknown identities return `not_found`.
+
+### upsertScheduleEvents(items): ScheduleResult<void>
+
+Whole-batch replacement of complete business events: the batch is validated first (including duplicates inside the batch and resource existence) and applied in order once everything passes. Existing business identities are replaced in place or moved to the target resource (identity and internal numeric id preserved); missing ones are appended using the existing internal id allocation; omitted optional fields fall back to their defaults.
+
+### deleteEventByBusinessId(id) / highlightEventByBusinessId(id) / updateTrackByBusinessId(id, patch)
+
 * `deleteEventByBusinessId(id)` re-resolves interaction pointers by identity, so deleting a neighbour never drifts the selection.
 * `highlightEventByBusinessId(id)` mirrors `highlightEvent`.
-* `updateTrackByBusinessId(id, patch)` updates resource metadata only.
+* `updateTrackByBusinessId(id, patch)` updates resource metadata only (`customData` replaced wholesale) and does not change time configuration.
 
 ### Compatibility notes
 
@@ -1618,7 +1653,7 @@ Common `ChangeType` values:
 
 ### endChangeBatch(): void
 
-Batches multiple state changes into a single redraw cycle.
+Batches multiple state changes into a single redraw cycle. Batches can nest. The outermost `endChangeBatch()` draws the final state and delivers any time-indicator highlight change.
 
 ```ts
 timeline.beginChangeBatch();
@@ -1765,6 +1800,14 @@ Returns the current viewport snapshot in logical pixels: width/height/dpr, scrol
 
 Subscribes to viewport changes. The listener receives the current snapshot synchronously at registration; afterwards at most one notification per rendered frame, after derived layout and scroll clamping settle. The unsubscribe function is idempotent and `destroy()` clears every subscription and pending notification. Listener exceptions are isolated. Covered changes: scroll:x/y, zoom:change, canvas:resize, tracks:add/update/remove, data:load, config:endTime and `adjustCanvasSize()` after host-driven row-height changes.
 
+```ts
+const unsubscribe = timeline.subscribeViewport((snapshot) => {
+  positionLeftColumn(snapshot);
+});
+unsubscribe();
+unsubscribe(); // idempotent
+```
+
 ### getTrackRectByBusinessId(id): TrackRect | null
 
 Returns row geometry for a resource identity: `businessId`, `trackIndex`, the full `rect` and `visibleRect` (intersection with the drawable viewport; `null` when fully off-screen; off-screen rows still return the full rect). Unknown identities return `null`. The row formula is shared with `TracksRenderer`: `y = timelineHeight + firstTrackTopMargin + index * (trackHeight + trackMargin) - scrollY`.
@@ -1868,6 +1911,8 @@ Plugin IDs use this format:
 `${plugin.metadata.name}@${plugin.metadata.version}`
 ```
 
+A dependency can name an exact `name@version` or any loaded version of `name`. Manual removal returns `false` while the plugin is the last matching provider for a dependent. This also applies during the dependent’s activation and teardown. Remove the dependent first.
+
 ## setTheme(theme: "light" | "dark"): Promise<boolean>
 
 Switches between the built-in light and dark themes.
@@ -1881,11 +1926,9 @@ await timeline.setTheme("dark");
 await timeline.setTheme("light");
 ```
 
-Notes:
+The constructor’s initial theme, `setTheme()`, `usePlugin(theme)` and removal of a current or queued theme run in invocation order. A successful switch unloads the previous theme, activates the requested theme and emits `theme:change`. Selecting the active theme returns `true` immediately when its turn arrives.
 
-* `setTheme()` switches between `LightThemePlugin` and `DarkThemePlugin`
-* The old theme is unloaded before the new one is loaded
-* A successful switch triggers `theme:change`
+If a dependent still requires the active theme, the switch returns `false` and the theme remains active. If activation fails, the manager cleans up the attempted registrations, restores the palette and tries to reactivate the previous theme. The switch returns `false`. If reactivation also fails, `getLoadedPlugins()` shows no active theme and a subsequent switch can select one.
 
 ## Set a theme at construction time
 
@@ -2232,7 +2275,9 @@ type BusinessId = string | number;
 
 type ScheduleErrorCode =
   | "invalid_input" | "duplicate_business_id" | "not_found"
-  | "missing_business_id" | "destroyed";
+  | "missing_business_id" | "destroyed"
+  // added by the M2 editing protocol
+  | "busy" | "reconciliation_required" | "invalid_server_result" | "stale_operation";
 
 interface ScheduleError { code: ScheduleErrorCode; path?: string; message: string }
 type ScheduleResult<T> = { ok: true; value: T } | { ok: false; error: ScheduleError };
@@ -2435,7 +2480,7 @@ export default defineConfig({
 });
 ```
 
-Build, test and lint commands use `vp pack`, `vp test` and `vp lint`. Test APIs are imported from `vite-plus/test`. Vite+ supplies the build, test, lint and formatting tools, so standalone tsdown, Vitest and Oxlint dependencies are unnecessary. The direct `vite` dependency is an alias to the matching Vite+ core package. The V8 coverage provider remains a separate dependency matching the bundled Vitest version.
+Build, test and lint commands use `vp pack`, `vp test` and `vp lint`. Test APIs are imported from `vite-plus/test`. Vite+ supplies the build, test, lint and formatting tools, so standalone tsdown, Vitest and Oxlint dependencies are unnecessary. The workspace declares no `vite` alias to Vite+ core: `vp pack` / `vp build` run on `@voidzero-dev/vite-plus-core` through `vite-plus`, while the bundled Vitest resolves its own upstream `vite`. The V8 coverage provider remains a separate dependency matching the bundled Vitest version.
 
 ## Package Outputs
 
@@ -2738,7 +2783,7 @@ Below are common workflows you’ll likely use most in Copilot Chat.
 
 ## Tool List
 
-Below is the full set of tools exposed by MCP server v2.0 in this repo (8 tools). All return values are plain text.
+Below is the full set of tools exposed by MCP server v2.0 in this repo (10 tools). All return values are plain text.
 
 > **Compared to v1.0**: Removed 6 tools that overlapped with VS Code built-ins (`timeline_search`, `timeline_read_excerpt`, `timeline_repo_map`, `timeline_trace_entrypoints`, `timeline_run_repo_script`, `timeline_run_mcp_script`) and added 5 semantic analysis tools.
 
@@ -3017,32 +3062,6 @@ Example:
 
 
 ---
-url: /timeline-canvas/en/guide/resource-scheduling.md
----
-
-import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
-
-<main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
-  <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>Resource Schedule View</h1>
-
-  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
-    A fixed left column shows line name/status/utilization; each task shows the work order id, quantity, completion percentage and alerts. Click a work order in view mode for details. Incremental refreshes and the viewport subscription keep business identities stable.
-    Enable "Enable async commit" to enter the M2 editing protocol (start
-    <code>node scripts/schedule-demo-server.mjs</code> first): drags/resizes create a candidate →
-    synchronous validation → onBeforeCommit → server accept/reject/correction. Unknown results
-    (response cut after the server wrote) enter "save result pending confirmation", lock the task
-    (amber badge on the task), and require "Query authoritative recovery" + reconcileScheduleEvent
-    to unlock. The demo server is authoritative for placement only (time window and line);
-    recovery restores content fields from the local confirmed facts. Export and queries
-    always contain confirmed facts only.
-  </p>
-
-  <ResourceScheduleHost lang="en" />
-</main>
-
-
-
----
 url: /timeline-canvas/en/guide/usage.md
 ---
 
@@ -3123,7 +3142,7 @@ timeline.loadData({
         },
       ],
     },
-    { events: [{ startTime: 1800, endTime: 1800, title: "Requirements Review" }] },
+    { events: [{ startTime: 1800, endTime: 2700, title: "Requirements Review" }] },
   ],
 });
 ```
@@ -3340,7 +3359,7 @@ Enable only the server needed for the current workspace by default. The servers 
 
 ## Package Status and Requirements
 
-The current user MCP package is `timeline-canvas-user-mcp@0.1.0`. Start it from npm with:
+The current user MCP package is `timeline-canvas-user-mcp@0.1.2`. Start it from npm with:
 
 ```bash
 MCP_WORKSPACE_ROOT=/absolute/path/to/user-project npx -y timeline-canvas-user-mcp@latest
@@ -3354,14 +3373,14 @@ Runtime requirements match the repository:
 * CI uses Node.js 24.20.0
 * The user application installs `timeline-canvas`
 
-The templates use only public APIs and have been verified against `timeline-canvas@1.4.1` and the current `timeline-canvas@1.5.0` release. Every successful tool response includes a `project` object:
+The templates use only public APIs and have been verified against `timeline-canvas` versions `1.4.1`, `1.5.0`, `1.6.0`, and `1.6.1`. Every successful tool response includes a `project` object:
 
 | Field | Meaning |
 |---|---|
 | `root` | Resolved user-project root |
 | `installedVersion` | Version resolved from the user project's installed `timeline-canvas`, or `null` |
-| `testedVersion` | Current template test target, `1.5.0` |
-| `compatibility` | `tested-version` for installed `1.4.1` or `1.5.0`; `unverified-version` for any other installed version; `not-installed` when the package cannot be resolved |
+| `testedVersion` | Current template test target, `1.6.1` |
+| `compatibility` | `tested-version` for installed `1.4.1`, `1.5.0`, `1.6.0`, or `1.6.1`; `unverified-version` for any other installed version; `not-installed` when the package cannot be resolved |
 
 Run `timeline_user_validate_plugin` for every generated or adapted plugin against the user project's installed public declarations. `tested-version` records known template verification and does not validate the application's plugin code.
 
@@ -3435,11 +3454,11 @@ pnpm -C /path/to/timeline-canvas/packages/user-mcp-service build
 pnpm -C /path/to/timeline-canvas/packages/user-mcp-service pack
 ```
 
-The package directory receives `timeline-canvas-user-mcp-0.1.0.tgz`. Install that file into the user project:
+The package directory receives `timeline-canvas-user-mcp-0.1.2.tgz`. Install that file into the user project:
 
 ```bash
 pnpm --dir /absolute/path/to/user-project add -D \
-  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.0.tgz
+  /path/to/timeline-canvas/packages/user-mcp-service/timeline-canvas-user-mcp-0.1.2.tgz
 ```
 
 Point the MCP client at the installed executable:
@@ -3530,7 +3549,7 @@ Example:
 }
 ```
 
-The response contains `files: [{ path, content }]`, usage, notes, the installed library version, the template `testedVersion`, and a compatibility status. The templates use only public APIs and are tested against `timeline-canvas@1.4.1` and `timeline-canvas@1.5.0`; the current `testedVersion` is `1.5.0`. The agent applies the returned source after review.
+The response contains `files: [{ path, content }]`, usage, notes, the installed library version, the template `testedVersion`, and a compatibility status. The templates use only public APIs and are tested against `timeline-canvas` versions `1.4.1`, `1.5.0`, `1.6.0`, and `1.6.1`; the current `testedVersion` is `1.6.1`. The agent applies the returned source after review.
 
 ## `timeline_user_validate_plugin`
 
@@ -3591,10 +3610,10 @@ url: /timeline-canvas/en/index.md
 
 
 ---
-url: /timeline-canvas/en/playground.md
+url: /timeline-canvas/en/playground/media-timeline.md
 ---
 
-import TimelinePlayground from "../public/components/TimelinePlayground";
+import TimelinePlayground from "../../public/components/TimelinePlayground";
 
 <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
   <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
@@ -3610,7 +3629,7 @@ import TimelinePlayground from "../public/components/TimelinePlayground";
 url: /timeline-canvas/en/playground/schedule.md
 ---
 
-import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHost";
+import { ResourceSchedule } from "../../public/components/ResourceSchedule";
 
 <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px clamp(12px, 3vw, 32px) 32px" }}>
   <h1 style={{ margin: "0 0 12px", fontSize: 20, lineHeight: 1.3, letterSpacing: 0 }}>
@@ -3618,12 +3637,23 @@ import { ResourceScheduleHost } from "../../public/components/ResourceScheduleHo
   </h1>
 
   <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
-    "Enable async commit" requires <code>node scripts/schedule-demo-server.mjs</code> first;
-    see <a href="/timeline-canvas/en/guide/resource-scheduling">Resource Schedule View</a> for the
-    editing protocol and recovery flow.
+    A fixed left column shows line name/status/utilization; each task shows the work order id, quantity,
+    completion percentage and alerts. Click a work order in view mode for details. Incremental refreshes
+    and the viewport subscription keep business identities stable.
   </p>
 
-  <ResourceScheduleHost lang="en" />
+  <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    Enable "Enable async commit" to enter the M2 editing protocol (start
+    <code>node scripts/schedule-demo-server.mjs</code> first): drags/resizes create a candidate →
+    synchronous validation → onBeforeCommit → server accept/reject/correction. Unknown results
+    (response cut after the server wrote) enter "save result pending confirmation", lock the task
+    (amber badge on the task), and require "Query authoritative recovery" + reconcileScheduleEvent
+    to unlock. The demo server is authoritative for placement only (time window and line);
+    recovery restores content fields from the local confirmed facts. Export and queries
+    always contain confirmed facts only.
+  </p>
+
+  <ResourceSchedule lang="en" />
 </main>
 
 
@@ -3637,9 +3667,18 @@ url: /timeline-canvas/en/plugins/plugin-development/advanced.md
 ```javascript
 // Communicate via shared data or exposed methods
 const SharedStorePlugin = () => ({
+  metadata: {
+    name: "shared-store",
+    version: "1.0.0",
+    description: "Shares messages between plugins",
+    type: PluginType.EXTENSION,
+  },
+  // Only init / activate / deactivate / destroy are lifecycle hooks.
   activate(context) {
     context.api.setData("shared:messages", []);
   },
+  // Any other method is a plain custom method, not a hook: call it explicitly
+  // on the object returned by the factory.
   pushMessage(context, message) {
     const list = context.api.getData("shared:messages") || [];
     list.push(message);
@@ -3651,11 +3690,27 @@ const SharedStorePlugin = () => ({
 ## Chaining via priority
 
 ```javascript
-// Use plugin priority to control execution order
+// Use plugin priority to control the order in which plugins are activated
+const performValidation = (payload) => {
+  // ...validation logic
+  return { allowed: true };
+};
+
 const ValidationPlugin = () => ({
-  metadata: { priority: PluginPriority.HIGH },
-  validateEventMove(payload) {
-    return this.performValidation(payload);
+  metadata: {
+    // name / version / description / type are required; only priority is optional
+    name: "validation",
+    version: "1.0.0",
+    description: "Validates event moves before they are committed",
+    type: PluginType.EVENT_HANDLER,
+    priority: PluginPriority.HIGH,
+  },
+  activate(context) {
+    // The plugin is a plain object literal, so there is no `this`:
+    // register the handler through the plugin API instead.
+    context.api.registerEventHandler("validate:event:move", (payload) =>
+      performValidation(payload)
+    );
   },
 });
 ```
@@ -3664,15 +3719,22 @@ const ValidationPlugin = () => ({
 
 ```javascript
 // Conditional loading
-const ConditionalPlugin = () => ({
+const ConditionalPlugin = (options = {}) => ({
+  metadata: {
+    name: "conditional",
+    version: "1.0.0",
+    description: "Loads an extra plugin when the host enables it",
+    type: PluginType.EXTENSION,
+  },
   init(context) {
-    // Check conditions
-    if (context.timeline.config.enableAdvancedFeatures) {
-      // Dynamically load an advanced plugin
-      import("./advanced-plugin.js").then((module) => {
-        context.timeline.usePlugin(module.default);
-      });
-    }
+    // The switch comes from the caller: TimelineConfig has no
+    // `enableAdvancedFeatures` option.
+    if (!options.enableAdvancedFeatures) return;
+
+    // Dynamically load an advanced plugin
+    import("./advanced-plugin.js").then((module) => {
+      context.timeline.usePlugin(module.default);
+    });
   },
 });
 ```
@@ -3684,15 +3746,21 @@ const ConditionalPlugin = () => ({
 ```javascript
 // Add debug output
 const DebugPlugin = () => ({
+  metadata: {
+    name: "debug",
+    version: "1.0.0",
+    description: "Logs plugin debug information",
+    type: PluginType.TOOL,
+  },
   activate(context) {
-    if (context.timeline.config.debug) {
-      console.log("Plugin debug mode is enabled");
+    if (!context.timeline.config.debug) return;
 
-      // Register debug events
-      context.api.registerEventHandler("debug:info", (info) => {
-        console.log("Debug info:", info);
-      });
-    }
+    console.log("Plugin debug mode is enabled");
+
+    // Register debug events
+    context.api.registerEventHandler("debug:info", (info) => {
+      console.log("Debug info:", info);
+    });
   },
 });
 ```
@@ -4245,6 +4313,8 @@ Known keys and payloads:
 * `render:event:media`: `(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)` (11-tuple, matching `EventsRenderer`; during drags the visible representation of the dragged event is emitted once by `InteractionRenderer`)
 * `validate:event:move`: a single payload object `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`
 
+Each `emitEvent()` and `validateEvent()` call uses the handler list captured at dispatch start. Registrations or removals inside a handler take effect for the next dispatch, including a nested dispatch.
+
 
 
 ---
@@ -4616,6 +4686,14 @@ Notes:
 * Skip `next()` to fully replace that core layer
 * Multiple hooks form a middleware-style chain
 
+### Callback state and registration names
+
+Background layers, overlay layers and `render:event:media` handlers each receive a scoped 2D context. The renderer restores transforms, styles and clips after each callback, even if its `save()` and `restore()` calls are unbalanced. An exception in one layer allows the remaining callbacks and frame composition to continue. Pixels already drawn remain on the surface. Draw synchronously with the supplied `ctx`.
+
+A core hook can set a transform or clip around `next()`. The continuation runs at most once and expires when the hook returns. An exception before `next()` continues the chain after restoring the hook’s drawing state. An exception after `next()` preserves the single downstream draw.
+
+Layer names and hook names use separate registries. Within each registry, the last registration for a name supplies the active callback. Each plugin can unregister its own entry. Removing an override, including rollback after failed activation, reveals the most recent registration still present under that name. Distinct active names run by descending plugin priority, then by registration order.
+
 ## RenderLayer example
 
 ```ts
@@ -4688,5 +4766,7 @@ const timeline = new Timeline("canvas", {
 ```
 
 Constraints: context data is read-only; the order is background → media hook → custom/default content → selection border/handles and other decorations; a throwing callback is logged with a fixed error code and falls back to the default content (the media hook is not drawn twice) and rendering recovers on the next frame; the callback must not change the core hit rectangle or bypass readOnly.
+
+For a scheduling draft, `rect` locates the candidate on its target track. The media handler and content callback receive the confirmed event and its source indices, including when that source track has scrolled out of view. `commitState` distinguishes preview, pending and reconciliation.
 
 

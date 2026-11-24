@@ -22,7 +22,11 @@ await timeline.usePlugin(
     borderColor: "#555",
     fontSize: 12,
     fontFamily: "Arial, sans-serif",
-    htmlTemplate: (title) => `<div><strong>${title}</strong></div>`,
+    htmlTemplate: (title) => {
+      const label = document.createElement("strong");
+      label.textContent = title;
+      return label.outerHTML;
+    },
   })
 );
 ```
@@ -33,6 +37,8 @@ await timeline.usePlugin(
 * The default delay is `300ms`
 * Hover hit-testing is throttled with `mousemove` plus `requestAnimationFrame`
 * In HTML mode, an empty `htmlTemplate(title)` result falls back to canvas rendering
+* Showing, moving or hiding a tooltip invalidates the overlay so the change appears on an otherwise idle timeline.
+* `htmlTemplate` returns trusted markup. Insert external titles with `textContent` as in the example.
 
 ## Good fit for
 

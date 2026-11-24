@@ -1,2 +1,2 @@
-import { t as EventMediaPlugin } from "../EventMediaPlugin-B1YKwQ8_.mjs";
+import { t as EventMediaPlugin } from "../EventMediaPlugin-bgTbuib5.mjs";
 export { EventMediaPlugin };

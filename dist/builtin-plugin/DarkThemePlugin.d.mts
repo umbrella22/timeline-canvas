@@ -1,2 +1,2 @@
-import { t as DarkThemePlugin } from "../DarkThemePlugin-DN2gKMxW.mjs";
+import { t as DarkThemePlugin } from "../DarkThemePlugin-BFzVkfT7.mjs";
 export { DarkThemePlugin as DarkTheme, DarkThemePlugin };

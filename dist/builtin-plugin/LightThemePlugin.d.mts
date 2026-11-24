@@ -1,2 +1,2 @@
-import { t as LightThemePlugin } from "../LightThemePlugin-DOaW67ZR.mjs";
+import { t as LightThemePlugin } from "../LightThemePlugin-C2kbid6J.mjs";
 export { LightThemePlugin as LightTheme, LightThemePlugin };

@@ -2,7 +2,7 @@ import type { ScheduleDataFormat } from "../../../packages/timeline/src/index";
 
 /**
  * 资源排程示例数据：固定种子可复现。
- * 08:00–18:00（相对秒 28800–64800），产线 A1–A4，工单含数量/完成百分比/告警。
+ * 08:00–18:00（相对秒 28800–64800），产线 A1–A10，工单含数量/完成百分比/告警。
  */
 
 export interface ResourceLineMeta {
@@ -14,7 +14,7 @@ export interface ResourceLineMeta {
   utilization: number;
 }
 
-/** mulberry32 固定种子伪随机，保证 4x40 与 100 行总 10000 两组数据可复现 */
+/** mulberry32 固定种子伪随机，保证 10x40 与 100 行总 10000 两组数据可复现 */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -43,7 +43,11 @@ function buildLines(count: number, rand: () => number): ResourceLineMeta[] {
   });
 }
 
-/** 每行工单互不重叠；工单时长 300–3600 秒，间隔 120–900 秒 */
+/**
+ * 每行工单按时间窗等分槽位排布：第 i 条起点落在第 i 个槽内并做 ≤10% 槽宽抖动，
+ * 条宽取槽宽的 45%–85%。抖动上限 + 条宽上限 = 95% < 100%，因此 count 条工单必然
+ * 全部落在 08:00–18:00 内、互不重叠，且请求数量与实际生成数量一致（不依赖窗口截断）。
+ */
 function buildTrackEvents(
   line: ResourceLineMeta,
   orderOffset: number,
@@ -51,17 +55,16 @@ function buildTrackEvents(
   rand: () => number,
 ): ScheduleDataFormat["tracks"][number]["events"] {
   const events: ScheduleDataFormat["tracks"][number]["events"] = [];
-  let cursor = DAY_START + Math.floor(rand() * 600);
+  const slot = (DAY_END - DAY_START) / count;
   for (let i = 0; i < count; i++) {
-    const duration = 300 + Math.floor(rand() * 3300);
-    const endTime = cursor + duration;
-    if (endTime > DAY_END) break;
+    const startTime = Math.round(DAY_START + i * slot + rand() * slot * 0.1);
+    const endTime = Math.round(startTime + slot * (0.45 + rand() * 0.4));
     const quantity = 10 + Math.floor(rand() * 240);
     const progress = Math.floor(rand() * 101);
     const alert = rand() > 0.85;
     events.push({
       businessId: `${line.businessId}-WO-${(orderOffset + i + 1).toString().padStart(5, "0")}`,
-      startTime: cursor,
+      startTime,
       endTime,
       title: `${line.businessId}-${(orderOffset + i + 1).toString().padStart(5, "0")}`,
       customData: {
@@ -72,15 +75,14 @@ function buildTrackEvents(
         itemEn: `Material ${(orderOffset + i) % 12 + 1}`,
       },
     });
-    cursor = endTime + 120 + Math.floor(rand() * 780);
   }
   return events;
 }
 
-/** 4 产线 x 40 工单的查看示例数据（8 小时工作窗） */
+/** 10 产线 x 40 工单的查看示例数据（10 小时工作窗，08:00–18:00） */
 export function buildResourceSchedule(seed = 20260912): ScheduleDataFormat {
   const rand = mulberry32(seed);
-  const lines = buildLines(4, rand);
+  const lines = buildLines(10, rand);
   let orderOffset = 0;
   return {
     timeIndicatorPosition: DAY_START + 3600,

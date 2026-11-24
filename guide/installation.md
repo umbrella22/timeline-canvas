@@ -54,7 +54,7 @@ export default defineConfig({
 });
 ```
 
-构建、测试和检查分别使用 `vp pack`、`vp test`、`vp lint`，测试 API 从 `vite-plus/test` 导入。Vite+ 已提供构建、测试、检查和格式化工具，因此不再独立依赖 tsdown、Vitest、Oxlint。直接声明的 `vite` 是对应版本 Vite+ 核心包的别名。V8 覆盖率插件仍需单独安装，并与内置 Vitest 保持版本一致。
+构建、测试和检查分别使用 `vp pack`、`vp test`、`vp lint`，测试 API 从 `vite-plus/test` 导入。Vite+ 已提供构建、测试、检查和格式化工具，因此不再独立依赖 tsdown、Vitest、Oxlint。本工作区不声明指向 Vite+ 核心包的 `vite` 别名：`vp pack` / `vp build` 通过 `vite-plus` 运行在 `@voidzero-dev/vite-plus-core` 上，内置 Vitest 则自行解析上游 `vite`。V8 覆盖率插件仍需单独安装，并与内置 Vitest 保持版本一致。
 
 ## 包输出
 

@@ -176,7 +176,7 @@ Common `ChangeType` values:
 
 ### endChangeBatch(): void
 
-Batches multiple state changes into a single redraw cycle.
+Batches multiple state changes into a single redraw cycle. Batches can nest. The outermost `endChangeBatch()` draws the final state and delivers any time-indicator highlight change.
 
 ```ts
 timeline.beginChangeBatch();
@@ -322,6 +322,14 @@ Returns the current viewport snapshot in logical pixels: width/height/dpr, scrol
 ### subscribeViewport(listener): () => void
 
 Subscribes to viewport changes. The listener receives the current snapshot synchronously at registration; afterwards at most one notification per rendered frame, after derived layout and scroll clamping settle. The unsubscribe function is idempotent and `destroy()` clears every subscription and pending notification. Listener exceptions are isolated. Covered changes: scroll:x/y, zoom:change, canvas:resize, tracks:add/update/remove, data:load, config:endTime and `adjustCanvasSize()` after host-driven row-height changes.
+
+```ts
+const unsubscribe = timeline.subscribeViewport((snapshot) => {
+  positionLeftColumn(snapshot);
+});
+unsubscribe();
+unsubscribe(); // idempotent
+```
 
 ### getTrackRectByBusinessId(id): TrackRect | null
 

@@ -116,3 +116,5 @@ context.api.registerEventHandler("my:custom:event", (payload: unknown) => payloa
 
 * `render:event:media`：`(ctx, canvas, config, state, trackIndex, eventIndex, eventX, trackY, eventWidth, eventVerticalPadding, eventHeight)`（11 元组，与 `EventsRenderer` 的发射一致；拖动帧中拖动事件的可见表示由 `InteractionRenderer` 发射一次）
 * `validate:event:move`：单个载荷对象 `{ fromTrackIndex, fromEventIndex, toTrackIndex, newStartTime, duration }`
+
+每次 `emitEvent()` 和 `validateEvent()` 按分发开始时的处理器列表执行。回调中的注册或注销从下一次分发起生效，嵌套分发也会读取更新后的列表。

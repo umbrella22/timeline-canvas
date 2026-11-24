@@ -75,7 +75,7 @@ timeline.loadData({
         },
       ],
     },
-    { events: [{ startTime: 1800, endTime: 1800, title: "需求评审" }] },
+    { events: [{ startTime: 1800, endTime: 2700, title: "需求评审" }] },
   ],
 });
 ```

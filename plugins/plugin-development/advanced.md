@@ -3,9 +3,17 @@
 ```javascript
 // 使用共享数据或公开方法进行通信
 const SharedStorePlugin = () => ({
+  metadata: {
+    name: "shared-store",
+    version: "1.0.0",
+    description: "在插件之间共享消息",
+    type: PluginType.EXTENSION,
+  },
+  // 只有 init / activate / deactivate / destroy 是生命周期钩子
   activate(context) {
     context.api.setData("shared:messages", []);
   },
+  // 其余方法只是普通自定义方法，不是钩子：在工厂返回的对象上显式调用
   pushMessage(context, message) {
     const list = context.api.getData("shared:messages") || [];
     list.push(message);
@@ -17,11 +25,26 @@ const SharedStorePlugin = () => ({
 ## 插件链式调用
 
 ```javascript
-// 通过插件优先级保证执行顺序
+// 通过插件优先级保证激活顺序
+const performValidation = (payload) => {
+  // ...校验逻辑
+  return { allowed: true };
+};
+
 const ValidationPlugin = () => ({
-  metadata: { priority: PluginPriority.HIGH },
-  validateEventMove(payload) {
-    return this.performValidation(payload);
+  metadata: {
+    // name / version / description / type 为必填，仅 priority 可选
+    name: "validation",
+    version: "1.0.0",
+    description: "在提交前校验事件移动",
+    type: PluginType.EVENT_HANDLER,
+    priority: PluginPriority.HIGH,
+  },
+  activate(context) {
+    // 插件是普通对象字面量，没有 `this`：改为在插件 API 上注册处理器
+    context.api.registerEventHandler("validate:event:move", (payload) =>
+      performValidation(payload)
+    );
   },
 });
 ```
@@ -30,15 +53,21 @@ const ValidationPlugin = () => ({
 
 ```javascript
 // 条件加载
-const ConditionalPlugin = () => ({
+const ConditionalPlugin = (options = {}) => ({
+  metadata: {
+    name: "conditional",
+    version: "1.0.0",
+    description: "由宿主决定是否加载额外插件",
+    type: PluginType.EXTENSION,
+  },
   init(context) {
-    // 检查条件
-    if (context.timeline.config.enableAdvancedFeatures) {
-      // 动态加载高级功能插件
-      import("./advanced-plugin.js").then((module) => {
-        context.timeline.usePlugin(module.default);
-      });
-    }
+    // 开关由调用方传入：TimelineConfig 没有 `enableAdvancedFeatures` 字段
+    if (!options.enableAdvancedFeatures) return;
+
+    // 动态加载高级功能插件
+    import("./advanced-plugin.js").then((module) => {
+      context.timeline.usePlugin(module.default);
+    });
   },
 });
 ```
@@ -50,15 +79,21 @@ const ConditionalPlugin = () => ({
 ```javascript
 // 添加调试信息
 const DebugPlugin = () => ({
+  metadata: {
+    name: "debug",
+    version: "1.0.0",
+    description: "输出插件调试信息",
+    type: PluginType.TOOL,
+  },
   activate(context) {
-    if (context.timeline.config.debug) {
-      console.log("插件调试模式已启用");
+    if (!context.timeline.config.debug) return;
 
-      // 注册调试事件
-      context.api.registerEventHandler("debug:info", (info) => {
-        console.log("调试信息:", info);
-      });
-    }
+    console.log("插件调试模式已启用");
+
+    // 注册调试事件
+    context.api.registerEventHandler("debug:info", (info) => {
+      console.log("调试信息:", info);
+    });
   },
 });
 ```

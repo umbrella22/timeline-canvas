@@ -67,10 +67,10 @@ export async function runResourceScheduleBenchmark(
   const frameSamples = options.frameSamples ?? 120;
 
   const rows = 100;
-  // 请求上限；受 10 小时窗口约束，生成器实际可能放入更少事件
+  // 每行按 10 小时窗口等分槽位，生成行数按请求值精确落位
   const requestedEvents = 10000;
   const data = buildBenchmarkSchedule(rows, requestedEvents);
-  // 报告实测规模：硬编码请求值会谎报被测数据集
+  // 报告实测规模而不是请求值：生成器行为变化时不会谎报被测数据集
   const totalEvents = data.tracks.reduce((sum, track) => sum + track.events.length, 0);
 
   const loadTimings: number[] = [];
