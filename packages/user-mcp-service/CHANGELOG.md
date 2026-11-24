@@ -1,5 +1,11 @@
 # timeline-canvas-user-mcp
 
+## 0.1.2
+
+### Patch Changes
+
+- 6aa9783: Verify the integration and plugin templates against timeline-canvas 1.6.1. Report the tested versions consistently in the generated guidance and publish the user MCP with provenance.
+
 ## 0.1.1
 
 ### Patch Changes

@@ -1,4 +1,4 @@
-import { TESTED_TIMELINE_VERSIONS } from "./project";
+import { TESTED_TIMELINE_VERSIONS } from "./project.js";
 
 export type GuideFramework = "vanilla" | "react" | "vue";
 

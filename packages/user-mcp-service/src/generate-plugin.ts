@@ -1,5 +1,5 @@
 import ts from "typescript";
-import { TESTED_TIMELINE_VERSIONS } from "./project";
+import { TESTED_TIMELINE_VERSIONS } from "./project.js";
 
 export type PluginTemplate = "basic" | "render" | "event-handler";
 
@@ -222,7 +222,7 @@ export function generatePlugin(input: GeneratePluginInput): GeneratedPlugin {
     usage: `import { ${input.exportName} } from "./src/timeline-plugin";\n\nawait timeline.usePlugin(${input.exportName}());`,
     notes: [
       "The template uses only the public timeline-canvas 1.4.1 API.",
-      `Static templates are tested against timeline-canvas ${TESTED_TIMELINE_VERSIONS.join(", ")}.`,
+      `Static templates are tested against timeline-canvas ${TESTED_TIMELINE_VERSIONS.join(", ")} and do not claim compatibility with every version.`,
     ],
   };
 }

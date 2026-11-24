@@ -1,5 +1,11 @@
 # timeline-canvas-mcp
 
+## 2.3.2
+
+### Patch Changes
+
+- 6aa9783: Include the source repository and package directory in the npm manifest and publish the repository MCP with provenance through GitHub Actions.
+
 ## 2.3.1
 
 ### Patch Changes
